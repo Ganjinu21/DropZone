@@ -1,0 +1,23 @@
+const {chromium}=require('playwright');
+const {pathToFileURL}=require('url'),path=require('path');
+(async()=>{const br=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',args:['--no-sandbox','--disable-gpu']});
+try{let p=await br.newPage({viewport:{width:915,height:412},isMobile:true,hasTouch:true});
+const errors=[];p.on('pageerror',e=>errors.push(String(e)));
+await p.goto(pathToFileURL(path.resolve('game/index.html')).href);
+await p.locator('#start').click();
+await p.evaluate(()=>{mode='qa';run.t=9;run.enemies=[];run.effects=[];run.marks=[];run.cues=[];
+let offsets=[[90,-95],[-115,60],[-150,-120]];
+for(let i=0;i<3;i++){let m=run.squad[i];m.gait=6+i*8;m.moving=true;m.moveSpeed=92;
+ const [dx,dy]=offsets[i];m.flip=Math.sign(dx);m.shoot=.198;
+ const p=clamp(Math.atan2(dy,Math.abs(dx)),-.4,.4);m.aimPitch=p;
+ const x=m.x+dx,y=m.y+dy;const e={x,y,hp:26,max:47,type:i,phase:i*.42,hit:0,flip:-m.flip,speed:0};run.enemies.push(e);
+ const u=[24,20,25][i],v=21-[32,28,29][i];
+ const sx=m.x+m.flip*(u*Math.cos(p)-v*Math.sin(p)),sy=m.y-21+u*Math.sin(p)+v*Math.cos(p);
+ const a=Math.atan2(y-17-sy,x-sx);run.marks.push({x:sx,y:sy,tx:x,ty:y-17,id:i,sniper:i===2,age:.03,duration:.15});
+ effect(0,sx,sy,m.flip,i===2?23:18,.11,a,i);effect(2,x,y-17,1,17,.17,a,i);
+ }
+ combatCue('guard',run.x+16,run.y,.38,0,run.heading,34);run.cues[0].age=.18;
+ render()});await p.waitForTimeout(50);await p.screenshot({path:'work/qa-active-squad.png'});
+await p.evaluate(()=>{run.cues=[];run.effects=[];run.marks=[];for(let i=0;i<3;i++){let m=run.squad[i];m.y=run.y;m.x=run.x-105+i*105;m.aimPitch=[-.4,.13,.4][i]; m.flip=1;}render()});await p.screenshot({path:'work/qa-articulation.png',clip:{x:310,y:138,width:300,height:83}});
+console.log(JSON.stringify(errors));if(errors.length)process.exitCode=1;
+}finally{await br.close();}})().catch(e=>{console.error(e);process.exitCode=1});

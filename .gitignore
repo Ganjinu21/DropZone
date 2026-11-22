@@ -1,0 +1,26 @@
+# Local build products and signing material
+/dist/
+*.jks
+*.keystore
+*.idsig
+*.class
+*.dex
+__pycache__/
+node_modules/
+.env
+.env.*
+
+# Keep reproducible project scripts, omit scratch outputs
+/work/*
+!/work/build.ps1
+!/work/package-usb.ps1
+!/work/Install-DropZone.template.cmd
+!/work/build-streets.py
+!/work/pavement.png
+!/work/prepare-combat-units.py
+!/work/make-launcher.py
+!/work/icon-generated.png
+!/work/test.cjs
+!/work/touch.cjs
+!/work/review-shots.cjs
+!/work/check-combat-render.cjs
