@@ -20,7 +20,7 @@
     </div>
     <div class="controlhint">
       <div class="hint-touch"><i class="direction-mark" aria-hidden="true"></i><span>드래그로 이동</span><i class="swap-mark" aria-hidden="true"></i><span>대원을 탭해 선두 교대</span></div>
-      <div class="hint-keys"><kbd>WASD</kbd><span>또는</span><kbd>방향키</kbd><span>이동</span><kbd>1–3</kbd><span>선두 교대</span></div>
+      <div class="hint-keys"><kbd>WASD</kbd><span>또는</span><kbd>방향키</kbd><span>이동</span><kbd>1–3</kbd><span>선두 교대</span><kbd>E</kbd><span>계단 이용</span></div>
     </div>
   </main>
 
@@ -30,6 +30,8 @@
       <div class="timer" aria-label="생존 시간"><b id="time"></b><span class="time-goal">/ 05:00</span></div>
       <span id="kills"></span>
     </div>
+    <div id="sector"></div>
+    <button id="stairs" hidden><kbd>E</kbd><span></span></button>
     <div class="xp" aria-label="분대 레벨과 경험치"><em id="lv"></em><div><i id="xpfill"></i></div></div>
     <div id="party" role="group" aria-label="분대원 선택"></div>
   </section>
@@ -49,8 +51,18 @@
   </section>
   <div id="rotate">가로로 돌려서 플레이하세요</div>
   <script src="images.js"></script>
-  <script src="game.js"></script>
   <script src="streets.js"></script>
+  <script src="street-wear.js"></script>
+  <script src="city-damage.js"></script>
+  <script src="city-kit.js"></script>
+  <script src="transit-kit.js"></script>
+  <script src="street-fixture-frames.js"></script>
+  <script src="street-fixtures.js"></script>
+  <script src="surface.js"></script>
+  <script src="metro.js"></script>
+  <script src="navigation.js"></script>
+  <script src="ambience.js"></script>
+  <script src="game.js"></script>
   <script src="render.js"></script>
 </body>
 </html>

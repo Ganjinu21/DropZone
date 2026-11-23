@@ -32,7 +32,7 @@ try {
         $writer = [IO.StreamWriter]::new($entry.Open(),$utf8)
         try { $writer.Write($script) } finally { $writer.Dispose() }
         $projectFiles = @(Get-ChildItem -LiteralPath (Join-Path $project 'game'), (Join-Path $project 'android') -File -Recurse)
-        foreach ($buildFile in @('build.ps1','package-usb.ps1','Install-DropZone.template.cmd','build-streets.py','pavement.png')) {
+        foreach ($buildFile in @('build.ps1','package-usb.ps1','Install-DropZone.template.cmd','build-streets.py','export-map-assets.py','build-roof-damage.py','build-city-kit.py','build-transit-kit.py','build-ground-kit.py','build-street-fixtures.py','pavement.png')) {
             $projectFiles += Get-Item -LiteralPath (Join-Path $PSScriptRoot $buildFile)
         }
         foreach ($projectFile in $projectFiles) {

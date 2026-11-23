@@ -61,13 +61,6 @@ function drawAimingUnit(m, row, frame, legFrame, x, y, recoil) {
   ctx.restore();
 }
 
-function ground(cx, cy) {
-  drawStreetGround(ctx, cx, cy, viewW, viewH);
-  ctx.strokeStyle = '#ac9270';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(2, 2, W - 4, H - 4);
-}
-
 function drawCrystal(g) {
   const rare = g.val > 1;
   const phase = run.t * 3.3 + (g.seed ?? (Math.floor(g.x / 20) + Math.floor(g.y / 20))) * 1.93;
@@ -169,20 +162,6 @@ function drawEnemy(e) {
     ctx.fillStyle = '#302b2c'; ctx.fillRect(x, y, 20, 4);
     ctx.fillStyle = '#da926a'; ctx.fillRect(x + 1, y + 1, Math.ceil(18 * Math.max(0, e.hp) / e.max), 2);
   }
-}
-
-function drawProp(o) {
-  // Fade naturally as a member passes behind this sprite's footprint.
-  let cover = 0;
-  for (const m of run.squad) {
-    if (m.hp <= 0 || m.y > o.y) continue;
-    const horizontal = o.w * .44 + 12 - Math.abs(m.x - o.x);
-    const vertical = m.y - (o.y - o.h) + 7;
-    cover = Math.max(cover, clamp(Math.min(horizontal, vertical) / 22, 0, 1));
-  }
-  ctx.globalAlpha = 1 - cover * .58;
-  ctx.drawImage(art[o.id], Math.round(o.x - o.w / 2), Math.round(o.y - o.h), o.w, o.h);
-  ctx.globalAlpha = 1;
 }
 
 function drawTracer(mark) {
@@ -333,17 +312,23 @@ function drawStick() {
 
 function render() {
   if (!run || mode === 'home') return;
-  const cx = Math.round(clamp(run.camera.x - viewW / 2, 0, Math.max(0, W - viewW)));
-  const cy = Math.round(clamp(run.camera.y - viewH / 2, 0, Math.max(0, H - viewH)));
+  const map=cityMaps[run.floor];
+  const cx = Math.round(clamp(run.camera.x - viewW / 2, 0, Math.max(0, map.bounds.w - viewW)));
+  const cy = Math.round(clamp(run.camera.y - viewH / 2, 0, Math.max(0, map.bounds.h - viewH)));
   const visible = (x, y, padding = 80) => x >= cx - padding && x <= cx + viewW + padding &&
     y >= cy - padding && y <= cy + viewH + padding;
   const cues = run.cues || [];
   ctx.setTransform(1, 0, 0, 1, -cx, -cy);
-  ground(cx, cy);
+  ctx.fillStyle='#172027';
+  ctx.fillRect(cx,cy,viewW,viewH);
+  ctx.save();
+  const view={x:cx,y:cy,w:viewW,h:viewH};
+  map.draw(ctx,view);
+  drawMapAmbience(ctx,run.floor,view,run.t,reduceMotion.matches);
+  ctx.restore();
   for (const g of run.crystals) if (visible(g.x, g.y, 12)) drawCrystal(g);
   for (const cue of cues) if (visible(cue.x, cue.y)) drawGroundCue(cue);
   const actors = [];
-  for (const o of env) if (visible(o.x, o.y, Math.max(o.w, o.h) + 12)) actors.push({ o, draw: drawProp });
   for (const o of run.enemies) if (visible(o.x, o.y)) actors.push({ o, draw: drawEnemy });
   for (const o of run.squad) if (o.hp > 0) actors.push({ o, draw: drawHero });
   actors.sort((a, b) => a.o.y - b.o.y);

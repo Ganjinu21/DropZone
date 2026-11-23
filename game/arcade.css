@@ -211,3 +211,27 @@ kbd { background: #172430; border: 1px solid #687576; box-shadow: 0 2px #0a1116;
   #loadout { gap: 4px; }
   #loadout > div { padding-inline: 5px; }
 }
+
+#sector {
+  position: absolute;
+  top: calc(var(--safe-top) + 42px);
+  left: var(--safe-left);
+  padding: 5px 9px;
+  border-left: 3px solid #a2c9b5;
+  background: #12232be6;
+  color: #e3e7d5;
+  font-size: clamp(10px, 1.2vw, 14px);
+}
+#stairs {
+  position: absolute;
+  bottom: calc(var(--safe-bottom) + clamp(66px, 13vh, 84px));
+  right: var(--safe-right);
+  min-height: 44px;
+  padding: 8px 14px;
+  background: #19312ff5;
+  border: 2px solid #b1d7bb;
+  box-shadow: 0 3px #0d1b22;
+  font-weight: 700;
+}
+#stairs kbd { margin-right: 8px; }
+@media (pointer: coarse) { #stairs kbd { display: none; } }
