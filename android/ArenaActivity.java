@@ -14,6 +14,7 @@ public class ArenaActivity extends Activity {
         arena = new WebView(this);
         arena.setBackgroundColor(0xff111a20);
         arena.getSettings().setJavaScriptEnabled(true);
+        arena.getSettings().setDomStorageEnabled(true);
         arena.getSettings().setAllowContentAccess(false);
         arena.getSettings().setBlockNetworkLoads(true);
         arena.setOnLongClickListener(v -> true);
@@ -24,9 +25,8 @@ public class ArenaActivity extends Activity {
     @Override public void onPause() { arena.evaluateJavascript("if(typeof pause==='function')pause()", null); arena.onPause(); super.onPause(); }
     @Override public void onResume() { super.onResume(); if(arena!=null)arena.onResume(); }
     @Override public void onBackPressed() {
-        arena.evaluateJavascript("typeof mode==='undefined'||mode==='home'", value -> {
-            if ("true".equals(value)) finish();
-            else arena.evaluateJavascript("window.gameBack&&window.gameBack()",null);
+        arena.evaluateJavascript("!!(window.gameBack && window.gameBack())", handled -> {
+            if (!"true".equals(handled)) finish();
         });
     }
 }

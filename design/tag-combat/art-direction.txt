@@ -1,0 +1,16 @@
+Drop Zone Squad — 선두 장비 시안
+
+선두의 장비는 기존 대원과 같은 ¾ 측면에서 본다. 자세의 기준은 오른쪽 조준이다.
+벌크의 왼팔은 파란 방패를 지지하고 오른손은 권총을 쥔다. 레이븐은
+가까운 오른손과 먼 왼손의 엄지·손등·밝기를 구분한다. 링스의 오른손은
+권총손잡이를, 왼손은 긴 총몸의 아랫면을 받친다.
+
+재생 리듬 비교에는 flanne의 20 Minutes Till Dawn 공식 데모와 SNK의
+Metal Slug 영상을 참고했다. 이 시안의 총구 섬광·탄두·명중·탄피는
+각각 독립된 스프라이트다. 미리보기 속 발사 간격은 동작 비교용이다.
+https://flanne.itch.io/10-minutes-till-dawn
+https://www.youtube.com/watch?v=tF62iHdOBbc
+
+확대 콘셉트 lineup.png는 내장 ImageGen으로 제작했다. 실제 전투용 시트는
+기존 대원 도트를 바탕으로 별도 제작했다. 확대 콘셉트의 생성 프롬프트:
+Create a polished THREE CHARACTER SELECTION LINEUP for Drop Zone Squad. Reference image 1 is the actual video game's character identity, wardrobe, color and camera reference. Reference image 2 is ONLY the equipment COLOR/DESIGN guide, NOT its overhead angle or hand poses. Paint three separate full-body premium pixel sprites on TRUE TRANSPARENT canvas. Side scrolling tactical RPG view like character sheet rows 1-3, facing right, boots on ground, eye-level three-quarter side angle with just a little upper surface visible. Three lively cartoon humans, big heads, exaggerated large expressive gripping gloves, compact heroic build. At left BULK: gold body armor, blue-white helmet, visible eyes, his anatomical LEFT forearm bracing a large COBALT BLUE curved modern riot shield with slim icy visor and twin white diagonal marks at the front. His anatomical RIGHT hand holds a separate compact pistol peeking above the shield; each arm attached naturally to its shoulder. Middle RAVEN: the warm-brown dark-haired female assault operator with red scarf from sprite row 2. TWO short silver/charcoal pistols with red grip insets, both aimed right in a modern shooting stance. Please solve hand anatomy: her anatomical RIGHT hand (near viewer) and LEFT hand (far side) are opposite gloves, not duplicated. Draw near RIGHT hand lower with back of its glove and strongly lit knuckle plates visible; far LEFT hand higher and extended farther right, clearly show different palm-side silhouette and thumb coming from the opposite side. A visible thumb opposed to fingers on each hand. At right LYNX: original tan hooded olive cloak, aiming a long dark teal scoped marksman rifle right, in side profile. RIGHT hand on grip under rear of rifle, LEFT hand distinct and farther forward, palm up cradling front handguard, cheek to stock, butt resting at shoulder. All characters share one baseline with plenty of space, each entirely inside its own third of a very wide landscape composition. The long rifle must fit in the frame. Crisp classic arcade pixel art, visible large square pixel clusters, near-black pixel outlines, chunky light and shadow, visual clarity at 64 pixels. No text, floor, labels, firing effects or merged figures. No overhead view.

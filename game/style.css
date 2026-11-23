@@ -44,7 +44,7 @@ h1, h2, p { margin: 0; }
   width: 100%;
   height: 100%;
 }
-#world, .operator img, .who img, .item img, #loadout img { image-rendering: pixelated; }
+#world, .operator img, .who img, .item img, #loadout canvas { image-rendering: pixelated; }
 #hud { pointer-events: none; }
 #hud button { pointer-events: auto; }
 #home {

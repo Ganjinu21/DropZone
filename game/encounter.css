@@ -1,0 +1,27 @@
+#stage-panel.rush-phase { border-color: #ffbc58; }
+.rush-phase #wave-label { color: #ffd18b; }
+#encounter-alert {
+  --signal: #ffbd63;
+  position: absolute;
+  top: max(calc(var(--safe-top) + 78px), 16vh);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 6px 18px 8px;
+  color: var(--signal);
+  background: #172226ed;
+  border-inline: 3px solid var(--signal);
+  box-shadow: 0 2px 0 #0f1619a1;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
+}
+#encounter-alert[data-kind="boss"] { --signal: #ff967d; background: #302125ef; }
+#encounter-alert[data-kind="stage"] { --signal: #a6dfc9; }
+#encounter-alert span { color: #f2e4d0; font-size: clamp(10px, 2.4vh, 13px); line-height: 1.25; }
+#encounter-alert strong { font-size: clamp(14px, 3.2vh, 23px); line-height: 1.2; }
+@media (max-height: 420px) {
+  #encounter-alert { top: calc(var(--safe-top) + 61px); padding-block: 3px 5px; }
+}

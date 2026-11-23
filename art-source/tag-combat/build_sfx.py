@@ -1,0 +1,132 @@
+"""Render Drop Zone's original mono combat cues with the Python standard library."""
+
+import base64
+import json
+import math
+import random
+import struct
+import wave
+from pathlib import Path
+
+
+RATE = 44100
+OUTPUT = Path(__file__).resolve().parents[2] / "game/art/tag-combat/sfx"
+
+
+class Cue:
+    def __init__(self, seconds, seed):
+        self.samples = [0.0] * round(seconds * RATE)
+        self.noise = random.Random(seed)
+
+    def burst(self, start, gain, low, high, decay, attack=0.0007):
+        """Band-limit a noise burst and shape the leading edge."""
+        low_blend = 1 - math.exp(-math.tau * low / RATE)
+        high_blend = 1 - math.exp(-math.tau * high / RATE)
+        first = second = 0.0
+        offset = round(start * RATE)
+        for i in range(len(self.samples) - offset):
+            t = i / RATE
+            source = self.noise.uniform(-1, 1)
+            first += high_blend * (source - first)
+            second += low_blend * (first - second)
+            env = (1 - math.exp(-t / attack)) * math.exp(-t / decay)
+            self.samples[offset + i] += gain * env * (first - second)
+
+    def thump(self, start, gain, high, low, decay):
+        """Short downward pressure transient. Phase follows a decaying sweep."""
+        offset = round(start * RATE)
+        sweep = decay * 0.4
+        for i in range(len(self.samples) - offset):
+            t = i / RATE
+            phase = math.tau * (low * t + (high - low) * sweep * (1 - math.exp(-t / sweep)))
+            env = (1 - math.exp(-t / 0.0009)) * math.exp(-t / decay)
+            self.samples[offset + i] += gain * math.sin(phase) * env
+
+    def bounce(self, delay, gain):
+        dry = self.samples.copy()
+        offset = round(delay * RATE)
+        previous = 0
+        for i in range(offset, len(dry)):
+            previous += 0.26 * (dry[i - offset] - previous)
+            self.samples[i] += gain * previous
+
+    def save(self, name, db):
+        # Remove rumble, soften just the largest peaks, and ease into digital silence.
+        floor = 0.0
+        blend = 1 - math.exp(-math.tau * 75 / RATE)
+        end = len(self.samples) - 1
+        for i, sample in enumerate(self.samples):
+            floor += blend * (sample - floor)
+            fade = min(1, (end - i) / (0.010 * RATE))
+            self.samples[i] = math.tanh(1.55 * (sample - floor)) * fade
+        peak = max(map(abs, self.samples))
+        scale = 32767 * 10 ** (db / 20) / peak
+        pcm = struct.pack(f"<{len(self.samples)}h", *(round(s * scale) for s in self.samples))
+        with wave.open(str(OUTPUT / f"{name}.wav"), "wb") as stream:
+            stream.setparams((1, 2, RATE, 0, "NONE", "not compressed"))
+            stream.writeframes(pcm)
+
+
+def build():
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+
+    # The guard's heavy, short report and its delayed mechanical close.
+    bulk = Cue(0.24, 71)
+    bulk.burst(0, 2.3, 420, 4300, 0.014)
+    bulk.thump(0.001, 0.68, 325, 108, 0.035)
+    bulk.burst(0.005, 2.0, 125, 1250, 0.032)
+    bulk.burst(0.059, 0.62, 740, 3350, 0.008)
+    bulk.bounce(0.020, 0.21)
+    bulk.save("bulk", -4)
+
+    # Alternate these distinct transients. Their tails leave room for the next attack.
+    for name, seed, center, snap, rack in (
+        ("raven-a", 941, 4650, 480, 0.031),
+        ("raven-b", 977, 3900, 390, 0.037),
+    ):
+        raven = Cue(0.115, seed)
+        raven.burst(0, 1.85, 900, center + 1600, 0.008)
+        raven.thump(0.0005, 0.52, snap, 165, 0.014)
+        raven.burst(0.002, 1.75, 380, center, 0.016)
+        raven.burst(rack, 0.39, 1250, center + 500, 0.004)
+        raven.save(name, -5.5)
+
+    # A crisp, wide-band crack over a lower body, followed by two short room reflections.
+    lynx = Cue(0.365, 137)
+    lynx.burst(0, 3.5, 1450, 7700, 0.010)
+    lynx.thump(0.001, 0.8, 420, 95, 0.044)
+    lynx.burst(0.004, 3.3, 210, 2400, 0.040)
+    lynx.burst(0.011, 0.8, 600, 3700, 0.055)
+    lynx.bounce(0.034, 0.25)
+    lynx.bounce(0.071, 0.14)
+    lynx.save("lynx", -3)
+
+    support = Cue(0.080, 508)
+    support.burst(0, 1.45, 680, 3100, 0.009)
+    support.thump(0.001, 0.33, 310, 148, 0.011)
+    support.save("support", -13.5)
+
+    hit = Cue(0.093, 292)
+    hit.burst(0, 1.47, 550, 4000, 0.008)
+    hit.thump(0, 0.39, 530, 165, 0.013)
+    hit.burst(0.013, 0.65, 800, 5100, 0.012)
+    hit.save("hit", -12)
+
+    block = Cue(0.168, 901)
+    block.burst(0, 1.95, 1400, 7100, 0.008)
+    block.thump(0, 0.53, 490, 205, 0.018)
+    for hz, amp, decay in ((859, 0.33, 0.027), (1579, 0.22, 0.018), (2491, 0.15, 0.014)):
+        block.thump(0.001, amp, hz * 1.045, hz, decay)
+    block.burst(0.015, 0.45, 1400, 5900, 0.020)
+    block.save("block", -8)
+
+    # Script assets also load under Android's file:///android_asset origin.
+    # Keep one in-memory Web Audio buffer per authored one-shot during play.
+    sounds = {path.stem: base64.b64encode(path.read_bytes()).decode("ascii")
+              for path in sorted(OUTPUT.glob("*.wav"))}
+    bank = "// Generated by art-source/tag-combat/build_sfx.py.\nconst COMBAT_SOUNDS = "
+    (OUTPUT.parent / "sfx-bank.js").write_text(bank + json.dumps(sounds, indent=2) + ";\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    build()

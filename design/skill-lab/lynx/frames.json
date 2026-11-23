@@ -1,0 +1,121 @@
+{
+  "facing": "right",
+  "durationMs": 4000,
+  "precision.png": {
+    "cell": [
+      96,
+      64
+    ],
+    "anchor": [
+      32,
+      60
+    ],
+    "columns": [
+      "ready",
+      "brace",
+      "focus",
+      "heavyKick",
+      "return",
+      "cycle",
+      "settle"
+    ],
+    "muzzles": [
+      [
+        81,
+        32
+      ],
+      [
+        82,
+        34
+      ],
+      [
+        82,
+        35
+      ],
+      [
+        76,
+        36
+      ],
+      [
+        78,
+        36
+      ],
+      [
+        80,
+        35
+      ],
+      [
+        81,
+        34
+      ]
+    ]
+  },
+  "pierce-fx.png": {
+    "cell": [
+      56,
+      48
+    ],
+    "rows": [
+      "muzzle",
+      "basicRound",
+      "exit"
+    ],
+    "pivots": [
+      [
+        7,
+        24
+      ],
+      [
+        32,
+        24
+      ],
+      [
+        17,
+        24
+      ]
+    ],
+    "exposureMs": [
+      24,
+      32,
+      40,
+      48,
+      48
+    ]
+  },
+  "laser.png": {
+    "cell": [
+      160,
+      26
+    ],
+    "rows": [
+      "pulse",
+      "fullCore",
+      "coolCore",
+      "thinCore",
+      "afterimage",
+      "filament",
+      "tail"
+    ],
+    "exposureMs": [
+      32,
+      40,
+      48,
+      58,
+      60,
+      75,
+      97
+    ],
+    "anchor": [
+      0,
+      13
+    ]
+  },
+  "basicFlightMs": 340,
+  "fireMs": [
+    650,
+    1410,
+    2170,
+    2930
+  ],
+  "impactDelayMs": 0
+}

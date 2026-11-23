@@ -1,0 +1,462 @@
+{
+  "file": "units.png",
+  "cell": [
+    96,
+    64
+  ],
+  "anchor": [
+    32,
+    60
+  ],
+  "facing": "right",
+  "view": "original three-quarter side",
+  "handedness": "Anatomical right is near camera (trigger, Raven A); left is far (shield, support grip, Raven B). Mirror the assembled sprite and muzzle point about anchor.x; do not swap hand ids.",
+  "columns": [
+    "ready",
+    "fireA",
+    "recoveryA",
+    "fireB",
+    "recoveryB",
+    "settle"
+  ],
+  "rows": [
+    {
+      "name": "bulk_lead",
+      "row": 0,
+      "frames": [
+        {
+          "col": 0,
+          "muzzle": [
+            57,
+            30
+          ]
+        },
+        {
+          "col": 1,
+          "muzzle": [
+            55,
+            29
+          ]
+        },
+        {
+          "col": 2,
+          "muzzle": [
+            56,
+            30
+          ]
+        },
+        {
+          "col": 3,
+          "muzzle": [
+            55,
+            29
+          ]
+        },
+        {
+          "col": 4,
+          "muzzle": [
+            56,
+            30
+          ]
+        },
+        {
+          "col": 5,
+          "muzzle": [
+            57,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "name": "raven_lead",
+      "row": 1,
+      "frames": [
+        {
+          "col": 0,
+          "muzzle": [
+            57,
+            36
+          ]
+        },
+        {
+          "col": 1,
+          "muzzle": [
+            53,
+            35
+          ]
+        },
+        {
+          "col": 2,
+          "muzzle": [
+            55,
+            36
+          ]
+        },
+        {
+          "col": 3,
+          "muzzle": [
+            60,
+            26
+          ]
+        },
+        {
+          "col": 4,
+          "muzzle": [
+            62,
+            27
+          ]
+        },
+        {
+          "col": 5,
+          "muzzle": [
+            57,
+            36
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lynx_lead",
+      "row": 2,
+      "frames": [
+        {
+          "col": 0,
+          "muzzle": [
+            80,
+            32
+          ]
+        },
+        {
+          "col": 1,
+          "muzzle": [
+            76,
+            31
+          ]
+        },
+        {
+          "col": 2,
+          "muzzle": [
+            78,
+            32
+          ]
+        },
+        {
+          "col": 3,
+          "muzzle": [
+            76,
+            31
+          ]
+        },
+        {
+          "col": 4,
+          "muzzle": [
+            78,
+            32
+          ]
+        },
+        {
+          "col": 5,
+          "muzzle": [
+            80,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bulk_support",
+      "row": 3,
+      "frames": [
+        {
+          "col": 0,
+          "muzzle": [
+            53,
+            28
+          ]
+        },
+        {
+          "col": 1,
+          "muzzle": [
+            51,
+            27
+          ]
+        },
+        {
+          "col": 2,
+          "muzzle": [
+            52,
+            28
+          ]
+        },
+        {
+          "col": 3,
+          "muzzle": [
+            51,
+            27
+          ]
+        },
+        {
+          "col": 4,
+          "muzzle": [
+            52,
+            28
+          ]
+        },
+        {
+          "col": 5,
+          "muzzle": [
+            53,
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "name": "raven_support",
+      "row": 4,
+      "frames": [
+        {
+          "col": 0,
+          "muzzle": [
+            51,
+            31
+          ]
+        },
+        {
+          "col": 1,
+          "muzzle": [
+            49,
+            30
+          ]
+        },
+        {
+          "col": 2,
+          "muzzle": [
+            50,
+            31
+          ]
+        },
+        {
+          "col": 3,
+          "muzzle": [
+            49,
+            30
+          ]
+        },
+        {
+          "col": 4,
+          "muzzle": [
+            50,
+            31
+          ]
+        },
+        {
+          "col": 5,
+          "muzzle": [
+            51,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lynx_support",
+      "row": 5,
+      "frames": [
+        {
+          "col": 0,
+          "muzzle": [
+            53,
+            33
+          ]
+        },
+        {
+          "col": 1,
+          "muzzle": [
+            51,
+            32
+          ]
+        },
+        {
+          "col": 2,
+          "muzzle": [
+            52,
+            33
+          ]
+        },
+        {
+          "col": 3,
+          "muzzle": [
+            51,
+            32
+          ]
+        },
+        {
+          "col": 4,
+          "muzzle": [
+            52,
+            33
+          ]
+        },
+        {
+          "col": 5,
+          "muzzle": [
+            53,
+            33
+          ]
+        }
+      ]
+    }
+  ],
+  "clips": {
+    "bulk_lead": {
+      "frames": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "exposureMs": [
+        45,
+        64,
+        72,
+        210
+      ],
+      "fireAtColumns": [
+        1
+      ]
+    },
+    "raven_lead": {
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "exposureMs": [
+        36,
+        32,
+        37,
+        36,
+        32,
+        37
+      ],
+      "fireAtColumns": [
+        1,
+        3
+      ]
+    },
+    "lynx_lead": {
+      "frames": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "exposureMs": [
+        65,
+        64,
+        144,
+        420
+      ],
+      "fireAtColumns": [
+        1
+      ]
+    },
+    "bulk_support": {
+      "frames": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "exposureMs": [
+        95,
+        45,
+        65,
+        200
+      ],
+      "fireAtColumns": [
+        1
+      ]
+    },
+    "raven_support": {
+      "frames": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "exposureMs": [
+        95,
+        45,
+        65,
+        200
+      ],
+      "fireAtColumns": [
+        1
+      ]
+    },
+    "lynx_support": {
+      "frames": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "exposureMs": [
+        95,
+        45,
+        65,
+        200
+      ],
+      "fireAtColumns": [
+        1
+      ]
+    }
+  },
+  "equip": {
+    "file": "units-equip.png",
+    "cell": [
+      96,
+      64
+    ],
+    "rows": [
+      "bulk",
+      "raven",
+      "lynx"
+    ],
+    "anchor": [
+      32,
+      60
+    ],
+    "columns": [
+      "support",
+      "draw",
+      "raise",
+      "ready"
+    ],
+    "exposureMs": [
+      42,
+      58,
+      58,
+      82
+    ]
+  },
+  "gear": {
+    "file": "units-gear.png",
+    "cell": [
+      96,
+      64
+    ],
+    "rows": [
+      "shield",
+      "dualPistols",
+      "marksmanRifle",
+      "sidearm"
+    ]
+  }
+}

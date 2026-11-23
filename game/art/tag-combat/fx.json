@@ -1,0 +1,180 @@
+{
+  "image": "fx.png",
+  "frameSize": [
+    48,
+    48
+  ],
+  "columns": 4,
+  "heading": "right",
+  "worldPixelsPerTexel": 1,
+  "clips": {
+    "bulk_muzzle": {
+      "row": 0,
+      "pivot": [
+        6,
+        24
+      ],
+      "durationMs": [
+        18,
+        30,
+        36,
+        60
+      ],
+      "loop": false
+    },
+    "raven_muzzle": {
+      "row": 1,
+      "pivot": [
+        6,
+        24
+      ],
+      "durationMs": [
+        16,
+        24,
+        22,
+        34
+      ],
+      "loop": false
+    },
+    "lynx_muzzle": {
+      "row": 2,
+      "pivot": [
+        6,
+        24
+      ],
+      "durationMs": [
+        20,
+        45,
+        40,
+        75
+      ],
+      "loop": false
+    },
+    "support_muzzle": {
+      "row": 3,
+      "pivot": [
+        6,
+        24
+      ],
+      "durationMs": [
+        17,
+        18,
+        22,
+        32
+      ],
+      "loop": false
+    },
+    "bulk_bullet": {
+      "row": 4,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        22,
+        22,
+        22,
+        22
+      ],
+      "loop": true
+    },
+    "raven_bullet": {
+      "row": 5,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        18,
+        18,
+        18,
+        18
+      ],
+      "loop": true
+    },
+    "lynx_bullet": {
+      "row": 6,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        17,
+        17,
+        17,
+        17
+      ],
+      "loop": true
+    },
+    "hit_spark": {
+      "row": 7,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        18,
+        29,
+        40,
+        45
+      ],
+      "loop": false
+    },
+    "pierce_exit": {
+      "row": 8,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        18,
+        34,
+        43,
+        53
+      ],
+      "loop": false
+    },
+    "brass": {
+      "row": 9,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        36,
+        40,
+        44,
+        50
+      ],
+      "loop": true
+    },
+    "shield_block": {
+      "row": 10,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        18,
+        35,
+        50,
+        65
+      ],
+      "loop": false
+    },
+    "tag_pulse": {
+      "row": 11,
+      "pivot": [
+        24,
+        24
+      ],
+      "durationMs": [
+        44,
+        55,
+        65,
+        105
+      ],
+      "loop": false
+    }
+  }
+}

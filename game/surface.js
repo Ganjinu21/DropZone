@@ -149,8 +149,6 @@ const SURFACE = (() => {
       if(a.y===b.y+b.h)a.shared.N=true;
     }
   }
-  for(const exit of exits)solids.push(TransitKit.entranceSolid(exit));
-
   // Props live in functional groups at the mouths of alleys, bays, and stair landings.
   const fixtures=[];
   function prop(id,x,y,scale=2,blocking=false) {
@@ -401,5 +399,11 @@ const SURFACE = (() => {
     }
     while(cache.size>24)cache.delete(cache.keys().next().value);
   }
-  return {bounds,spawn,exits,solids,draw};
+  let footprints=solids;
+  for(const e of exits){
+    const cut=TransitKit.stairRect(e,-12,TransitKit.stairLength+4,-32,32);
+    footprints=footprints.flatMap(b=>TransitKit.subtractRect(b,cut));
+    footprints.push(...TransitKit.stairRails(e,false));
+  }
+  return {bounds,spawn,exits,solids:footprints,draw};
 })();

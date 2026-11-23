@@ -8,26 +8,15 @@ const METRO = (() => {
   const west = 128, east = 1992, north = 156, south = 1048;
   const left = 560, right = 1560;
   const arcadeTop = 334, arcadeEnd = 554, platformTop = 774;
-  const exits = [
-    [238,237,'버스정류장'], [453,237,'역앞광장'], [232,693,'정비 골목'], [435,965,'하역장'],
-    [1669,237,'시장 입구'], [1890,237,'시장 뒷골목'], [1890,693,'상가 대로'], [1689,965,'주차장']
-  ].map(([x,y,name]) => ({x,y,name}));
-  const solids = [
-    box(0,0,bounds.w,north), box(0,south,bounds.w,bounds.h-south),
-    box(0,north,west,south-north), box(east,north,bounds.w-east,south-north),
-    box(left,north,right-left,arcadeTop-north), box(left,arcadeEnd,right-left,platformTop-arcadeEnd)
-  ];
-
   const props = [];
   function fixture(type,x,y,w,h,style=0) {
     const item = {type,x,y,w,h,style};
     props.push(item);
-    solids.push(box(x,y,w,h));
   }
   [302,404,1692,1794].forEach((x,i)=>fixture('gate',x,476,20,48,i));
   fixture('tickets',138,334,74,44);
   fixture('lockers',1900,332,79,45);
-  fixture('vending',135,833,59,45);
+  fixture('vending',135,740,59,45);
   fixture('vending',1925,870,48,45,1);
   fixture('bench',391,660,73,23);
   fixture('bench',1630,642,73,23);
@@ -37,13 +26,8 @@ const METRO = (() => {
   fixture('map',1786,791,64,28);
   fixture('mop',492,537,27,28);
   fixture('mop',1620,356,27,28,1);
-  fixture('fallenMachine',1848,900,76,42);
-  let atlas;
-
-  function paint() {
-    const sheet = document.createElement('canvas');
-    sheet.width=bounds.w; sheet.height=bounds.h;
-    const g=sheet.getContext('2d',{alpha:false});
+  fixture('fallenMachine',1848,876,76,42);
+  function paint(g) {
     g.imageSmoothingEnabled=false;
     let seed=9141;
     function rand() { seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }
@@ -298,27 +282,6 @@ const METRO = (() => {
       poly([[xx,yy],[xx+3+rand()*6,yy-2],[xx+1,yy+3]],choose(['#a1b3a7','#89968b','#55716c','#a19c85']));
     }
     scraps(1690,1045,35,48);
-    function stairs(e,n) {
-      const x=e.x-44,y=e.y-29;
-      poly([[x-10,y-18],[x+95,y-18],[x+109,y+4],[x+109,y+54],[x+96,y+65],[x+1,y+63],[x-10,y+53]],'#25393655');
-      r(x-5,y-7,98,69,'#23333280');r(x-3,y-7,94,64,'#344343');
-      poly([[x-10,y-16],[x-2,y-22],[x+3,y-14],[x+3,y+52],[x-10,y+58]],'#728278');
-      poly([[x+85,y-16],[x+91,y-22],[x+98,y-15],[x+98,y+58],[x+85,y+52]],'#445854');
-      wire([[x-7,y+51],[x-7,y-12],[x-2,y-17]],'#abb6a6',3);
-      wire([[x+93,y+51],[x+93,y-12],[x+88,y-16]],'#9baea3',3);
-      for(let j=0;j<8;j++){
-        r(x+3,y+5+j*6,82,5,choose(['#84918a','#909990','#859089']));
-        r(x+3,y+5+j*6,82,2,'#b3bbab');
-      }
-      r(x,y,3,57,'#bac6bb');r(x+85,y,3,57,'#bac6bb');
-      studs(x+2,y+57,84);
-      r(x-3,y-22,96,24,'#1f2c2e');r(x-2,y-22,94,2,'#97a38f');
-      r(x+1,y-18,21,17,'#d1ac62');txt(String(n+1),x+11,y-4,14,'#222e30','center');
-      txt(e.name,x+27,y-6,11,'#e8e1c8');
-      r(x-3,y+54,5,8,'#59645e');r(x+86,y+54,5,8,'#59645e');
-    }
-    exits.forEach(stairs);
-
     function luggage(x,y) {
       r(x+1,y+5,20,12,'#443f39');r(x+2,y+2,17,12,'#856957');
       r(x+6,y,7,3,'#434c46');r(x+5,y+2,2,11,'#baa682');r(x+14,y+2,2,11,'#baa682');
@@ -418,16 +381,8 @@ const METRO = (() => {
     g.fillStyle=g.createPattern(art.stationPatina,'repeat');
     g.globalAlpha=.66;g.fillRect(west,97,east-west,1107);
     g.restore();
-    return sheet;
   }
-
-  function draw(ctx,view) {
-    if(!atlas)atlas=paint();
-    const x=Math.max(0,Math.floor(view.x)),y=Math.max(0,Math.floor(view.y));
-    const w=Math.min(bounds.w,Math.ceil(view.x+view.w))-x;
-    const h=Math.min(bounds.h,Math.ceil(view.y+view.h))-y;
-    ctx.fillStyle='#202b2e';ctx.fillRect(view.x,view.y,view.w,view.h);
-    if(w>0 && h>0)ctx.drawImage(atlas,x,y,w,h,x,y,w,h);
-  }
-  return {bounds,exits,solids,draw};
+  const rooms=[box(west,north,left-west,south-north),box(right,north,east-right,south-north),
+    box(left,arcadeTop,right-left,arcadeEnd-arcadeTop),box(left,platformTop,right-left,south-platformTop)];
+  return {rooms,props,paint};
 })();

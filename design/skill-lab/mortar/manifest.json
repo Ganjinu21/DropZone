@@ -1,0 +1,130 @@
+{
+  "name": "해머",
+  "operator": {
+    "image": "operator.png",
+    "cell": [
+      80,
+      76
+    ],
+    "anchor": [
+      32,
+      60
+    ],
+    "basic": [
+      "stepA",
+      "stepB",
+      "stepC",
+      "stepD",
+      "aim",
+      "kick",
+      "recover",
+      "ready"
+    ],
+    "plant": [
+      "reach",
+      "squat",
+      "extract",
+      "lift",
+      "swing",
+      "slam",
+      "brace",
+      "signal"
+    ],
+    "foregroundHandRow": 2
+  },
+  "emplacement": {
+    "image": "emplacement.png",
+    "cell": [
+      64,
+      64
+    ],
+    "anchor": [
+      25,
+      54
+    ],
+    "frames": [
+      "folded",
+      "drop",
+      "expand",
+      "kick",
+      "returnA",
+      "returnB",
+      "ready",
+      "ready"
+    ]
+  },
+  "effects": {
+    "image": "effects.png",
+    "cell": [
+      64,
+      64
+    ],
+    "anchor": [
+      32,
+      32
+    ],
+    "rows": [
+      "landingCue",
+      "groundSlam",
+      "impact",
+      "round"
+    ]
+  },
+  "blast": {
+    "image": "blast-layers.png",
+    "cell": [
+      124,
+      108
+    ],
+    "anchor": [
+      62,
+      84
+    ],
+    "frameDurationMs": [
+      36,
+      44,
+      57,
+      64,
+      74,
+      83,
+      86,
+      94,
+      103,
+      108,
+      116,
+      132
+    ],
+    "rows": [
+      "grenadeScorch",
+      "grenadeFire",
+      "grenadeDebris",
+      "salvoScorch",
+      "salvoFire",
+      "salvoDebris"
+    ]
+  },
+  "demo": {
+    "durationMs": 4000,
+    "plantContactMs": 610,
+    "barrageMs": [
+      990,
+      1290,
+      1420,
+      1550,
+      2020,
+      2190,
+      2500,
+      2650
+    ],
+    "barrageImpactMs": [
+      1630,
+      1890,
+      2035,
+      2175,
+      2665,
+      2815,
+      3150,
+      3320
+    ]
+  }
+}

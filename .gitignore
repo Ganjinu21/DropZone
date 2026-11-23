@@ -12,6 +12,12 @@ node_modules/
 
 # Keep reproducible project scripts, omit scratch outputs
 /work/*
+!/work/art/
+/work/art/*
+!/work/art/tag-combat/
+/work/art/tag-combat/*
+!/work/art/tag-combat/fx.py
+!/work/art/tag-combat/units.py
 !/work/build.ps1
 !/work/package-usb.ps1
 !/work/Install-DropZone.template.cmd
@@ -24,3 +30,10 @@ node_modules/
 !/work/touch.cjs
 !/work/review-shots.cjs
 !/work/check-combat-render.cjs
+!/work/check-tag-combat.cjs
+!/work/check-stair-links.cjs
+!/work/check-squad-skills.cjs
+!/work/check-squad-skill-ui.cjs
+!/work/check-zombie-stages.cjs
+!/work/select-test-squad.cjs
+!/work/check-lineup.cjs

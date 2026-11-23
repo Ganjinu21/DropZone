@@ -15,9 +15,30 @@ const TransitKit = (() => {
     const [sx,sy,w,h]=rect;
     ctx.drawImage(art.transitKit,sx,sy,w,h,Math.round(x),Math.round(y),w,h);
   }
-  function entranceSolid({x,y,facing}) {
-    const [dx,dy]=normals[facing];
-    return {x:x-dx*72-36,y:y-dy*72-36,w:72,h:72};
+  const stairLength=84, halfWidth=28;
+  function stairPoint(exit,along,side=0) {
+    const [nx,ny]=normals[exit.facing];
+    return {x:exit.x-along*nx-side*ny,y:exit.y-along*ny+side*nx};
+  }
+  function stairRect(exit,start,end,left,right) {
+    const a=stairPoint(exit,start,left), b=stairPoint(exit,end,right);
+    return {x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)};
+  }
+  function stairCoordinates(exit,point) {
+    const [nx,ny]=normals[exit.facing], x=point.x-exit.x,y=point.y-exit.y;
+    return {along:-x*nx-y*ny,side:-x*ny+y*nx};
+  }
+  function stairRails(exit,metro) {
+    const w=halfWidth,len=stairLength;
+    return [stairRect(exit,0,len,-w-4,-w),stairRect(exit,0,len,w,w+4),
+      stairRect(exit,metro?-4:len,metro?0:len+4,-w-4,w+4)];
+  }
+  function subtractRect(box,cut){
+    const x=Math.max(box.x,cut.x),y=Math.max(box.y,cut.y);
+    const r=Math.min(box.x+box.w,cut.x+cut.w),b=Math.min(box.y+box.h,cut.y+cut.h);
+    if(x>=r||y>=b)return [box];
+    return [{x:box.x,y:box.y,w:box.w,h:y-box.y},{x:box.x,y:b,w:box.w,h:box.y+box.h-b},
+      {x:box.x,y,w:x-box.x,h:b-y},{x:r,y,w:box.x+box.w-r,h:b-y}].filter(v=>v.w>0&&v.h>0);
   }
   function drawEntrance(ctx,{x,y,facing,number}) {
     const [dx,dy]=normals[facing], dir=directions.indexOf(facing);
@@ -73,7 +94,7 @@ const TransitKit = (() => {
       if(i<2){stamp(ctx,modules.joint,x,y);x+=modules.joint[2];}
     }
   }
-  return {drawEntrance,entranceSolid,drawTrain,
+  return {drawEntrance,stairLength,halfWidth,stairPoint,stairRect,stairCoordinates,stairRails,subtractRect,drawTrain,
     drawLooseDoor(ctx,x,y){stamp(ctx,modules.looseDoor,x,y);}
   };
 })();

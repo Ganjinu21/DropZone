@@ -132,9 +132,10 @@ class MapRoutes {
   }
 }
 
-const cityMaps = {surface:SURFACE, metro:METRO};
+const cityMaps = {surface:SURFACE, metro:underground};
 const routes = {};
 function makeMap() {
+  underground.prepare();
   for(const key of Object.keys(cityMaps)) routes[key]=new MapRoutes(cityMaps[key]);
 }
 function otherFloor() {return run.floor==='surface'?'metro':'surface';}
@@ -144,64 +145,75 @@ function nearestStair() {
   for(let i=1;i<exits.length;i++)if(dist(run,exits[i])<dist(run,exits[index]))index=i;
   return index;
 }
-function freshFloor() {return {enemies:[],crystals:[],pursuitExit:-1,crossAfter:0};}
-function canUseStair(index) {
-  const stair=cityMaps[run.floor].exits[index];
-  return run.t>=run.stairReady && dist(run,stair)<=65 && routes[run.floor].clear(run.x,run.y,stair.x,stair.y,4);
+
+function freshFloor() {
+  return {enemies:[],crystals:[],effects:[],marks:[],cues:[],pursuitExit:-1};
 }
-function useStair() {
-  if(mode!=='play')return;
-  const index=nearestStair();
-  if(!canUseStair(index))return;
-  const old=run.floors[run.floor];
-  old.enemies=run.enemies;
-  old.crystals=run.crystals;
-  old.pursuitExit=index;
-  old.crossAfter=run.t+1.65;
-  run.floor=otherFloor();
-  const dest=cityMaps[run.floor].exits[index];
-  const here=run.floors[run.floor];
-  run.enemies=here.enemies;
-  run.crystals=here.crystals;
-  run.x=dest.x;run.y=dest.y;
-  run.camera={x:run.x,y:run.y};
-  run.effects.length=0;run.cues.length=0;run.marks.length=0;run.mark=null;
-  run.stairReady=run.t+2;
-  run.arrivalGrace=run.t+.55;
-  for(const m of run.squad){
-    m.x=run.x;m.y=run.y;m.lastShot=null;m.shoot=0;
+function stairFormationScale(point) {
+  const approach=40, width=TransitKit.halfWidth, len=TransitKit.stairLength;
+  for(const e of SURFACE.exits){
+    if(Math.abs(point.x-e.x)>len+approach||Math.abs(point.y-e.y)>len+approach)continue;
+    const {along,side}=TransitKit.stairCoordinates(e,point);
+    const outside=Math.max(0,-along,along-len,Math.abs(side)-width);
+    if(outside<approach)return .48+.52*outside/approach;
   }
-  tone(run.floor==='metro'?280:410,.13,.035,'triangle');
-  updateHud();
+  return 1;
+}
+const floorLists=['enemies','crystals','effects','marks','cues'];
+function updateStairDepth() {
+  let depth=run.floor==='metro'?1:0, index=-1;
+  for(const [i,e] of SURFACE.exits.entries()){
+    if(Math.abs(run.x-e.x)>125||Math.abs(run.y-e.y)>125)continue;
+    const {along,side}=TransitKit.stairCoordinates(e,run);
+    if(Math.abs(side)>TransitKit.halfWidth||along<0||along>TransitKit.stairLength)continue;
+    depth=along/TransitKit.stairLength;index=i;break;
+  }
+  run.depth=depth;
+  run.stair=index;
+  const floor=depth>=.5?'metro':'surface';
+  if(floor===run.floor)return;
+  const old=run.floors[run.floor],destination=run.floors[floor];
+  old.pursuitExit=index;
+  for(const key of floorLists){old[key]=run[key];run[key]=destination[key]}
+  run.floor=floor;
+  run.mark=null;
+  routes[floor].aimAt(run.x,run.y);
+  updateMapHud();
 }
 function updatePursuit(dt) {
   const floor=otherFloor(), other=run.floors[floor];
-  if(other.pursuitExit<0 || !other.enemies.length)return;
-  const stair=cityMaps[floor].exits[other.pursuitExit];
-  const arrival=cityMaps[run.floor].exits[other.pursuitExit];
+  advanceRounds(dt,other,floor);
+  for(const list of [other.effects,other.cues]){
+    let write=0;
+    for(const v of list){v.age+=dt;if(v.age<v.duration)list[write++]=v}
+    list.length=write;
+  }
+  if(other.pursuitExit<0||!other.enemies.length)return;
+  const e=SURFACE.exits[other.pursuitExit],goingDown=floor==='surface';
+  const half=TransitKit.stairLength/2;
+  const goal=TransitKit.stairPoint(e,half+(goingDown?6:-6));
   const nav=routes[floor];
-  nav.aimAt(stair.x,stair.y);
+  nav.aimAt(goal.x,goal.y);
   let remaining=0;
-  for(const e of other.enemies){
-    if(e.hp<=0)continue;
-    if(dist(e,stair)>15)nav.chase(e,stair,dt);
-    if(dist(e,stair)<=15 && other.crossAfter<=run.t){
-      e.x=arrival.x;e.y=arrival.y;e.arrived=run.t;
-      run.enemies.push(e);
-      other.crossAfter=run.t+.30;
-    } else other.enemies[remaining++]=e;
+  for(const enemy of other.enemies){
+    if(enemy.hp<=0)continue;
+    enemy.hit-=dt;
+    nav.chase(enemy,goal,dt);
+    const {along,side}=TransitKit.stairCoordinates(e,enemy);
+    if(Math.abs(side)<TransitKit.halfWidth && Math.abs(along-half)<11 &&
+       (goingDown?along>=half:along<=half)){
+      run.enemies.push(enemy);
+    } else other.enemies[remaining++]=enemy;
   }
   other.enemies.length=remaining;
 }
-function updateMapHud() {
-  const index=nearestStair(),stair=cityMaps[run.floor].exits[index],metro=run.floor==='metro';
-  const bearing=Math.round(Math.atan2(stair.y-run.y,stair.x-run.x)*4/Math.PI);
+function updateMapHud(){
+  const index=run.stair>=0?run.stair:nearestStair(),e=SURFACE.exits[index];
+  const inside=run.depth>0&&run.depth<1;
+  const target=TransitKit.stairPoint(e,run.floor==='metro'?TransitKit.stairLength:0);
+  const bearing=Math.round(Math.atan2(target.y-run.y,target.x-run.x)*4/Math.PI);
   const arrow=['→','↘','↓','↙','←','↖','↑','↗'][(bearing+8)%8];
-  const badge=$('sector');
-  const label=(metro?'지하철':'지상')+'  ·  '+arrow+' '+(index+1)+'번 '+stair.name;
-  if(badge.textContent!==label)badge.textContent=label;
-  const button=$('stairs');
-  button.hidden=!canUseStair(index);
-  const action=(index+1)+'번 '+(metro?'지상으로':'역으로');
-  if(button.lastElementChild.textContent!==action)button.lastElementChild.textContent=action;
+  const area=inside?'연결 계단':run.floor==='metro'?'지하철':'지상';
+  const label=area+'  ·  '+(inside?'':arrow+' ')+(index+1)+'번 '+e.name;
+  if($('sector').textContent!==label)$('sector').textContent=label;
 }

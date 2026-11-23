@@ -36,9 +36,21 @@ Push-Location -LiteralPath $project
 try {
     # aapt2's resource scanner on Windows expects a relative path in Unicode workspaces.
     Invoke-BuildTool "$buildTools\aapt2.exe" @('compile', '--dir', 'android/res', '-o', 'work/android-build/resources.zip')
-    Invoke-BuildTool "$buildTools\aapt2.exe" @('link', '-I', $androidJar, '--manifest', 'android/AndroidManifest.xml', '-A', 'game', '-o', 'work/android-build/base.apk', 'work/android-build/resources.zip')
+    Invoke-BuildTool "$buildTools\aapt2.exe" @('link', '-I', $androidJar, '--manifest', 'android/AndroidManifest.xml', '-o', 'work/android-build/base.apk', 'work/android-build/resources.zip')
 } finally {
     Pop-Location
+}
+# Android AssetManager requires forward slashes in the ZIP directory itself.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$gameRoot = (Resolve-Path "$project\game").Path
+$archive = [IO.Compression.ZipFile]::Open("$stage\base.apk", 'Update')
+try {
+    foreach ($file in (Get-ChildItem -LiteralPath $gameRoot -File -Recurse)) {
+        $assetName = 'assets/' + $file.FullName.Substring($gameRoot.Length + 1).Replace('\','/')
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $assetName)
+    }
+} finally {
+    $archive.Dispose()
 }
 Push-Location -LiteralPath $stage
 try {

@@ -1,0 +1,10 @@
+// Exercise the same selection and launch path that a player sees.
+module.exports = async function selectTestSquad(page, ids = [0, 1, 2]) {
+  await page.locator('#start:enabled').waitFor();
+  await page.locator('#select-team').click();
+  const selected = page.locator('#roster-screen [data-pick][aria-pressed="true"]');
+  while (await selected.count()) await selected.first().click();
+  for (const id of ids) await page.locator(`#roster-screen [data-pick="${id}"]`).click();
+  await page.locator('#deploy-team').click();
+  await page.locator('#hud').waitFor();
+};

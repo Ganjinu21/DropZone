@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eeeae0">
+  <title>분대 스킬 도감 · Drop Zone Squad</title>
+  <link rel="stylesheet" href="review.css">
+</head>
+<body>
+<main>
+  <header class="mast"><b><i aria-hidden="true"></i> DROP ZONE SQUAD</b><span>전투 디자인 스튜디오</span></header>
+  <section class="title"><h1>분대 스킬 도감<span>.</span></h1><p>대원 4명 <b>/</b> 모션 9종</p></section>
+  <nav id="roster" aria-label="대원 선택"></nav>
+  <section class="viewer" aria-label="대원 원화 및 동작 시안">
+    <a id="portrait-link" class="portrait" href="portraits/bulk.png" target="_blank" rel="noopener">
+      <div class="portrait-head"><span id="callsign">BULK</span><span aria-hidden="true">↗</span></div>
+      <img id="portrait" alt="벌크의 메카 벙커 원화" src="portraits/bulk.png">
+      <div class="portrait-foot"><strong id="operator">벌크</strong><span id="role-name">방어병</span></div>
+    </a>
+    <article class="motion">
+      <div class="motion-head"><div id="modes" aria-label="동작 선택"></div><h2 id="move-title">메카 벙커 고정 모드</h2></div>
+      <div class="screen"><canvas id="stage" width="400" height="160" aria-label="선택한 동작 미리보기"></canvas></div>
+      <div class="transport"><button id="play" type="button">일시정지</button><input id="time" type="range" min="0" max="4000" step="1" value="0" aria-label="애니메이션 재생 위치"><output id="clock">0.00 s</output><button id="speed" type="button" aria-label="재생 속도">1×</button><button id="sound" type="button" aria-pressed="false">소리 켜기</button></div>
+      <p id="description"></p>
+      <div class="links"><a id="gif" href="clips/bulk-skill.gif" download>동작 GIF ↓</a><a href="skill-reel.mp4">전체 영상 재생 ↗</a><a href="skill-reel.mp4" download="DropZone-Squad-Skill-Preview-v3.mp4">공유용 MP4 저장 ↓</a></div>
+    </article>
+  </section>
+  <section class="film"><div class="rail-label"><h2>동작 분해</h2><span>누르면 해당 순간에 정지합니다</span></div><div id="frames"></div></section>
+  <details class="sources"><summary>이 대원의 원본 에셋</summary><div id="sources"></div></details>
+</main>
+<script src="shared/atlas.js"></script>
+<script>window.SkillLab = Object.create(null);</script>
+<script src="bulk/scene.js"></script><script src="raven/scene.js"></script><script src="lynx/scene.js"></script><script src="mortar/scene.js"></script>
+<script src="review.js"></script>
+</body>
+</html>

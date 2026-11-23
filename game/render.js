@@ -40,24 +40,86 @@ function drawUnit(frame, row, x, y, flip, width = 64, height = 64) {
   ctx.restore();
 }
 
-function drawAimingUnit(m, row, frame, legFrame, x, y, recoil) {
-  const hip = 39;
-  const lowerStart = hip - 4;
-  const upperEnd = hip + 3;
-  const pitch = m.aimPitch ?? 0;
+const tagRoles = ['bulk', 'raven', 'lynx'];
+const shoulder = { x: 32, y: 32 };
+const tagArt = {
+  combatUnits: 'combat-units.png',
+  infectedBosses: 'art/bosses/infected.png',
+  tagRig: 'art/tag-combat/units-rig.png',
+  tagEquip: 'art/tag-combat/units-equip.png',
+  tagGear: 'art/tag-combat/units-gear.png',
+  tagFX: 'art/tag-combat/fx.png'
+};
+
+function tagCell(atlas, col, row, x, y) {
+  ctx.drawImage(atlas, col * 96, row * 64, 96, 64, x, y, 96, 64);
+}
+
+// Gameplay and rendering use the same shoulder, gait offset and weapon socket.
+function shoulderAt(m) {
+  const gait = (m.gait ?? 0) / 30 + m.id * .31;
+  const stride = Math.sin(gait * TAU);
+  const bob = m.moving && !reduceMotion.matches ? Math.round(Math.abs(stride) * 1.7) : 0;
+  return { x: Math.round(m.x), y: Math.round(m.y) + shoulder.y - 60 - bob };
+}
+
+function combatAim(m, tx, ty, col, lead) {
+  const pivot = shoulderAt(m);
+  const dx = tx - pivot.x, dy = ty - pivot.y;
+  m.flip = dx < 0 ? -1 : dx > 0 ? 1 : m.flip;
+  const [, my] = tagAtlas.muzzles[m.id === 3 ? 3 : m.id + (lead ? 0 : 3)][col];
+  // The far pistol points along a parallel line above the shoulder. Solve for
+  // the rotation that puts the target on that line, including steep shots.
+  const offset = my - shoulder.y;
+  const bearing = Math.atan2(dy, Math.abs(dx));
+  const correction = Math.asin(clamp(offset / Math.max(1, Math.hypot(dx, dy)), -1, 1));
+  m.aimPitch = bearing - correction;
+  m.aimAngle = Math.atan2(Math.sin(m.aimPitch), m.flip * Math.cos(m.aimPitch));
+}
+
+function combatMuzzle(m, col, lead, pitch = m.aimPitch ?? 0) {
+  const pivot = shoulderAt(m);
+  const [mx, my] = tagAtlas.muzzles[m.id === 3 ? 3 : m.id + (lead ? 0 : 3)][col];
+  const u = mx - shoulder.x, v = my - shoulder.y;
+  const c = Math.cos(pitch), s = Math.sin(pitch);
+  return { x: pivot.x + m.flip * (u * c - v * s), y: pivot.y + u * s + v * c };
+}
+
+function equippedPose(m, lead) {
+  const age = run.t - (m.lastShot ?? -Infinity);
+  const row = m.id + (lead ? 0 : 3);
+  const clip = tagAtlas.clips[tagRoles[m.id] + (lead ? '_lead' : '_support')];
+  const fire = m.shotColumn === 3 && lead && m.id === 1 ? 3 : 1;
+  const idx = clip.frames.indexOf(fire);
+  const kick = clip.exposureMs[idx] / 1000;
+  const recover = clip.exposureMs[idx + 1] / 1000;
+  const col = age < kick ? fire : age < kick + recover ? fire + 1 : 0;
+  const aim = (m.aimPitch ?? 0) * clamp((.34 - age) / .12, 0, 1);
+  return { row, col, aim };
+}
+
+function drawEquippedMember(m, lead) {
+  const pivot = shoulderAt(m), { row, col, aim } = equippedPose(m, lead);
+  const hit = m.hurt > .6;
+  const rig = hit ? art.tagRigHit : art.tagRig;
   ctx.save();
-  ctx.translate(Math.round(x), Math.round(y));
+  ctx.translate(pivot.x, pivot.y);
   ctx.scale(m.flip, 1);
-  // Both halves overlap at the belt. Legs keep their independent stride while aiming.
-  const walking = legFrame < 4;
-  const legX = (legFrame + (walking ? 4 : 0)) * 64;
-  const legY = (row + (walking ? 3 : 0)) * 64;
-  ctx.drawImage(art.combatUnits, legX, legY + lowerStart, 64, 64 - lowerStart,
-    -32, lowerStart - 60, 64, 64 - lowerStart);
-  ctx.translate(-recoil, hip - 60);
-  ctx.rotate(pitch);
-  ctx.drawImage(art.combatUnits, frame * 64, row * 64, 64, upperEnd,
-    -32, -hip, 64, upperEnd);
+  const sinceTag = run.t - (m.leadChanged ?? -Infinity);
+  if (sinceTag < .24 && (m.lastShot == null || m.lastShot < m.leadChanged)) {
+    const frame = sinceTag < .042 ? 0 : sinceTag < .10 ? 1 : sinceTag < .158 ? 2 : 3;
+    tagCell(hit ? art.tagEquipHit : art.tagEquip, lead ? frame : 3 - frame, m.id, -32, -shoulder.y);
+  } else {
+    const walking = m.moving && !reduceMotion.matches;
+    const stride = Math.floor(((m.gait ?? 0) / 30 + m.id * .31) * 4) % 4;
+    const legRow = m.id + (walking ? 3 : 0) + (hit ? 6 : 0);
+    const legCol = walking ? 4 + stride : 4;
+    ctx.drawImage(art.combatUnits, legCol * 64, legRow * 64 + 40, 64, 24,
+      -32, 40 - shoulder.y, 64, 24);
+    tagCell(rig, col, row, -32, -shoulder.y);
+    ctx.rotate(aim);
+    tagCell(rig, col, row + 6, -32, -shoulder.y);
+  }
   ctx.restore();
 }
 
@@ -103,53 +165,68 @@ function leaderChevron(x, y) {
 }
 
 function drawHero(m) {
-  const moving = m.moving ?? run.moving;
-  const gait = (m.gait ?? run.walk * 7.5) / 30 + m.id * .31;
-  const firing = m.shoot > 0;
-  const stroke = Math.sin(gait * TAU);
-  const shotPhase = clamp((.22 - m.shoot) / .22, 0, 1);
-  const strideFrame = Math.floor(gait * 4) % 4;
-  const frame = firing ? 4 + Math.min(3, Math.floor(shotPhase * 4)) :
-    moving ? strideFrame : 0;
-  const motion = !reduceMotion.matches;
-  const recoil = firing && motion ? (1 - shotPhase) ** 2 * (m.id === 2 ? 3.2 : 1.8) : 0;
-  const sway = moving && motion ? stroke * .8 : 0;
-  const lift = !motion ? 0 : moving ? Math.abs(stroke) * 1.7 : (1 + Math.sin(run.t * 2.6 + m.id * 2)) * .5;
   const lead = m.id === run.lead;
   footShadow(m.x, m.y, 12);
   if (lead) {
     ellipse(m.x, m.y, 17, 5, '#342d25aa', 3, .04, 3.10);
     ellipse(m.x, m.y, 17, 5, '#edbf68', 1.5, .07, 3.07);
   }
-  if (moving && motion && m.moveSpeed > 40) {
-    const step = (gait % .5) * 2;
-    const side = Math.floor(gait * 2) % 2 ? 1 : -1;
-    const x = m.x - run.dx * (3 + step * 7) - run.dy * side * 4;
-    const y = m.y - run.dy * (3 + step * 7) + run.dx * side * 3;
-    ctx.globalAlpha = (1 - step) * .4;
-    ellipse(x, y, 2 + step * 3, 1 + step, '#b3a08a');
-    ctx.globalAlpha = 1;
+  const skill = run.activeSkill?.id === m.id ? run.activeSkill : null;
+  if (m.id === 3) {
+    if (skill) drawHammerSkill(m,skill);
+    else drawHammerCarry(m,lead);
+  } else if (skill?.phase === 'spin') drawSpinner(m,skill);
+  else if (skill) drawRifleSkill(m,skill);
+  else drawEquippedMember(m, lead);
+  if (lead) leaderChevron(m.x, m.y - [57,55,55,51][m.id]);
+}
+
+function drawBossSprite(stage, frame, x, y, flip, hit, height = 88) {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.scale(flip, 1);
+  ctx.drawImage(hit ? art.infectedBossHit : art.infectedBosses,
+    frame * 96, (stage - 1) * 88, 96, 88, -48, -Math.round(83 * height / 88), 96, height);
+  ctx.restore();
+}
+
+function drawInfectedBoss(e) {
+  const stage = e.stage || e.pattern?.stage || run.stage;
+  const marks = e.pattern?.marks || [];
+  const cfg = bossPatterns[stage - 1];
+  const active = marks.find(mark => !mark.done);
+  let frame = 0, flip = e.flip, height = 88;
+  if (active || marks.length) {
+    if (stage === 3) {
+      // Each spore marks a fresh target before its impact. The launcher's
+      // recoil follows that individual shot, even as older marks expire.
+      const latest = marks[marks.length - 1];
+      frame = latest.age >= .23 && latest.age < .45 ? 3 : 2;
+    } else {
+      frame = !active || active.age >= cfg.windup ? 3 : 2;
+      if (stage === 1 && Math.abs(marks[0].dx) > .1) flip = Math.sign(marks[0].dx);
+    }
+  } else if (!reduceMotion.matches) {
+    const inContact = run.squad.some(m => m.deployed && m.hp > 0 && Math.hypot(e.x-m.x,e.y-m.y) <= 11);
+    const phase = run.t * (stage === 2 ? 3.6 : 4.5) + e.phase;
+    frame = inContact ? 0 : Math.floor(phase) % 2;
+    height += Math.sin(phase * Math.PI) > .5 ? 1 : 0;
   }
-  const impact = m.hurt > .60;
-  const row = m.id + (impact ? 6 : 0);
-  if (firing) {
-    drawAimingUnit(m, row, frame, moving ? strideFrame : frame, m.x + sway, m.y - lift, recoil);
-  } else {
-    drawUnit(frame, row, m.x + sway, m.y - lift, m.flip);
-  }
-  if (lead) leaderChevron(m.x, m.y - [57, 55, 55][m.id] - lift);
+  footShadow(e.x, e.y, stage === 2 ? 23 : 19);
+  drawBossSprite(stage, frame, e.x, e.y, flip, e.hit > .052, height);
 }
 
 function drawEnemy(e) {
   const heavy = e.type === 2;
-  const cadence = [5.4, 8.5, 3.9][e.type];
-  const phase = run.t * cadence + e.phase;
-  const frame = Math.floor(phase) % 4;
-  const lift = reduceMotion.matches ? 0 : Math.abs(Math.sin(phase * Math.PI / 2)) * (heavy ? .65 : 1.1);
-  footShadow(e.x, e.y, heavy ? 12 : 7.5);
-  drawUnit(frame, 3 + e.type + (e.hit > .052 ? 6 : 0), e.x, e.y - lift, e.flip);
+  if (e.boss) drawInfectedBoss(e);
+  else {
+    const phase = run.t * [5.4, 8.5, 3.9][e.type] + e.phase;
+    const lift = reduceMotion.matches ? 0 : Math.abs(Math.sin(phase * Math.PI / 2)) * (heavy ? .65 : 1.1);
+    footShadow(e.x, e.y, heavy ? 12 : 7.5);
+    drawUnit(Math.floor(phase) % 4, 3 + e.type + (e.hit > .052 ? 6 : 0), e.x, e.y - lift, e.flip);
+  }
   if (run.mark === e && run.lead === 2) {
-    const y = e.y - [18, 17, 25][e.type];
+    const y = chestY(e);
     const spread = 9 + Math.round(Math.sin(run.t * 5));
     for (const dx of [-1, 1]) for (const dy of [-1, 1]) {
       const x0 = Math.round(e.x) + dx * spread, y0 = Math.round(y) + dy * spread;
@@ -157,64 +234,93 @@ function drawEnemy(e) {
       line(x0, y0, x0, y0 - dy * 4, '#fcce7c', 2);
     }
   }
-  if (heavy && e.hp < e.max) {
+  if (heavy && !e.boss && e.hp < e.max) {
     const x = Math.round(e.x) - 10, y = Math.round(e.y) - 51;
     ctx.fillStyle = '#302b2c'; ctx.fillRect(x, y, 20, 4);
     ctx.fillStyle = '#da926a'; ctx.fillRect(x + 1, y + 1, Math.ceil(18 * Math.max(0, e.hp) / e.max), 2);
   }
 }
 
+function drawTagEffect(name, age, x, y, angle = 0) {
+  const clip = tagAtlas.fx[name];
+  let ms = Math.max(0, age * 1000);
+  if (clip.loop) ms %= clip.durationMs.reduce((a, b) => a + b, 0);
+  let col = 0;
+  while (col < clip.durationMs.length && ms >= clip.durationMs[col]) ms -= clip.durationMs[col++];
+  if (col === clip.durationMs.length) return;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.rotate(angle);
+  ctx.drawImage(art.tagFX, col * 48, clip.row * 48, 48, 48, -clip.pivot[0], -clip.pivot[1], 48, 48);
+  ctx.restore();
+}
+
 function drawTracer(mark) {
-  const t = clamp(mark.age / (mark.duration ?? .085), 0, 1);
+  const t = clamp(mark.age / mark.duration, 0, 1);
   const dx = mark.tx - mark.x, dy = mark.ty - mark.y;
-  const id = mark.id ?? mark.operator ?? (mark.sniper ? 2 : 1);
-  const head = .60 + .40 * Math.min(1, t * 4);
-  const tail = Math.max(0, t * .93 - .06);
-  const x1 = mark.x + dx * tail, y1 = mark.y + dy * tail;
-  const x2 = mark.x + dx * head, y2 = mark.y + dy * head;
-  const color = id === 2 ? '#a1e9e5' : id === 0 ? '#ffd793' : '#ffb369';
-  ctx.globalAlpha = (1 - t) * .32;
-  line(x1, y1, x2, y2, color, id === 2 ? 4.5 : 3);
-  ctx.globalAlpha = (1 - t) * .95;
-  line(x1, y1, x2, y2, color, id === 2 ? 1.65 : 1.2);
-  const glint = Math.max(tail, head - .12);
-  line(mark.x + dx * glint, mark.y + dy * glint, x2, y2, '#fffae4', id === 2 ? 2 : 1.6);
-  ctx.globalAlpha = 1;
+  const x = mark.x + dx * t, y = mark.y + dy * t;
+  const angle = mark.angle ?? Math.atan2(dy, dx);
+  if (drawSkillRound(mark,x,y,angle)) return;
+  if (mark.lead) {
+    drawTagEffect(tagRoles[mark.id] + '_bullet', mark.age, x, y, angle);
+  } else {
+    ctx.save();
+    ctx.translate(Math.round(x), Math.round(y));
+    ctx.rotate(angle);
+    ctx.fillStyle = '#b28d59'; ctx.fillRect(-5, -1, 5, 2);
+    ctx.fillStyle = '#ffedb5'; ctx.fillRect(-2, -1, 2, 1);
+    ctx.restore();
+  }
 }
 
 function drawEffect(e) {
-  const t = clamp(e.age / e.duration, 0, 1), frame = Math.min(5, Math.floor(t * 6));
-  const id = e.id ?? e.operator ?? 1;
-  const angle = Number.isFinite(e.angle) ? e.angle : (e.dir < 0 ? Math.PI : 0);
-  ctx.save();
-  ctx.translate(Math.round(e.x), Math.round(e.y));
-  if (e.row === 0) {
-    const w = Math.max(22, e.w) * (id === 2 ? 1.65 : 1.16), h = w * .54;
-    ctx.rotate(angle);
-    ctx.drawImage(art.fx, frame * 128, 0, 128, 72, -w * .28, -h * .50, w, h);
-  } else {
-    const w = e.w * (e.row === 2 ? 1.6 : 1);
-    if (e.row === 2) ctx.scale(Math.cos(angle) < 0 ? -1 : 1, 1);
-    const h = w * .56;
-    ctx.drawImage(art.fx, frame * 128, e.row * 72, 128, 72, -w * .36, -h * .77, w, h);
+  if (e.skillFx) { drawSkillFX(e); return; }
+  if (e.clip === 'brass') {
+    if (reduceMotion.matches) return;
+    const t = e.age / e.duration;
+    if (e.id === 0 && e.lead) {
+      skillFlash(art.bulkRounds,1,Math.min(4,Math.floor(t*5)),40,32,20,16,
+        e.x + e.flip*t*3,e.y+23*t-13*Math.sin(Math.PI*t),0,.65);
+    } else drawTagEffect('brass', e.age, e.x - e.flip * t * 16, e.y - Math.sin(t * Math.PI) * 12 + 22 * t * t);
+  } else if (e.clip && e.clip.endsWith('_muzzle')) {
+    const m = run.squad[e.id];
+    if (!m || m.deployed === false || m.hp <= 0 || m.lastShot !== e.shotTime ||
+      (m.id === run.lead) !== e.lead || run.activeSkill?.id === 0) return;
+    const pose = m.id === 3 ? {col:e.age < .045 ? 1 : e.age < .11 ? 2 : 0,aim:m.aimPitch} : equippedPose(m, e.lead);
+    // Raven's far barrel has a different resting socket from the near one.
+    const col = e.col === 3 && pose.col === 0 ? 4 : pose.col;
+    const tip = combatMuzzle(m, col, e.lead, pose.aim);
+    drawTagEffect(e.clip, e.age, tip.x, tip.y, e.angle);
+  } else if (e.clip === 'pierce_exit' || (e.clip === 'hit_spark' && e.lead)) {
+    const col = Math.min(4,Math.floor(e.age/e.duration*5));
+    if (e.id === 0) skillFlash(art.bulkRounds,2,col,40,32,16,16,e.x,e.y,e.angle);
+    else if (e.id === 1) skillFlash(art.ravenRounds,2,col,72,56,34,28,e.x,e.y,e.angle);
+    else if (e.id === 2) skillFlash(art.lynxPierce,2,col,56,48,17,24,e.x,e.y,e.angle);
+    else drawTagEffect(e.clip,e.age,e.x,e.y,e.angle);
+  } else if (e.clip) {
+    drawTagEffect(e.clip, e.age, e.x, e.y, e.angle);
+  } else if (e.row === 3) {
+    const frame = Math.min(5, Math.floor(e.age / e.duration * 6));
+    ctx.drawImage(art.fx, frame * 128, 3 * 72, 128, 72, e.x - e.w * .36, e.y - e.w * .43, e.w, e.w * .56);
   }
-  ctx.restore();
 }
 
 function drawDown(cue, t) {
   const id = cue.id, size = id === 2 ? 1.4 : 1;
   const dx = Math.cos(cue.angle || 0);
+  const opacity = ctx.globalAlpha;
   if (t < .70) {
     const p = t / .70;
-    ctx.globalAlpha = (1 - p) * .83;
+    ctx.globalAlpha = opacity * (1 - p) * .83;
     const flip = cue.flip || (dx > 0 ? -1 : 1);
-    drawUnit(2, 3 + id, cue.x + dx * p * 6, cue.y, flip, 64 + p * 4, 64 - p * 35);
+    if (cue.bossStage) drawBossSprite(cue.bossStage, 3, cue.x + dx*p*6, cue.y, flip, false, 88-p*47);
+    else drawUnit(2, 3 + id, cue.x + dx * p * 6, cue.y, flip, 64 + p * 4, 64 - p * 35);
   }
-  ctx.globalAlpha = (1 - t) * .65;
+  ctx.globalAlpha = opacity * (1 - t) * .65;
   const frame = Math.min(5, Math.floor(t * 6));
   const w = (18 + t * 12) * size;
   ctx.drawImage(art.fx, frame * 128, 2 * 72, 128, 72, cue.x - w * .36, cue.y - w * .42, w, w * .56);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = opacity;
 }
 
 function drawGroundCue(cue) {
@@ -226,30 +332,35 @@ function drawGroundCue(cue) {
   const x = guard ? cue.x : member.x, y = guard ? cue.y : member.y;
   const r = guard ? 7 + (cue.size - 7) * (1 - (1 - t) ** 2) : 12 + 20 * t;
   const flatten = guard ? .63 : .39;
-  const ink = guard ? '#b3eee1' : '#ffd184';
-  ctx.globalAlpha = (1 - t) * .15;
+  const ink = guard ? '#8ac8ff' : '#ffd184';
+  const opacity = ctx.globalAlpha;
+  ctx.globalAlpha = opacity * (1 - t) * .15;
   ellipse(x, y, r, r * flatten, ink);
-  ctx.globalAlpha = (1 - t) * .90;
+  ctx.globalAlpha = opacity * (1 - t) * .90;
   for (let i = 0; i < 4; i++) {
     const a = i * Math.PI / 2 + .12 + (guard ? 0 : t * .4);
     ellipse(x, y, r, r * flatten, ink, 2 - t, a, a + 1.22);
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = opacity;
 }
 
 function drawAirCue(cue) {
   const t = clamp(cue.age / cue.duration, 0, 1);
-  if (cue.kind === 'guard') {
+  const opacity = ctx.globalAlpha;
+  if (cue.kind === 'swap') {
+    const m = run.squad[cue.id];
+    drawTagEffect('tag_pulse', cue.age, m.x, m.y - 57);
+  } else if (cue.kind === 'guard') {
     const angle = cue.angle || 0;
-    ctx.globalAlpha = (1 - t) * .83;
+    ctx.globalAlpha = opacity * (1 - t) * .83;
     for (let i = 0; i < 4; i++) {
       const a = angle + (i - 1.5) * .33, r = 15 + t * 10;
       const x = cue.x + Math.cos(a) * r, y = cue.y - 10 + Math.sin(a) * r * .56;
-      line(x, y, x, y - 5 - 7 * Math.sin((i + 1) * Math.PI / 5), '#cbf8e8', 2);
+      line(x, y, x, y - 5 - 7 * Math.sin((i + 1) * Math.PI / 5), '#a2cefc', 2);
     }
   } else if (cue.kind === 'hurt') {
     const m = run.squad[cue.id];
-    ctx.globalAlpha = (1 - t) * .85;
+    ctx.globalAlpha = opacity * (1 - t) * .85;
     const r = 12 + t * 10;
     ellipse(m.x, m.y - 17, r, r, '#fc9578', 2, 3.4, 4.42);
     ellipse(m.x, m.y - 17, r, r, '#fc9578', 2, .25, 1.15);
@@ -258,29 +369,25 @@ function drawAirCue(cue) {
     const x = equip ? run.squad[cue.id].x : cue.x;
     const y = (equip ? run.squad[cue.id].y : cue.y) - 5;
     const count = equip ? 7 : 3;
-    ctx.globalAlpha = (1 - t) * .83;
+    ctx.globalAlpha = opacity * (1 - t) * .83;
     ctx.fillStyle = equip ? '#ffda8d' : '#a9eddc';
     for (let i = 0; i < count; i++) {
       const a = TAU * i / count + .4, r = (equip ? 12 : 6) * (1 + t * .65);
       ctx.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * .5 - 13 * t), 2, 2 + 2 * (1 - t));
     }
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = opacity;
 }
 
-function drawShell(m) {
-  if (m.lastShot == null || reduceMotion.matches) return;
-  const age = run.t - m.lastShot;
-  if (age < 0 || age > .33) return;
-  const t = age / .33;
-  const x = (m.shellX ?? m.x) - (m.shellFlip ?? m.flip) * (4 + t * 14);
-  const y = (m.shellY ?? m.y) - 26 - Math.sin(t * Math.PI) * 7 + t * t * 22;
-  ctx.save();
-  ctx.translate(Math.round(x), Math.round(y));
-  ctx.rotate((m.shellFlip ?? m.flip) * t * 5);
-  ctx.fillStyle = '#674a31'; ctx.fillRect(-2, -1, 5, 3);
-  ctx.fillStyle = '#f4c674'; ctx.fillRect(-1, -1, 3, 1);
-  ctx.restore();
+function drawFloorCues(state, opacity, visible, draw) {
+  for (const cue of state.cues) {
+    const attached = cue.kind === 'swap' || cue.kind === 'hurt' || cue.kind === 'equip';
+    const anchor = attached ? run.squad[cue.id] : cue;
+    if (attached && (anchor.deployed === false || run.activeSkill?.id === 0)) continue;
+    if ((!attached && !opacity) || !visible(anchor.x, anchor.y)) continue;
+    ctx.globalAlpha = attached ? 1 : opacity;
+    draw(cue);
+  }
 }
 
 function drawScreenShade() {
@@ -317,26 +424,62 @@ function render() {
   const cy = Math.round(clamp(run.camera.y - viewH / 2, 0, Math.max(0, map.bounds.h - viewH)));
   const visible = (x, y, padding = 80) => x >= cx - padding && x <= cx + viewW + padding &&
     y >= cy - padding && y <= cy + viewH + padding;
-  const cues = run.cues || [];
   ctx.setTransform(1, 0, 0, 1, -cx, -cy);
   ctx.fillStyle='#172027';
   ctx.fillRect(cx,cy,viewW,viewH);
   ctx.save();
   const view={x:cx,y:cy,w:viewW,h:viewH};
-  map.draw(ctx,view);
-  drawMapAmbience(ctx,run.floor,view,run.t,reduceMotion.matches);
+  const depth=run.depth??0, undergroundAlpha=depth*depth*(3-2*depth);
+  if(depth<1){
+    SURFACE.draw(ctx,view);
+    drawMapAmbience(ctx,'surface',view,run.t,reduceMotion.matches);
+  }
+  if(depth>0){
+    ctx.globalAlpha=undergroundAlpha;
+    underground.draw(ctx,view);
+    const origin=underground.offset;
+    ctx.translate(origin.x,origin.y);
+    drawMapAmbience(ctx,'metro',{...view,x:view.x-origin.x,y:view.y-origin.y},run.t,reduceMotion.matches);
+  }
   ctx.restore();
-  for (const g of run.crystals) if (visible(g.x, g.y, 12)) drawCrystal(g);
-  for (const cue of cues) if (visible(cue.x, cue.y)) drawGroundCue(cue);
+  // Keep surface-before-metro ordering on both sides of the logical midpoint.
+  const layers = [
+    {state: run.floor === 'surface' ? run : run.floors.surface, opacity: 1 - undergroundAlpha},
+    {state: run.floor === 'metro' ? run : run.floors.metro, opacity: undergroundAlpha}
+  ];
   const actors = [];
-  for (const o of run.enemies) if (visible(o.x, o.y)) actors.push({ o, draw: drawEnemy });
-  for (const o of run.squad) if (o.hp > 0) actors.push({ o, draw: drawHero });
+  for (const {state, opacity} of layers) {
+    if (opacity > 0) {
+      ctx.globalAlpha = opacity;
+      for (const g of state.crystals) if (visible(g.x, g.y, 12)) drawCrystal(g);
+      for (const e of state.effects) if (e.skillFx) drawSkillGround(e);
+      for (const o of state.enemies) if (visible(o.x, o.y)) actors.push({o, draw:drawEnemy, opacity});
+    }
+    drawFloorCues(state, opacity, visible, drawGroundCue);
+  }
+  ctx.save();
+  ctx.globalAlpha = 1;
+  drawBossWarnings(ctx);
+  ctx.restore();
+  if (run.activeSkill?.id === 0) actors.push({o:run.activeSkill,draw:drawBunker});
+  else for (const o of run.squad) if (o.hp > 0 && o.deployed !== false) actors.push({o,draw:drawHero});
   actors.sort((a, b) => a.o.y - b.o.y);
-  for (const { o, draw } of actors) draw(o);
-  for (const mark of run.marks) drawTracer(mark);
-  for (const e of run.effects) if (visible(e.x, e.y)) drawEffect(e);
-  for (const m of run.squad) if (m.hp > 0) drawShell(m);
-  for (const cue of cues) if (visible(cue.x, cue.y)) drawAirCue(cue);
+  for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}
+  ctx.globalAlpha=1;
+  for (const {state, opacity} of layers) {
+    ctx.globalAlpha = opacity;
+    if (opacity > 0) for (const mark of state.marks) drawTracer(mark);
+    for (const e of state.effects) {
+      const attached = e.clip?.endsWith('_muzzle');
+      const anchor = attached ? run.squad[e.id] : e;
+      const longEffect = e.skillFx === 'railBeam' || e.skillFx === 'shellArc';
+      if ((!attached && !opacity) || (!longEffect && !visible(anchor.x, anchor.y))) continue;
+      ctx.globalAlpha = attached ? 1 : opacity;
+      drawEffect(e);
+    }
+    drawFloorCues(state, opacity, visible, drawAirCue);
+  }
+  ctx.globalAlpha = 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawScreenShade();
   drawStick();
@@ -350,16 +493,34 @@ function tick(now) {
   requestAnimationFrame(tick);
 }
 
-Promise.all(Object.entries({ ...ART, combatUnits: 'combat-units.png' }).map(([id, url]) =>
+function flashTint(image) {
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const g = canvas.getContext('2d');
+  g.drawImage(image, 0, 0);
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(255,240,211,.72)';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+Promise.all(Object.entries({ ...ART, ...tagArt, ...skillArt }).map(([id, url]) =>
   new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => { art[id] = img; resolve(); };
-    img.onerror = reject;
+    img.onerror = () => reject(new Error('이미지 ' + id + (url.startsWith('data:') ? '' : ' (' + url + ')')));
     img.src = url;
   }))).then(() => {
+    art.tagRigHit = flashTint(art.tagRig);
+    art.infectedBossHit = flashTint(art.infectedBosses);
+    art.tagEquipHit = flashTint(art.tagEquip);
+    art.hammerCarryHit = flashTint(art.hammerCarry);
     makeMap();
     $('home').style.backgroundImage = 'linear-gradient(90deg,rgba(9,19,26,.86),rgba(12,21,27,.42) 45%,transparent 70%),url(' + ART.lobby + ')';
-    $('start').disabled = false;
-    $('start').textContent = '작전 개시';
+    setLobbyReady();
     requestAnimationFrame(tick);
-  }).catch(() => { $('start').textContent = '에셋을 불러오지 못했습니다'; });
+  }).catch(error => {
+    console.error('DropZone startup', error.stack || error.message);
+    $('start').textContent = '시작 실패 · ' + error.message;
+  });
