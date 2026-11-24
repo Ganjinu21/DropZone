@@ -14,18 +14,14 @@ CELL = (192, 128)
 # Each leg lists hip, knee center and boot collar. The first leg is nearest the
 # camera and appears on the left of the original wide stance. The waist line
 # retains the silhouette of individual belts, backpack hems and Lynx's cloak.
-RIGS = [
-    dict(legs=(((55,75),(51,94),(40,108)),((66,76),(85,88),(82,103))),
-         waist=((0,85),(38,85),(41,75),(63,76),(73,75),(110,74)), split=((70,61),(85,65),(98,66)), reach=17),
-    dict(legs=(((54,76),(49,97),(39,109)),((65,77),(78,95),(81,108))),
-         waist=((0,94),(35,93),(38,81),(43,77),(64,79),(84,77)), split=((74,61),(89,63),(102,64)), reach=20),
-    dict(legs=(((52,76),(49,95),(38,108)),((64,76),(79,89),(76,103))),
-         waist=((0,95),(29,96),(38,92),(41,82),(45,77),(68,79),(85,76)), split=((73,60),(87,63),(103,62)), reach=17),
-    dict(legs=(((49,77),(45,92),(36,108)),((66,79),(84,92),(86,108))),
-         waist=((0,83),(36,83),(46,80),(59,82),(70,82),(81,79),(106,77)), split=((74,62),(92,64),(104,65)), reach=18),
-    dict(legs=(((51,79),(47,95),(39,108)),((67,79),(85,95),(82,108))),
-         waist=((0,84),(41,84),(46,81),(63,82),(74,82),(81,80),(102,79)), split=((74,63),(88,64),(104,63)), reach=18)
-]
+FIELD_RIG = dict(
+    legs=(((51,79),(47,95),(39,108)),((67,79),(85,95),(82,108))),
+    waist=((0,84),(41,84),(46,81),(63,82),(74,82),(81,80),(102,79)),
+    split=((74,63),(88,64),(104,63)), reach=18
+)
+# Lynx's cloak hangs behind the back leg; its hem moves with the upper body.
+RIGS = [FIELD_RIG, FIELD_RIG, dict(FIELD_RIG,waist=((0,88),(32,87),*FIELD_RIG['waist'][1:])),
+        FIELD_RIG, FIELD_RIG]
 
 # A planted foot travels backwards an equal distance on each contact frame.
 # During the return it passes the grounded ankle with a clear toe and knee lift.
@@ -185,9 +181,6 @@ def stride_sheet(path):
                 moved,pitch=targets[i]
                 cel.alpha_composite(dress_leg(legs[i],rest,moved,pitch))
             cel.alpha_composite(coat,(0,BODY_Y[frame]))
-            if role<3:
-                # These legacy operators are authored on the original 96×64 grid.
-                cel=cel.resize((96,64),Image.Resampling.NEAREST).resize(CELL,Image.Resampling.NEAREST)
             atlas.alpha_composite(cel,(frame*CELL[0],role*CELL[1]))
     atlas.save(path,optimize=True)
 

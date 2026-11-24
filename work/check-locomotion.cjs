@@ -167,7 +167,7 @@ async function exerciseFormation(page) {
     // This catches a transparent margin, disappearing thin barrel or mismatched far-hand sprite.
     await page.evaluate(()=>{
       const canvas=document.createElement('canvas'),g=canvas.getContext('2d',{willReadFrequently:true});
-      for(const family of ['pistol','carbine','smg','sniper']){
+      for(const family of ['pistol',...weaponFamilies]){
         const models=new Set();
         for(const item of equipmentCatalog.filter(i=>i.family===family)){
           const id=Math.max(0,weaponFamilies.indexOf(family));
@@ -227,7 +227,7 @@ async function exerciseFormation(page) {
       }finally{ctx.drawImage=draw}
     });
     turns.forEach(([planes,dy],i)=>{
-      assert.equal(planes,[3+(i>>3),'body',5+(i>>3)].join(','));
+      assert.equal(planes,[1+(i>>3),'body',3+(i>>3)].join(','));
       assert.equal(dy,1);
     });
     await page.emulateMedia({reducedMotion:'reduce'});

@@ -55,7 +55,7 @@ const {chromium} = require('playwright');
       };
       // Capture real draws and decoded audio starts; a populated asset list alone
       // wouldn't detect a missing render hook or a sound played by a benched leader.
-      const sprites = new Map([...Object.keys(skillArt),'crewBodies','rocket-0','smg-0-skill','sniper-0-skill'].map(key => [art[key],key]));
+      const sprites = new Map([...Object.keys(skillArt),'crewBodies','crewStride','rocket-0','smg-0-skill','sniper-0-skill'].map(key => [art[key],key]));
       const draw = ctx.drawImage.bind(ctx);
       ctx.drawImage = (image,...args) => {
         if (sprites.has(image)) skillUI.drawn.add(sprites.get(image));
@@ -70,9 +70,9 @@ const {chromium} = require('playwright');
     });
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[0,1,2]);
     const expected = [
-      {sound:'cannon', sprites:['mechFold','bunker','squadBoard','bulkRounds']},
-      {sound:'smgA', sprites:['ravenAim','smg-0-skill','ravenEcho','ravenRounds']},
-      {sound:'pierce', sprites:['lynxAim','sniper-0-skill','lynxBeam','lynxPierce']},
+      {sound:'cannon', sprites:['mechFold','bunker','crewStride','bulkRounds']},
+      {sound:'smgA', sprites:['crewBodies','smg-0-skill','ravenRounds']},
+      {sound:'pierce', sprites:['crewBodies','sniper-0-skill','lynxBeam','lynxPierce']},
       {sound:'burst', sprites:['crewBodies','rocket-0','hammerFx','hammerBlast']}
     ];
     for (const [id,cast] of expected.entries()) {

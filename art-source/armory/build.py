@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 from PIL import Image, ImageDraw
 from field_crew import squad_icons
-from locomotion import stride_sheet
+from field_uniforms import publish as publish_uniforms
 from leg_armor import build_worn_armor
 import specialists
 
@@ -51,20 +51,7 @@ for family in families:
                 d.rectangle((w//2+4,y+3,w//2+7,y+5),fill="#454f4d")
                 d.point((w//2+6,y+5),fill=accent)
         cropped(canvas).save(out/f"{family}-{variant}.png")
-hands=Image.new('RGBA',(384,128))
-bodies=Image.new('RGBA',(96*5*2,64*2))
-for role in range(5):
-    if role<3:
-        body=units.operator(role).resize((192,128), Image.Resampling.NEAREST)
-    else:
-        name='hammer' if role==3 else 'cct'
-        body=specialists.body(name)
-        hands.alpha_composite(specialists.hands(name),((role-3)*192,0))
-        specialists.portrait(name).save(out/f'{name}-portrait.png')
-    bodies.alpha_composite(body,(role*192,0))
-bodies.save(out/'bodies.png')
-hands.save(out/'specialist-hands.png')
-stride_sheet(out/'crew-stride.png')
+publish_uniforms(out)
 build_worn_armor(out)
 squad_icons(out)
 shield=cropped(units.SHIELD);shield.save(out/'shield.png')

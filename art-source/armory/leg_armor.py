@@ -56,8 +56,6 @@ def posed_coordinates(body, stride, role):
         upper = Image.new('L',CELL)
         upper.paste(coat.getchannel('A'),(0,BODY_Y[frame] if column else 0))
         coordinates.putalpha(ImageChops.subtract(coordinates.getchannel('A'),upper))
-        if role<3:
-            coordinates = coordinates.resize((96,64),Image.Resampling.NEAREST).resize(CELL,Image.Resampling.NEAREST)
         rendered = stride.crop((frame*192,role*128,(frame+1)*192,(role+1)*128)) if column else body
         coordinates.putalpha(ImageChops.darker(coordinates.getchannel('A'),rendered.getchannel('A')))
         yield coordinates.crop(CROP)

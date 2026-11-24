@@ -84,20 +84,20 @@ function shoulderAt(m) {
 // Widths are in game pixels. The same native art stays sharp in the larger locker preview.
 const fieldWidths={pistol:[18,19,20,21,22],carbine:[29,30,32,34,36],smg:[23,24,25,26,28],
   sniper:[49,52,54,57,60],rocket:[46,47,49,51,53],ar:[34,35,37,39,41]};
+// Rear and forward palm centers on the CCT rig, in field pixels from the shoulder.
+const rifleHands=[[0,-1],[11,0]];
+const fieldHands={
+  pistol:[[0,-1],[3,0]], carbine:rifleHands, smg:[[0,-1],[11,-4]],
+  sniper:[[0,2],[11,3]], rocket:[[0,-3],[8,-4]], ar:rifleHands
+};
 function weaponMount(m,col,recoil=0){
   const {family,tier,artKey:key}=m.weapon,far=family==='smg' && col===3;
   const image=art[far?key+'-far':key];
   const w=fieldWidths[family][tier],h=Math.round(w*image.height/image.width);
-  const fit=weaponSockets[far?'smgFar':family]?.[tier];
-  if(fit){
-    // Attach each trimmed sprite by its painted grip. The near and far hands
-    // keep distinct mounts when Raven alternates weapons.
-    const gripX=(m.id>=3?10:5)+(far?7:0)-recoil,gripY=2-(far?7:0);
-    return {image,w,h,x:gripX-Math.round(w*fit.grip[0]),y:gripY-Math.round(h*fit.grip[1]),
-      gripX,gripY,bore:fit.bore};
-  }
-  const rocket=family==='rocket';
-  return {image,w,h,x:(rocket?-16:-10)-recoil,y:rocket?-12:-11,bore: rocket ? .53 : .36};
+  const fit=weaponSockets[far?'smgFar':family][tier];
+  const [x,y]=fieldHands[family][far || family==='rocket'?1:0];
+  return {image,w,h,x:x-recoil-Math.round(w*fit.grip[0]),y:y-Math.round(h*fit.grip[1]),
+    gripX:x-recoil,gripY:y,bore:fit.bore};
 }
 function combatAim(m,tx,ty,col){
   const pivot=shoulderAt(m),dx=tx-pivot.x,dy=ty-pivot.y;
@@ -123,38 +123,40 @@ function drawCrewBody(g,m,moving){
     g.drawImage(sprite,x,y+split,192,128-split,-32,-60+hip/2,96,(128-hip)/2);
   }else g.drawImage(sprite,x,y,192,128,-32,-60,96,64);
 }
+// Hand positions are relative to the same shoulder pivot used for shot origins.
+// The forearm and forward palm are separate so the two SMGs can recoil independently.
+function drawCrewHand(g,id,forward,x,y,glove){
+  const sx=forward?76:0,width=forward?116:76;
+  const offsetX=x-(forward?11:0),offsetY=y-(forward?0:-1);
+  g.drawImage(art.specialistHands,id*192+sx,0,width,128,sx/2-32+offsetX,-32+offsetY,width/2,64);
+  if(glove)g.drawImage(glove,x-4,y-3,8,6);
+}
 function drawMemberGear(g,m,age,moving=false){
   const id=m.id,dy=moving?crewTorsoY(m):0,glove=fieldGear(m.loadout,'gloves');
+  const family=m.weapon.family;
   g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
   drawCrewBody(g,m,moving);
   if(id===0)g.drawImage(art[m.shieldItem||'shield-0'],-19,-39+dy,25,37);
   g.save();g.translate(0,-28+dy);
   g.rotate((m.aimPitch||0)*clamp((.34-age)/.12,0,1));
-  for(const col of (m.weapon.family==='smg'?[3,1]:[1])){
+  for(const col of (family==='smg'?[3,1]:[1])){
     const kick=age<.055 && (m.shotColumn||1)===col?2:0;
     const mount=weaponMount(m,col,kick);
     g.drawImage(mount.image,mount.x,mount.y,mount.w,mount.h);
-    if(id>=3){
-      const family=m.weapon.family;
-      if(family==='ar'){
-        const end=mount.x+mount.w,beamY=Math.round(mount.y+mount.h*mount.bore);
-        g.fillStyle='#94322e';g.fillRect(end+1,beamY,2,1);g.fillRect(end+5,beamY,1,1);
-        g.fillStyle='#ff5147';g.fillRect(end+8,beamY-1,2,2);
-      }
+    if(family==='ar'){
+      const end=mount.x+mount.w,beamY=Math.round(mount.y+mount.h*mount.bore);
+      g.fillStyle='#94322e';g.fillRect(end+1,beamY,2,1);g.fillRect(end+5,beamY,1,1);
+      g.fillStyle='#ff5147';g.fillRect(end+8,beamY-1,2,2);
+    }
+    if(family==='smg'){
+      drawCrewHand(g,id,col===3,mount.gripX,mount.gripY,glove);
     }else{
-      const {gripX,gripY}=mount;
-      if(glove)g.drawImage(glove,gripX-4,gripY-3,9,6);
-      else{g.fillStyle='#393f37';g.fillRect(gripX-3,gripY-2,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY-2,3,2)}
+      const [rear,forward]=fieldHands[family];
+      if(id!==0)drawCrewHand(g,id,true,forward[0]-kick,forward[1],glove);
+      drawCrewHand(g,id,false,rear[0]-kick,rear[1],glove);
     }
   }
   g.restore();
-  if(id>=3){
-    g.drawImage(art.specialistHands,(id-3)*192,0,192,128,-32,-60+dy,96,64);
-    if(glove){
-      g.drawImage(glove,6,-31+dy,9,7);
-      g.drawImage(glove,-6,-32+dy,10,8);
-    }
-  }
   g.restore();
 }
 function drawCrewPreview(canvas,id,row){

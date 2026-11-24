@@ -5,8 +5,9 @@ const TAU=Math.PI*2;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const names=['벌크','레이븐','링스','해머','CCT'], roles=['돌격병','SMG 양손잡이','저격병','로켓병','공중통제사'];
 const memberHealth=[145,98,85,102,94];
-ART.face3='art/armory/hammer-portrait.png';
-ART.face4='art/armory/cct-portrait.png';
+['bulk','raven','lynx','hammer','cct'].forEach((role,id)=>{
+ ART['face'+id]='art/armory/'+role+'-portrait.png';
+});
 const formationSlots = [[23, 0], [-15, -24], [-18, 24]];
 const swapTime = 1.5;
 let mode='home',run,viewW=960,viewH=540,stick=null,pressed=new Set(),sound,last=0,selected=0,offers=[];

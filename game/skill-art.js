@@ -1,9 +1,8 @@
 'use strict';
 
 const skillArt = Object.fromEntries(Object.entries({
-  bunker: 'bunker', mechFold: 'bulk-fold', squadBoard: 'squad-board', bulkRounds: 'bulk-ballistics',
-  ravenAim: 'raven-aim', ravenEcho: 'raven-echo', ravenRounds: 'raven-ballistics',
-  lynxAim: 'lynx-aim', lynxPierce: 'lynx-pierce', lynxBeam: 'lynx-beam',
+  bunker: 'bunker', mechFold: 'bulk-fold', bulkRounds: 'bulk-ballistics',
+  ravenRounds: 'raven-ballistics', lynxPierce: 'lynx-pierce', lynxBeam: 'lynx-beam',
   hammerFx: 'hammer-fx', hammerBlast: 'hammer-blast'
 }).map(([id, name]) => [id, 'art/skills/' + name + '.png']));
 
@@ -30,10 +29,10 @@ function skillAimPose(m, s) {
   const since = s.age - s.lastFire;
   if (m.id === 1) {
     const fired = m.shotColumn === 3 ? 3 : 1;
-    return {sheet:art.ravenAim, w:112, h:72, fx:54, fy:65, px:53, py:36,
+    return {w:112, h:72, fx:54, fy:65, px:53, py:36,
       col:since < .042 ? fired : since < .096 ? fired+1 : 0};
   }
-  return {sheet:art.lynxAim, w:96, h:64, fx:32, fy:60, px:30, py:33,
+  return {w:96, h:64, fx:32, fy:60, px:30, py:33,
     col:s.phase === 'charge' ? (s.age < .18 ? 0 : 1)
       : since < .064 ? 3 : since < .136 ? 4 : since < .27 ? 5 : since < .422 ? 6 : 2};
 }
@@ -82,8 +81,7 @@ function drawRifleSkill(m, s) {
   ctx.save();
   ctx.translate(Math.round(m.x), Math.round(m.y));
   ctx.scale(flip, 1);
-  if(m.moving || crewOutfitSheet(m))drawCrewBody(ctx,m,m.moving);
-  else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
+  drawCrewBody(ctx,m,m.moving);
   ctx.translate(p.px-p.fx, p.py-p.fy+crewTorsoY(m));
   ctx.rotate(pitch);
   const item=rifleSkillItem(m);
@@ -96,15 +94,8 @@ function drawRifleSkill(m, s) {
 }
 
 function drawSpinner(m, s) {
-  const i = spinStep(s.angle);
   if (!reduceMotion.matches) {
     ctx.save();
-    for (let back = 3; back >= 1; back--) {
-      const old = (i - back * 2 + 16) % 16, a = old * TAU / 16;
-      ctx.globalAlpha = (4-back)*.18;
-      skillCell(art.ravenEcho,old%8,(3-back)*2+Math.floor(old/8),112,72,
-        m.x-Math.cos(a)*back*4,m.y+Math.sin(a)*back*1.6,54,65);
-    }
     for (let hand=0;hand<2;hand++) {
       const tip=s.angle+hand*Math.PI;
       for (let j=0;j<5;j++) {
@@ -116,16 +107,17 @@ function drawSpinner(m, s) {
     }
     ctx.restore();
   }
+  drawSpinPose(m,s.angle);
+}
+
+function drawSpinPose(m, angle) {
+  const i=spinStep(angle);
   const spin=art[rifleSkillItem(m).artKey+'-skill'];
   const glove=fieldGear(m.loadout,'gloves');
-  if(!m.moving && !crewOutfitSheet(m) && !glove){
-    skillCell(spin,i%8,1+Math.floor(i/8),112,72,m.x,m.y,54,65);
-    return;
-  }
   const row=Math.floor(i/8);
-  const y=m.y+crewTorsoY(m), facing=Math.cos(s.angle)<0?-1:1;
+  const y=m.y+crewTorsoY(m), facing=Math.cos(angle)<0?-1:1;
   const hands=(near)=>{
-    skillCell(spin,i%8,(near?5:3)+row,112,72,m.x,y,54,65);
+    skillCell(spin,i%8,(near?3:1)+row,112,72,m.x,y,54,65);
     if(!glove)return;
     for(const direction of [i*TAU/16+.32,i*TAU/16+Math.PI-.32]){
       if((Math.sin(direction)>=-.10)!==near)continue;
@@ -167,8 +159,9 @@ function drawHammerSkill(m,s){
   }
   ctx.translate(x,y);ctx.rotate(pitch);
   ctx.drawImage(image,reach-w,-Math.round(h*bore),w,h);
-  ctx.fillStyle='#825136';ctx.fillRect(0,3,7,3);
-  ctx.fillStyle='#d69a67';ctx.fillRect(1,2,5,3);
+  const glove=fieldGear(m.loadout,'gloves');
+  drawCrewHand(ctx,m.id,true,7,3,glove);
+  drawCrewHand(ctx,m.id,false,-2,3,glove);
   ctx.restore();
   const contact=(s.age-.60)/.24;
   if(contact>=0 && contact<1)skillFlash(art.hammerFx,1,Math.floor(contact*8),64,64,32,32,s.x+facing*17,s.y,0,.8);
@@ -181,8 +174,7 @@ function boardBunker(s, p) {
     const x = from.x+(s.x-from.x)*p, y = from.y+(s.y-from.y)*p;
     ctx.save();
     ctx.globalAlpha *= Math.min(1,(1-p)*3);
-    if (m.id < 3 && !crewOutfitSheet(m) && !fieldGear(m.loadout,'gloves')) skillCell(art.squadBoard,Math.min(3,Math.floor(p*4)),m.id,96,64,x,y,32,60);
-    else drawEquippedMember({...m,x,y,moving:p<1,gait:m.gait+p*Math.hypot(s.x-from.x,s.y-from.y)});
+    drawEquippedMember({...m,x,y,moving:p<1,gait:m.gait+p*Math.hypot(s.x-from.x,s.y-from.y)});
     ctx.restore();
   }
   for(const [i,ally] of (run.radioTeam||[]).entries()){
@@ -309,9 +301,8 @@ function drawSkillGround(e) {
     skillCell(art.hammerBlast,col,e.large ? 3 : 0,124,108,e.x,e.y,62,84);
     ctx.restore();
   } else if (e.skillFx === 'spinEcho' && !reduceMotion.matches) {
-    const step=spinStep(e.angle);
     ctx.save();ctx.globalAlpha *= .28*(1-e.age/e.duration);
-    skillCell(art.ravenEcho,step%8,4+Math.floor(step/8),112,72,e.x,e.y,54,65);
+    drawSpinPose({...run.squad[e.id],x:e.x,y:e.y,gait:e.gait,moving:e.moving},e.angle);
     ctx.restore();
   }
 }

@@ -1,11 +1,13 @@
 """Fit the catalog art to the crew's hands and bake the matching skill frames and firing sockets."""
 import json
 from importlib.util import module_from_spec, spec_from_file_location
-from math import cos, sin, tau
+from math import cos, sin
 from pathlib import Path
 from statistics import median
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageDraw, ImageOps
+
+from catalog_style import build_catalog
 
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG = ROOT / 'game/art/armory/catalog'
@@ -18,6 +20,8 @@ GRIPS = {
     'carbine': ((.195,.64),(.338,.66),(.32,.67),(.33,.67),(.318,.66)),
     'smg': ((.265,.61),(.32,.61),(.34,.61),(.34,.62),(.34,.62)),
     'sniper': ((.245,.535),(.252,.626),(.252,.68),(.25,.68),(.24,.68)),
+    'ar': ((.303,.66),(.307,.66),(.292,.66),(.293,.66),(.275,.66)),
+    'rocket': ((.54,.64),(.52,.69),(.53,.70),(.52,.71),(.52,.70)),
 }
 
 
@@ -28,7 +32,7 @@ def artist(name):
     return module
 
 
-def mount(image,grip):
+def mount(image,grip,open_rim=False):
     alpha=image.getchannel('A')
     if alpha.getpixel((int(grip[0]*image.width),int(grip[1]*image.height)))<128:
         raise ValueError('The declared hand socket is outside the painted grip')
@@ -36,7 +40,8 @@ def mount(image,grip):
     heights=[y+.5 for y in range(image.height) if alpha.getpixel((right,y))>=128]
     if not heights:
         raise ValueError('Expected a solid muzzle at the right edge of the fitted sprite')
-    return {'grip':grip,'bore':round(median(heights)/image.height,4)}
+    center=(heights[0]+heights[-1])/2 if open_rim else median(heights)
+    return {'grip':grip,'bore':round(center/image.height,4)}
 
 
 def write_pair(rank,near,far):
@@ -58,8 +63,45 @@ def track_gloves(module):
     return points,original
 
 
+def field_sleeve(canvas,shoulder,wrist,far,role):
+    """Paint a bent sleeve on the same light ramp as the CCT's rolled field jacket."""
+    x,y=shoulder
+    u,v=wrist
+    mid=(round(.60*x+.40*u),round(.60*y+.40*v))
+    ink='#312728'
+    d=ImageDraw.Draw(canvas)
+    d.line((shoulder,wrist),fill=ink,width=5)
+    d.line((shoulder,wrist),fill='#885f47' if far else '#c99665',width=3)
+    d.polygon([(x-3,y-2),(x-1,y-4),(x+2,y-4),(mid[0]+2,mid[1]-2),
+               (mid[0]+1,mid[1]+2),(x+1,y+3),(x-3,y+1)],
+              fill='#68533f' if far else '#927851',outline=ink)
+    d.line([(x-2,y-2),(x,y-3),(x+2,y-3)],fill='#a28a64' if far else '#d2b382')
+    d.line([(mid[0]-1,mid[1]+1),mid,(mid[0]+1,mid[1]-1)],fill='#534237')
+
+
+def field_glove(canvas,x,y,far,role):
+    """Keep the rear palm in shadow and the near knuckle plate above the grip."""
+    d=ImageDraw.Draw(canvas)
+    ink='#2b2424'
+    if far:
+        d.polygon([(x-4,y),(x-2,y-2),(x-1,y-4),(x+1,y-4),(x+1,y-1),
+                   (x+4,y-2),(x+5,y-1),(x+3,y+2),(x,y+3),(x-3,y+2)],
+                  fill='#6e5740',outline=ink)
+        d.line([(x,y+1),(x+2,y),(x+3,y)],fill='#a58962')
+    else:
+        d.polygon([(x-5,y),(x-3,y-3),(x,y-4),(x+3,y-3),(x+5,y-2),
+                   (x+5,y),(x+3,y+1),(x+2,y+3),(x-2,y+4),(x-4,y+2)],
+                  fill='#846544',outline=ink)
+        d.line([(x-3,y),(x-1,y-2),(x+1,y-2)],fill='#b99b71',width=2)
+        d.line([(x-2,y-2),(x,y-3)],fill='#d8bb8c')
+        d.line([(x,y+1),(x+2,y)],fill='#594735')
+        d.point((x+4,y-2),fill='#bd936b')
+
+
 def raven_sheet(rank,guns,fittings):
     raven=artist('raven')
+    raven.arm=field_sleeve
+    raven.glove=field_glove
 
     def equipment(angle, far=False):
         # Project the catalog side view into the turning hand's local plane.
@@ -85,8 +127,7 @@ def raven_sheet(rank,guns,fittings):
         return canvas,tip
 
     raven.equipment=equipment
-    sheet=Image.new('RGBA',(112*8,72*7))
-    body=raven.shifted_body
+    sheet=Image.new('RGBA',(112*8,72*5))
     raven.shifted_body=lambda *args: Image.new('RGBA',raven.CELL)
     forward=[]
     grips=[]
@@ -98,23 +139,20 @@ def raven_sheet(rank,guns,fittings):
         if i in (1,3):forward.append(tips[int(i==3)])
         grips.append(points.copy())
     raven.glove=original_glove
-    raven.shifted_body=body
     turning=[]
     for i in range(16):
         rear,front,tips=raven.spin_layers(i)
         turning.append(tips)
-        pose=rear.copy()
-        pose.alpha_composite(raven.spin_body(i*tau/16))
-        pose.alpha_composite(front)
-        sheet.paste(pose,(i%8*112,(1+i//8)*72))
-        sheet.paste(rear,(i%8*112,(3+i//8)*72))
-        sheet.paste(front,(i%8*112,(5+i//8)*72))
+        sheet.paste(rear,(i%8*112,(1+i//8)*72))
+        sheet.paste(front,(i%8*112,(3+i//8)*72))
     sheet.save(CATALOG / 'smg' / f'{rank}-skill.png',optimize=True)
     return {'forward':forward,'turn':turning},grips
 
 
 def lynx_sheet(rank,img,fit):
     lynx=artist('lynx')
+    lynx.crew.arm=field_sleeve
+    lynx.crew.glove=field_glove
     w=59
     gun=img.resize((w,round(w*img.height/img.width)),NEAREST)
     grip_x,grip_y=fit['grip']
@@ -134,13 +172,14 @@ def lynx_sheet(rank,img,fit):
 
 
 def build_ranked_art(make_pairs=True):
+    build_catalog(CATALOG)
     field={family:[] for family in (*GRIPS,'smgFar')}
     skill_grips={}
     for tier,rank in enumerate(RANKS):
         for family in GRIPS:
             suffix='-near' if family=='smg' else ''
             img=Image.open(CATALOG/family/f'{rank}{suffix}.png').convert('RGBA')
-            fit=mount(img,GRIPS[family][tier])
+            fit=mount(img,GRIPS[family][tier],open_rim=family=='rocket')
             field[family].append(fit)
             if family=='smg':
                 far=Image.open(CATALOG/'smg'/f'{rank}-far.png').convert('RGBA')

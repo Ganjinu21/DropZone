@@ -245,7 +245,7 @@ function fireSkillBeat(member,skill) {
     member.flip=Math.cos(skill.angle)<0?-1:1;
     member.shotColumn=hand?3:1;
     if (skill.phase==='spin' && hand===0) run.effects.push({skillFx:'spinEcho',id:1,lead:true,
-      x:member.x,y:member.y,flip:member.flip,angle:skill.angle,age:0,duration:.22});
+      x:member.x,y:member.y,gait:member.gait,moving:member.moving,angle:skill.angle,age:0,duration:.22});
     fireSkillBullet(member,skill,heading,target,hand);
     skill.nextShot+=skill.phase==='spin'?.07:.077;
   } else if (skill.id===2) {
