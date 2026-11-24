@@ -140,7 +140,7 @@ function showGearPopup(item,equipped){
   $('item-detail').textContent=itemOwner(item)+' · '+gearEffect(editSlot,item);
   const same=current.key===item.key;
   $('item-compare').textContent=same?'현재 장착 중':'현재 '+current.label+' · '+gearEffect(editSlot,current);
-  $('item-action').textContent=equipped?'교체할 장비 보기':same?'장착 중':'이 장비로 교체';
+  $('item-action').textContent=equipped?'장비 목록':same?'장착 중':'교체하기';
   $('item-action').disabled=!equipped && same;
   $('gear-popup').showModal();
 }
