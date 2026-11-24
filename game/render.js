@@ -44,6 +44,7 @@ const tagRoles = ['bulk', 'raven', 'lynx'];
 const shoulder = { x: 32, y: 32 };
 const tagArt = {
   ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon).map(i=>[i.key,itemImage(i)])),
+  crewStride:'art/armory/crew-stride.png',
   cctPatch:'art/armory/cct-patch.png',crewBodies:'art/armory/bodies.png',crewShield:'art/armory/shield.png',
   combatUnits: 'combat-units.png',
   cctPoses:'art/prep/cct-poses.png', cctRifle:'art/prep/ar.png', cobra:'art/prep/cobra.png',
@@ -85,17 +86,20 @@ function combatMuzzle(m,col,lead,pitch=m.aimPitch??0){
   const u=part.x+part.image.width,v=part.y+part.image.height*part.bore;
   return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
 }
+function drawWalkingLegs(g,m){
+  const frame=Math.floor((m.gait||0)/5)%8;
+  g.drawImage(art.crewStride,frame*64,m.id*24,64,24,-32,-20,64,24);
+}
 function drawMemberGear(g,m,age,moving=false){
   const id=m.id, pose=art.crewBodies;
   const bob=moving&&!reduceMotion.matches?Math.round(Math.abs(Math.sin(m.gait/30*TAU))*1.7):0;
   g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
-  if(moving && (id<3||id===4)){
-    const legRow=(id===4?1:id)+3,frame=4+Math.floor(m.gait/8)%4;
-    g.drawImage(art.combatUnits,frame*64,legRow*64+40,64,24,-32,-20,64,24);
+  if(moving){
+    drawWalkingLegs(g,m);
     g.drawImage(pose,id*96,0,96,41,-32,-60-bob,96,41);
   }else g.drawImage(pose,id*96,0,96,64,-32,-60-bob,96,64);
   if(id===4){
-    g.save();g.translate(-8,-49-bob);
+    g.save();g.translate(-10,-52-bob);
     if(m.flip<0){g.translate(art.cctPatch.width,0);g.scale(-1,1)}
     g.drawImage(art.cctPatch,0,0);g.restore();
   }
@@ -159,6 +163,21 @@ function leaderChevron(x, y) {
   ctx.strokeStyle = '#3b3128'; ctx.stroke();
   ctx.fillStyle = '#ffce75'; ctx.fill();
   ctx.fillStyle = '#fff3c6'; ctx.fillRect(-4, -3, 2, 1); ctx.fillRect(2, -3, 2, 1);
+  ctx.restore();
+}
+
+function drawDowned(m) {
+  footShadow(m.x,m.y,14);
+  ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));
+  ctx.save();ctx.scale(.72,.72);ctx.rotate(-Math.PI*.45);
+  drawMemberGear(ctx,{...m,id:m.id??4,weapon:m.weapon||gearByKey.get('ar-0'),x:5,y:13,flip:1},Infinity);
+  ctx.restore();
+  const progress=(m.reviveTime||0)/3;
+  ctx.fillStyle='#152322';ctx.fillRect(-24,-32,48,15);
+  ctx.textAlign='center';ctx.font='10px Arcade, sans-serif';ctx.fillStyle='#ffe3ae';
+  ctx.fillText(progress?'구조 '+Math.min(99,Math.floor(progress*100))+'%':'구조 3초',0,-21);
+  ctx.fillStyle='#354d48';ctx.fillRect(-23,-18,46,3);
+  ctx.fillStyle='#a6ddae';ctx.fillRect(-23,-18,Math.round(46*progress),3);
   ctx.restore();
 }
 
@@ -457,7 +476,8 @@ function render() {
   ctx.restore();
   if (run.activeSkill?.id === 0) actors.push({o:run.activeSkill,draw:drawBunker});
   else for (const o of run.squad) if (o.hp > 0 && o.deployed !== false) actors.push({o,draw:drawHero});
-  for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:m=>cctRadioSprite(m,55)});
+  for(const m of [...run.squad,...(run.radioTeam||[])])if(m.hp<=0 && m.downFloor===run.floor)actors.push({o:m,draw:drawDowned});
+  if(run.activeSkill?.id!==0)for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:m=>cctRadioSprite(m,55)});
   actors.sort((a, b) => a.o.y - b.o.y);
   for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}
   ctx.globalAlpha=1;

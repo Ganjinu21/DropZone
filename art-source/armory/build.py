@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 from PIL import Image, ImageDraw
+from field_crew import controller, stride_sheet, squad_icons
 
 root = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("unit_art", root / "work/art/tag-combat/units.py")
@@ -50,11 +51,11 @@ for role in range(5):
     elif role==3:
         body=units.layer(); hammer=Image.open(root/'game/art/skills/hammer-carry.png').convert('RGBA').resize((34,55),Image.Resampling.NEAREST);body.alpha_composite(hammer,(14,5))
     else:
-        body=units.operator(1)
-        cct=Image.open(root/'game/art/prep/cct-poses.png').convert('RGBA').crop((256,0,320,64))
-        body.alpha_composite(cct.crop((0,0,42,27)),(0,0));body.alpha_composite(cct.crop((13,23,29,40)),(13,23))
+        body=controller(units.operator(1))
     bodies.alpha_composite(body,(role*96,0))
 bodies.save(out/'bodies.png')
+stride_sheet(out/'crew-stride.png')
+squad_icons(out)
 shield=cropped(units.SHIELD);shield.save(out/'shield.png')
 # Reinforced field supply crate at native icon resolution.
 im=Image.new('RGBA',(64,44));d=ImageDraw.Draw(im)
@@ -78,7 +79,7 @@ for index,letter in enumerate('CCT'):
             if bit=='1':pen.point((2+index*4+x,1+y),fill='#ffe6aa')
 patch.save(out/'cct-patch.png')
 portrait=bodies.crop((384+9,5,384+55,51))
-portrait.alpha_composite(patch,(24-9,11-5))
+portrait.alpha_composite(patch,(22-9,8-5))
 portrait.save(out/'cct-portrait.png')
 # Button symbols on the same 16-pixel grid as the in-game equipment.
 glyphs={

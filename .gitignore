@@ -39,3 +39,4 @@ node_modules/
 !/work/check-lineup.cjs
 
 !/work/check-armory.cjs
+!/work/check-field-combat.cjs

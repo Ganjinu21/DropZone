@@ -43,6 +43,8 @@ const {chromium} = require('playwright');
           const skill = run.activeSkill, start = [run.x,run.y];
           if (skill.id === 0) pressed.add('KeyD');
           for (let frame=0; run.activeSkill && frame<600; frame++) {
+            if(skill.id===0 && frame===390)hitSquadMember(run.enemies[0],run.squad[0],routes[run.floor],skill.hp);
+            if(!run.activeSkill)break;
             update(1/60);
             if (frame%5===0) render();
           }

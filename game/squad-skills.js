@@ -1,7 +1,7 @@
 'use strict';
 
 const squadSkillDefs = [
-  {name:'벙커 전개', duration:4.8, cooldown:15},
+  {name:'벙커 전개', cooldown:15, durability:160},
   {name:'쌍기관단총 난사', duration:3, cooldown:10},
   {name:'관통 사격', duration:2.55, cooldown:11},
   {name:'박격포 포격', duration:3.65, cooldown:13},
@@ -46,7 +46,15 @@ function activateSquadSkill() {
   const phase=['deploy','forward','charge','deploy'][id];
   const skill={id,phase,x:member.x,y:member.y,floor:run.floor,age:0,duration:def.duration,
     angle:run.heading,initialAngle:run.heading,beat:0,nextShot:firstBeat,lastFire:-Infinity};
-  if (id===0) skill.boardFrom=run.squad.map(m=>({x:m.x,y:m.y}));
+  if (id===0) {
+    initializeRadioTeam();
+    skill.hp=skill.maxHp=def.durability;
+    skill.boardFrom=run.squad.map(m=>({x:m.x,y:m.y}));
+    skill.radioFrom=run.radioTeam?.map(m=>({x:m.x,y:m.y}));
+    for(const occupant of [...run.squad.filter(m=>m.deployed),...(run.radioTeam||[])]){
+      if(occupant.hp>0){occupant.x=skill.x;occupant.y=skill.y}
+    }
+  }
   if (id===3) skill.plantFacing=member.flip||1;
   run.activeSkill=skill;
   member.skillReadyAt=run.t+def.cooldown;
@@ -65,6 +73,34 @@ function cancelSquadSkill() {
   member.cool=Math.max(.19,member.cool);
   member.shoot=0; member.burstIndex=0;
   run.activeSkill=null;
+  updateHud();
+}
+
+function hitBunker(enemy,nav,damage,isContact){
+  const fort=run.activeSkill;
+  if(isContact && (enemy.nextBunkerHit||0)>run.t)return;
+  if(isContact)enemy.nextBunkerHit=run.t+.8;
+  fort.hp=Math.max(0,fort.hp-damage);
+  if(fort.hp>0)return;
+  cancelSquadSkill();
+  run.squad[0].skillReadyAt=run.t+squadSkillDefs[0].cooldown;
+  for(const m of run.squad)if(m.deployed && m.hp>0)m.hurt=.85;
+  for(const m of run.radioTeam||[])if(m.hp>0)m.grace=.85;
+  run.effects.push({skillFx:'blast',id:0,x:fort.x,y:fort.y,radius:98,large:true,age:0,duration:1,angle:0});
+  combatCue('guard',fort.x,fort.y,.4,0,0,98);
+  tone(115,.27,.08,'sawtooth',0,32);
+  for(const foe of run.enemies){
+    const d=dist(fort,foe);
+    if(foe.hp<=0 || d>98 || !nav.clear(fort.x,fort.y,foe.x,foe.y,0))continue;
+    const angle=d>.01?Math.atan2(foe.y-fort.y,foe.x-fort.x):foe.phase||0;
+    const step=foe.boss?2:6;
+    for(let n=0;n<9;n++){
+      const dx=Math.cos(angle)*step,dy=Math.sin(angle)*step;
+      if(!nav.clear(foe.x,foe.y,foe.x+dx,foe.y+dy,4))break;
+      nav.slide(foe,dx,dy,4);
+    }
+  }
+  updateHud();
 }
 
 function skillAim(member,target,fallback) {
@@ -221,11 +257,11 @@ function tickSquadSkills(dt) {
   const member=run.squad[skill.id];
   if (skill.id!==run.lead || member.hp<=0 || skill.floor!==run.floor) {cancelSquadSkill();return}
   skill.age+=dt;
-  if (skill.age>=skill.duration) {cancelSquadSkill();return}
+  if (skill.id!==0 && skill.age>=skill.duration) {cancelSquadSkill();return}
   if (!squadSkillLocked()) {skill.x=member.x; skill.y=member.y}
   switch (skill.id) {
     case 0:
-      skill.phase=skill.age<.58?'deploy':skill.age<4.42?'fire':'retract';
+      skill.phase=skill.age<.58?'deploy':'fire';
       if (skill.phase!=='fire') return;
       break;
     case 1:

@@ -56,6 +56,7 @@ function tickBossAttack(dt, nav) {
       pattern.nextShell=.55;
     }
   }
+  const targets=run.activeSkill?.id===0?[leader]:run.squad;
   for (const mark of pattern.marks) {
     mark.age+=dt;
     if (mark.age<cfg.windup || mark.done) continue;
@@ -65,7 +66,7 @@ function tickBossAttack(dt, nav) {
       const tx=boss.x+step*mark.dx, ty=boss.y+step*mark.dy;
       if (nav.clear(boss.x,boss.y,tx,ty,4)) {
         boss.x=tx; boss.y=ty; mark.travel+=step;
-        for (const member of run.squad) {
+        for (const member of targets) {
           if (!member.deployed || member.hp<=0 || mark.hit.has(member.id)) continue;
           const along=clamp((member.x-px)*mark.dx+(member.y-py)*mark.dy,0,step);
           if(Math.hypot(member.x-px-along*mark.dx,member.y-py-along*mark.dy)>mark.radius)continue;
@@ -79,7 +80,7 @@ function tickBossAttack(dt, nav) {
     } else if(cfg.kind==='pulse'){
       const previous=mark.waveRadius || 0;
       mark.waveRadius=cfg.radius*clamp((mark.age-cfg.windup)/cfg.expansion,0,1);
-      for(const member of run.squad){
+      for(const member of targets){
         if(!member.deployed || member.hp<=0 || mark.hit.has(member.id))continue;
         const distance=Math.hypot(member.x-mark.x,member.y-mark.y);
         if(distance<previous-5 || distance>mark.waveRadius+3 || !nav.clear(mark.x,mark.y,member.x,member.y,0))continue;
@@ -89,7 +90,7 @@ function tickBossAttack(dt, nav) {
       }
       if(mark.waveRadius<cfg.radius)continue;
     } else {
-      for (const member of run.squad) {
+      for (const member of targets) {
         if (!member.deployed || member.hp<=0 || Math.hypot(member.x-mark.x,member.y-mark.y)>mark.radius) continue;
         if (!nav.clear(mark.x,mark.y,member.x,member.y,0)) continue;
         hitSquadMember(boss,member,nav,cfg.damage);

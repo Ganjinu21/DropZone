@@ -1,9 +1,9 @@
 'use strict';
 
 function cctRadioSprite(member, size=64) {
-  const frame=member.shoot>0 ? 4 : member.moving ? Math.floor(member.gait/8)%4 : 0;
-  ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(member.flip||1,1);
-  ctx.drawImage(art.cctPoses,frame*64,0,64,64,-size/2,-size*60/64,size,size);ctx.restore();
+  ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(size/64,size/64);
+  drawMemberGear(ctx,{...member,id:4,x:0,y:0,weapon:gearByKey.get('ar-0')},member.shoot>0?0:Infinity,member.moving);
+  ctx.restore();
 }
 function callCobra(member){
   run.cobra={age:0,duration:7,shot:.5,x:member.x,y:member.y-76};
@@ -15,32 +15,68 @@ function fireSupport(source,enemy,damage){
   run.effects.push({clip:'support_tracer',x:source.x,y:source.y,tx:enemy.x,ty:chestY(enemy),age:0,duration:.095});
   damageEnemy(enemy,damage,angle);
 }
+function initializeRadioTeam(){
+  const chief=run.squad[4];
+  if(chief?.deployed && !run.radioTeam)run.radioTeam=[-1,1].map(side=>({
+    side,x:chief.x,y:chief.y,hp:30,max:30,gait:0,flip:1,shoot:0,cool:1,
+    grace:1,floor:run.floor,patrolTime:0,moving:false
+  }));
+}
+
+function choosePatrolPoint(ally,enemy,nav){
+  // Pick a reachable post around the squad, favouring opposite flanks under fire.
+  const facing=enemy?Math.atan2(enemy.y-run.y,enemy.x-run.x):run.heading;
+  const preferred=facing+ally.side*(enemy?1.4:2.1);
+  for(let i=0;i<8;i++){
+    const angle=preferred+(Math.random()-.5)*2.3;
+    const reach=(29+Math.random()*38)*stairFormationScale(run);
+    const x=run.x+Math.cos(angle)*reach,y=run.y+Math.sin(angle)*reach;
+    if(nav.clear(run.x,run.y,x,y,4) && nav.clear(ally.x,ally.y,x,y,4))return {x,y};
+  }
+  return {x:run.x,y:run.y};
+}
+
+function moveRadioAlly(ally,enemy,nav,dt){
+  const beyondLeash=dist(ally,run)>80;
+  ally.patrolTime-=dt;
+  if(!ally.post || ally.patrolTime<=0 || dist(ally.post,run)>70 || beyondLeash){
+    ally.post=beyondLeash?{x:run.x,y:run.y}:choosePatrolPoint(ally,enemy,nav);
+    ally.patrolTime=1.2+Math.random()*1.8;
+  }
+  const dx=ally.post.x-ally.x,dy=ally.post.y-ally.y,d=Math.hypot(dx,dy);
+  const x=ally.x,y=ally.y;
+  if(d>2){
+    ally.speed=beyondLeash?175:run.moving?128:55;
+    const fraction=Math.min(1,dt*ally.speed/d);
+    if(nav.clear(x,y,ally.post.x,ally.post.y,4))nav.slide(ally,dx*fraction,dy*fraction,4);
+    else nav.chase(ally,run,dt);
+  }
+  const travel=Math.hypot(ally.x-x,ally.y-y);
+  ally.moving=travel>dt*5;ally.gait+=travel;
+  if(ally.moving && Math.abs(ally.x-x)>dt*4)ally.flip=Math.sign(ally.x-x);
+}
 function updateRadioSupport(dt){
   const chief=run.squad[4];
   if(!chief?.deployed)return;
-  const nav=routes[run.floor];
-  if(!run.radioTeam)run.radioTeam=[-1,1].map(side=>({side,x:chief.x,y:chief.y,hp:30,gait:0,flip:1,shoot:0,cool:1,grace:1,floor:run.floor}));
+  initializeRadioTeam();
+  const nav=routes[run.floor],fort=run.activeSkill?.id===0?run.activeSkill:null;
   for(const ally of run.radioTeam){
     if(ally.hp<=0){
       ally.respawn-=dt;
-      if(ally.respawn<=0 && chief.hp>0)Object.assign(ally,{hp:30,x:chief.x,y:chief.y,grace:1,cool:.5});
+      if(ally.respawn<=0 && chief.hp>0)Object.assign(ally,{hp:ally.max,x:chief.x,y:chief.y,grace:1,cool:.5,
+        downFloor:null,reviveTime:0,floor:run.floor,post:null,patrolTime:0});
       continue;
     }
-    if(ally.floor!==run.floor){ally.x=run.x;ally.y=run.y;ally.floor=run.floor}
-    let tx=run.x-36,ty=run.y+ally.side*38;
-    if(nav.blocked(tx,ty,4)){tx=run.x;ty=run.y}
-    const dx=tx-ally.x,dy=ty-ally.y,d=Math.hypot(dx,dy);
-    ally.moving=d>12;
-    if(ally.moving){
-      const step=Math.min(d,145*dt),x=ally.x,y=ally.y;
-      if(nav.clear(x,y,tx,ty,4))nav.slide(ally,dx/d*step,dy/d*step,4);
-      else {ally.speed=145;nav.chase(ally,run,dt)}
-      ally.gait+=Math.hypot(ally.x-x,ally.y-y);if(Math.abs(dx)>3)ally.flip=Math.sign(dx);
-    }
-    ally.shoot-=dt;ally.cool-=dt;ally.grace-=dt;
+    if(ally.floor!==run.floor){ally.x=run.x;ally.y=run.y;ally.floor=run.floor;ally.post=null}
+    if(fort){ally.x=fort.x;ally.y=fort.y;ally.moving=false;ally.post=null;continue}
     const enemy=combatTargets(ally,188,false)[0]?.enemy;
+    moveRadioAlly(ally,enemy,nav,dt);
+    ally.shoot-=dt;ally.cool-=dt;ally.grace-=dt;
     if(!enemy)continue;
-    if(ally.grace<=0 && dist(enemy,ally)<18){ally.hp-=enemy.contactDamage||8;ally.grace=.75;if(ally.hp<=0){ally.respawn=6;continue}}
+    if(ally.grace<=0 && dist(enemy,ally)<18){
+      ally.hp-=enemy.contactDamage||8;ally.grace=.75;
+      if(ally.hp<=0){ally.hp=0;ally.downFloor=run.floor;ally.reviveTime=0;ally.respawn=6;continue}
+    }
     if(ally.cool<=0){ally.flip=enemy.x<ally.x?-1:1;fireSupport({x:ally.x+ally.flip*14,y:ally.y-23},enemy,5);ally.shoot=.16;ally.cool=1.25}
   }
   const craft=run.cobra;

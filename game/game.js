@@ -87,23 +87,36 @@ const upgrades=[
  ['고폭탄','해머의 기본 포탄과 집중 포격의 폭발 피해가 증가합니다.','기본 피해',n=>String(22+6*n)],
  ['확산 탄두','해머의 기본 포탄과 집중 포격이 더 넓게 폭발합니다.','기본 반경',n=>((37+5*n)/10).toFixed(1)+' m'],
  ['조준 보정','통제관의 소총 탄환 피해를 높입니다.','탄환 피해',n=>String(14+4*n)],
- ['지원 편대','코브라의 지원 사격 피해를 높입니다.','지원 피해',n=>String(19+3*n)]
+ ['지원 편대','코브라의 지원 사격 피해를 높입니다.','지원 피해',n=>String(19+3*n)],
+ ['응급 처치','생존한 분대원과 지원병의 체력을 즉시 회복합니다.','최대 체력',()=> '30%'],
+ ['화력 강화','기본 공격, 특수 스킬, 지원 사격의 피해가 증가합니다.','피해 보너스',n=> '+'+(n*10)+'%']
 ];
+const fieldKit=10, firepower=11;
+const scalableUpgrades=[1,2,5,6,8];
 function openUpgrade(){
- const pool=upgrades.map((_,i)=>i).filter(i=>run.up[i]<5 && run.squad[Math.floor(i/2)].deployed && run.squad[Math.floor(i/2)].hp>0);if(!pool.length)return;
- offers=[];for(const id of run.lineup){let possible=pool.filter(k=>Math.floor(k/2)===id);if(possible.length)offers.push(possible[Math.floor(Math.random()*possible.length)])}
- for(const k of pool)if(offers.length<3&&!offers.includes(k))offers.push(k);
+ const available=run.lineup.filter(id=>run.squad[id].hp>0).flatMap(id=>[id*2,id*2+1]);
+ if(!available.length)return;
+ let personal=available.filter(key=>run.up[key]<5);
+ // At a fully ranked loadout, keep a third, effective choice alongside the two squad cards.
+ if(!personal.length)personal=available.filter(key=>scalableUpgrades.includes(key));
+ const pick=list=>list[Math.floor(Math.random()*list.length)];
+ const first=pick(personal),shared=pick([fieldKit,firepower]);
+ const rest=[...personal.filter(i=>i!==first && Math.floor(i/2)!==Math.floor(first/2)),shared===fieldKit?firepower:fieldKit];
+ offers=[first,shared,pick(rest)];
+ for(let i=offers.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[offers[i],offers[j]]=[offers[j],offers[i]]}
  selected=0;show('upgrade');$('levelcaption').textContent='분대 레벨 '+String(run.level).padStart(2,'0');
  $('buildstat').textContent='생존 '+clock(run.t)+'　·　처치 '+run.kills;
  $('cards').innerHTML = offers.map((key, index) => {
    const [name, description, stat, format] = upgrades[key];
    const rank = run.up[key];
-   const operator = Math.floor(key / 2);
+   const common=key>=fieldKit,operator=common?'squad':Math.floor(key/2);
+   const sharedIcon=key===fieldKit?'art/armory/field-kit.png':'art/armory/squad-damage.png';
+   const icon=common?sharedIcon:key===6?'art/skills/hammer-installed.png':key===8?'art/prep/ar.png':key===9?'art/prep/cobra.png':'augment-'+key+'.png';
    return `<button class="card" data-i="${index}" data-operator="${operator}">
-     <span class="who"><img src="${ART['face'+operator]}" alt="">${names[operator]}<em>Lv. ${rank+1}</em></span>
-     <span class="item"><img src="${key===6?'art/skills/hammer-installed.png':key===8?'art/prep/ar.png':key===9?'art/prep/cobra.png':'augment-'+key+'.png'}" alt=""></span>
+     <span class="who"><img src="${common?sharedIcon:ART['face'+operator]}" alt="">${common?'분대':names[operator]}<em>${key===fieldKit?'즉시':'Lv. '+(rank+1)}</em></span>
+     <span class="item"><img src="${icon}" alt=""></span>
      <strong>${name}</strong><p>${description}</p>
-     <span class="num"><span>${stat}</span><span>${format(rank)} <span class="arrow">→</span> <b>${format(rank+1)}</b></span></span>
+     <span class="num"><span>${stat}</span><span>${key===fieldKit?'':format(rank)+' → '}<b>${format(rank+1)}</b></span></span>
    </button>`;
  }).join('');
  choose(0);tone(480,.15,.04,'sine')
@@ -111,7 +124,10 @@ function openUpgrade(){
 function choose(i){if(i<0||i>=offers.length)return;selected=i;[...$('cards').children].forEach((c,j)=>{c.classList.toggle('active',i===j);c.setAttribute('aria-pressed',i===j)})}
 function applyUpgrade(){
  if(mode!=='upgrade')return;
- const key=offers[selected],member=run.squad[Math.floor(key/2)];
+ const key=offers[selected],member=run.squad[key>=fieldKit?run.lead:Math.floor(key/2)];
+ if(key===fieldKit){
+   for(const m of [...run.squad,...(run.radioTeam||[])])if(m.hp>0)m.hp=Math.min(m.max,m.hp+m.max*.3);
+ }
  run.up[key]++;
  if(member.deployed)combatCue('equip',member.x,member.y,.52,member.id);
  tone(520,.12,.024,'sine',0,610);
@@ -135,7 +151,7 @@ function setLeader(i){
  tone(pitch*1.5,.09,.021,'triangle',.063,pitch*1.5);
  updateHud();
 }
-function switchLead(i){if(mode!=='play'||run.swap>0||!run.squad[i]||run.squad[i].hp<=0||i===run.lead)return;setLeader(i)}
+function switchLead(i){if(mode!=='play'||run.activeSkill||run.swap>0||!run.squad[i]||run.squad[i].hp<=0||i===run.lead)return;setLeader(i)}
 function updateHud(){
  updateStageHud({stage:run.stage,stageName:stageRules().name,wave:run.wave,waves:stageRules().waves.length,remaining:run.remaining,bossPhase:run.bossPhase,bossName:stageRules().bossName,boss:run.boss,bigWave:run.bigWave});
  updateMapHud();$('time').textContent=clock(run.t);$('kills').textContent='처치 '+run.kills;$('lv').textContent='Lv. '+run.level;$('xpfill').style.width=(100*run.xp/run.need)+'%';
@@ -145,8 +161,8 @@ function updateHud(){
  for(const b of party.children){
    const i=Number(b.dataset.i),m=run.squad[i],lead=i===run.lead;
    b.classList.toggle('lead',lead);b.classList.toggle('hurt',m.hurt>.43);
-   b.setAttribute('aria-pressed',String(lead));b.disabled=m.hp<=0;
-   b.querySelector('small').textContent=m.hp<=0?'이탈':roles[i];
+   b.setAttribute('aria-pressed',String(lead));b.disabled=m.hp<=0 || (!!run.activeSkill && !lead);
+   b.querySelector('small').textContent=m.hp<=0?'기절':roles[i];
    b.querySelector('i').style.width=Math.max(0,100*m.hp/m.max)+'%';
  }
  const remaining=Math.ceil(squadSkillCooldown(run.lead)),active=!!run.activeSkill;
@@ -198,19 +214,40 @@ function combatCue(kind,x,y,duration,id=0,angle=0,size=1){
  run.cues.push(cue);
 }
 function damageEnemy(e,power,angle=0,state=run){
- if(e.hp<=0)return;e.hp-=power;e.hit=.12;e.hitAngle=angle;
+ if(e.hp<=0)return;e.hp-=power*(1+.1*(run.up[firepower]||0));e.hit=.12;e.hitAngle=angle;
  if(e.hp>0)return;
  run.kills++;awardDiamonds(e.boss?5:1);state.crystals.push({x:e.x,y:e.y,val:e.type===2?4:1});
  state.cues.push({kind:'down',x:e.x,y:e.y,duration:.28,id:e.type,bossStage:e.boss?(e.stage||run.stage):0,angle,flip:e.flip,age:0});
  if(e.type===2)state.effects.push({row:3,x:e.x,y:e.y,dir:1,w:58,duration:.46,id:e.type,angle,age:0});
 }
 function hitSquadMember(enemy,member,nav,amount){
- if(mode!=='play'||!member.deployed||member.hp<=0||member.hurt>0||run.activeSkill?.id===0)return;
+ if(mode!=='play'||!member.deployed||member.hp<=0)return;
+ if(run.activeSkill?.id===0){
+   hitBunker(enemy,nav,amount??enemy.contactDamage??[8,6,15][enemy.type],amount===undefined);
+   return;
+ }
+ if(member.hurt>0)return;
  absorbContact(enemy,member,nav,amount);
  if(member.hp>0)return;
+ member.hp=0;member.downFloor=run.floor;member.reviveTime=0;member.moving=false;
  const next=run.lineup.find(id=>run.squad[id].hp>0);
  if(next===undefined)end(false);
  else if(run.lead===member.id)setLeader(next);
+}
+function updateRescues(dt){
+ const leader=run.squad[run.lead],nav=routes[run.floor];
+ for(const m of [...run.squad,...(run.radioTeam||[])]){
+   if(!m.downFloor || m.hp>0)continue;
+   if(run.moving || leader.moving || run.activeSkill?.id===0 || m.downFloor!==run.floor ||
+      dist(leader,m)>24 || !nav.clear(leader.x,leader.y,m.x,m.y,0)){
+     m.reviveTime=0;continue;
+   }
+   m.reviveTime+=dt;
+   if(m.reviveTime+1e-8<3)continue;
+   m.hp=m.max*.3;m.downFloor=null;m.reviveTime=0;m.hurt=1;m.grace=1;m.cool=.4;
+   combatCue('equip',m.x,m.y,.58,m.id??4);
+   tone(550,.15,.028,'sine',0,820);updateHud();
+ }
 }
 function moveFormation(dt) {
  const nav=routes[run.floor];
@@ -258,6 +295,7 @@ function update(dt){
  moveFormation(dt);
  tickSquadSkills(dt);
  updateRadioSupport(dt);
+ updateRescues(dt);
  advanceRounds(dt);
  updatePursuit(dt);
  updateEncounter(dt);
@@ -269,7 +307,7 @@ function update(dt){
  let near=living[0];if(!near)break;for(const m of living)if(dist(m,e)<dist(near,e))near=m;
  let vx=near.x-e.x,vy=near.y-e.y,d=Math.hypot(vx,vy)||1;e.flip=vx<0?-1:1;
  if(d>10 && !e.charging)nav.chase(e,near,dt);
- if(!e.charging && d<19 && near.hurt<=0 && nav.clear(e.x,e.y,near.x,near.y,0)){
+ if(!e.charging && d<(run.activeSkill?.id===0?38:19) && (near.hurt<=0 || run.activeSkill?.id===0) && nav.clear(e.x,e.y,near.x,near.y,0)){
  hitSquadMember(e,near,nav);
  if(mode!=='play')return;
  if(near.hp<=0)living=run.squad.filter(m=>m.deployed && m.hp>0);}

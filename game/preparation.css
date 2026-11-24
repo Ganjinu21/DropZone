@@ -122,7 +122,17 @@
   #sector{max-width:43vw}.xp{min-height:28px}.xp>div{width:46px}
   #stage-panel{left:auto;right:var(--safe-right);top:calc(var(--safe-top) + 40px);transform:none;min-width:115px}
   #encounter-alert{top:calc(var(--safe-top) + 115px)}#roster-screen{align-items:center}
-  #cards{grid-template-columns:1fr}.sheet header,.sheet footer{flex-wrap:wrap}.sheet{overflow-y:auto;touch-action:pan-y}
+  #upgrade{justify-content:safe center;padding-inline:max(9px,var(--safe-left)) max(9px,var(--safe-right))}
+  #cards{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  #cards .who{display:grid;grid-template-columns:19px 1fr;gap:1px 4px;padding:5px;font-size:11px}
+  #cards .who img{width:19px;height:19px;grid-row:span 2}
+  #cards .who em{margin:0;font-size:10px}
+  #cards .item{min-height:62px}
+  #cards strong{font-size:clamp(14px,4vw,20px)}
+  #cards strong,#cards p,#cards .num{margin-inline:6px}
+  #cards p{font-size:clamp(11px,3vw,14px);line-height:1.5;overflow-wrap:anywhere}
+  #cards .num{display:grid;gap:2px;font-size:11px}
+  .sheet header,.sheet footer{flex-wrap:wrap}.sheet{overflow-y:auto;touch-action:pan-y}
 }
 /* A transparent margin on the foreground sprite must not cover the two selectable reserves. */
 .figure-0,.figure-0 canvas,.figure-0 small {pointer-events:none}

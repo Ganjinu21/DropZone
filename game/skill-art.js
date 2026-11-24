@@ -89,7 +89,11 @@ function drawRifleSkill(m, s) {
   ctx.save();
   ctx.translate(Math.round(m.x), Math.round(m.y));
   ctx.scale(flip, 1);
-  skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
+  if(m.moving){
+    drawWalkingLegs(ctx,m);
+    const top=p.fy-19;
+    ctx.drawImage(p.sheet,p.col*p.w,0,p.w,top,-p.fx,-p.fy,p.w,top);
+  }else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
   ctx.translate(p.px-p.fx, p.py-p.fy);
   ctx.rotate(pitch);
   skillCell(p.sheet,p.col,1,p.w,p.h,0,0,p.px,p.py);
@@ -189,7 +193,14 @@ function boardBunker(s, p) {
     ctx.globalAlpha *= Math.min(1,(1-p)*3);
     if (m.id < 3) skillCell(art.squadBoard,Math.min(3,Math.floor(p*4)),m.id,96,64,x,y,32,60);
     else if(m.id===3)drawHammerCarry({...m,x,y},false);
-    else cctRadioSprite({...m,x,y});
+    else drawEquippedMember({...m,x,y});
+    ctx.restore();
+  }
+  for(const [i,ally] of (run.radioTeam||[]).entries()){
+    const from=s.radioFrom?.[i];
+    if(ally.hp<=0 || !from)continue;
+    ctx.save();ctx.globalAlpha*=Math.min(1,(1-p)*3);
+    cctRadioSprite({...ally,x:from.x+(s.x-from.x)*p,y:from.y+(s.y-from.y)*p,moving:true,gait:p*32},55);
     ctx.restore();
   }
 }
@@ -234,10 +245,8 @@ function foldingMech(s, baseline, armorEdge) {
 function drawBunker(s) {
   const h = bunkerWidth*art.bunker.height/art.bunker.width;
   const baseline = s.y+h*.08;
-  const deploy = s.phase==='deploy', retract = s.phase==='retract';
-  const exit = retract ? clamp((s.duration-s.age)/.38,0,1) : 1;
-  const appear = deploy ? clamp(s.age/.12,0,1) : exit;
-  footShadow(s.x,s.y-1,43*appear);
+  const deploy = s.phase==='deploy';
+  footShadow(s.x,s.y-1,43*(deploy ? clamp(s.age/.12,0,1) : 1));
   let top = s.y-h*.92, sealEdge = baseline;
   if (deploy) {
     const seal = foldEase((s.age-.41)/.15);
@@ -247,20 +256,16 @@ function drawBunker(s) {
     const mechHeight = foldingMech(s,baseline,sealEdge);
     top = Math.min(baseline-mechHeight,seal>0 ? baseline-h : baseline);
     if (s.age < .36) boardBunker(s,clamp(s.age/.36,0,1));
-  } else if (retract && exit < .84) {
-    boardBunker(s,exit/.84);
   }
   ctx.save();
   if (deploy) {
     ctx.beginPath();ctx.rect(s.x-bunkerWidth/2-1,baseline-145,bunkerWidth+2,145+sealEdge-baseline);ctx.clip();
-  } else if (retract) {
-    ctx.beginPath();ctx.rect(s.x-bunkerWidth/2-1,s.y-h,bunkerWidth+2,h*1.1);ctx.clip();
   }
-  ctx.globalAlpha *= exit;
-  ctx.drawImage(art.bunker,Math.round(s.x-bunkerWidth/2),
-    Math.round(s.y-h*.92+h*(1-exit)),bunkerWidth,h);
+  ctx.drawImage(art.bunker,Math.round(s.x-bunkerWidth/2),Math.round(s.y-h*.92),bunkerWidth,h);
   ctx.restore();
-  leaderChevron(s.x,top+(retract ? h*(1-exit) : 0)-4);
+  ctx.fillStyle='#172220';ctx.fillRect(s.x-23,top-8,46,6);
+  ctx.fillStyle=s.hp>s.maxHp*.3?'#b2c294':'#e49460';ctx.fillRect(s.x-22,top-7,Math.ceil(44*s.hp/s.maxHp),4);
+  leaderChevron(s.x,top-14);
 }
 
 function drawSkillRound(shot,x,y,angle) {

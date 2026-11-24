@@ -93,6 +93,5 @@ h1, h2, p { margin: 0; }
   #home { background-position: 53% center; }
   .controlhint, #party { bottom: calc(var(--safe-bottom) + 28px); }
   .sheet { justify-content: flex-start; padding-bottom: 46px; }
-  #cards { grid-template-columns: 1fr; }
   .sheet header { margin-top: 2vh; }
 }
