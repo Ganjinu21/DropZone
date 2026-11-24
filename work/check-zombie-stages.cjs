@@ -85,6 +85,7 @@ const selectTestSquad = require('./select-test-squad.cjs');
       function stage(n){
         start();
         run.stage=n;
+        for(const m of run.squad)m.gear.evadeChance=0;
         const boss=run.boss={stage:n,hp:500,max:500,x:0,y:0,contactDamage:10};
         run.enemies=[boss];
         for(const m of run.squad)Object.assign(m,{x:300,y:300,hurt:0});
@@ -116,8 +117,8 @@ const selectTestSquad = require('./select-test-squad.cjs');
       return summary;
     });
     assert.deepEqual(patterns.charge,{locked:true,moved:true,dodged:true});
-    assert.deepEqual(patterns.pulse,{safeUntilRing:true,damage:23.28,hitOnce:true});
-    assert.deepEqual(patterns.barrage,{locked:[65,105,150],damage:18.43,pending:0});
+    assert.deepEqual(patterns.pulse,{safeUntilRing:true,damage:24,hitOnce:true});
+    assert.deepEqual(patterns.barrage,{locked:[65,105,150],damage:19,pending:0});
     assert.deepEqual(errors,[]);
     console.log('Big waves',waves,'three bosses',patterns);
   } finally {await browser.close()}

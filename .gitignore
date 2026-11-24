@@ -39,8 +39,13 @@ node_modules/
 !/work/check-lineup.cjs
 
 !/work/check-armory.cjs
+!/work/check-ranked-clothing.cjs
+!/work/check-awakened-art.cjs
 !/work/check-field-combat.cjs
 
 !/work/check-weapon-progression.cjs
 !/work/check-locomotion.cjs
 !/work/check-enemy-approach.cjs
+!/work/check-continue.cjs
+!/work/check-checkpoint-migration.cjs
+!/work/check-awakened-support.cjs

@@ -8,8 +8,14 @@ const {chromium}=require('playwright');
   try{
     const page=await browser.newPage({viewport:{width:393,height:852},hasTouch:true,isMobile:true});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.addInitScript(()=>{window.requestAnimationFrame=()=>0});
     await page.goto(pathToFileURL(path.resolve(__dirname,'../game/index.html')).href);
     await page.locator('#select-team:enabled').waitFor();
+    const newSortie=async()=>{
+      await page.locator('#start:enabled').tap();
+      if(await page.locator('#replace-run').isVisible())await page.locator('#replace-confirm').tap();
+      await page.locator('#hud').waitFor();
+    };
     const screenshot=async name=>{
       if(!process.env.PREVIEW_DIR)return;
       await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(i=>i.src).map(i=>i.decode().catch(()=>{})))});
@@ -19,7 +25,7 @@ const {chromium}=require('playwright');
     // Verify all 25 item images, their shared loadout rules, and a saved five-piece S+ kit in combat.
     await page.locator('#select-team').tap();
     // A rank change must reach both the detail panel and the specific operator's equipped slot.
-    for(const [id,family] of [[0,'pistol'],[0,'carbine'],[1,'smg'],[2,'sniper']]){
+    for(const [id,family] of [[0,'pistol'],[1,'smg'],[2,'sniper']]){
       const operator=page.locator('[data-inspect="'+id+'"]');
       if(await operator.getAttribute('aria-pressed')!=='true')await operator.tap();
       const slot=page.locator('[data-slot="weapon"]');
@@ -48,17 +54,15 @@ const {chromium}=require('playwright');
     assert.ok(await page.evaluate(()=>equipmentCatalog.filter(i=>armorStats[i.family]).every(i=>
       weaponFamilies.every((_,id)=>canEquip(id,i.family,i)) && owns(i.key))));
     await page.locator('#prep-save').tap();
-    await page.reload();await page.locator('#start:enabled').tap();
-    assert.deepEqual(await page.evaluate(()=>run.squad.slice(0,3).map(m=>m.weapon.key)),['carbine-6','smg-6','sniper-6']);
+    await page.reload();await newSortie();
+    assert.deepEqual(await page.evaluate(()=>run.squad.slice(0,3).map(m=>m.weapon.key)),['pistol-6','smg-6','sniper-6']);
     const kit=await page.evaluate(()=>{
       const m=run.squad[0], w=m.weapon;
       magazineReady(m,w);m.ammo=1;spendRound(m,w);
-      const hp=m.hp;
-      absorbContact({x:m.x-1,y:m.y,type:0},m,routes.surface,100);
-      return [m.max-memberHealth[0],Math.round(100/m.gear.interval),hp-m.hp,
+      return [m.max-memberHealth[0],m.gear.evadeChance,m.gear.critChance,
         Math.round(1000*(m.reloadAt-run.t)/w.reload),Math.round(100*m.gear.movement)];
     });
-    assert.deepEqual(kit,[65,124,74,680,122]);
+    assert.deepEqual(kit,[65,.15,.22,741,122]);
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();
     await page.locator('#shop').tap();
     assert.ok(await page.evaluate(()=>developerMode && equipmentCatalog.filter(i=>i.weapon).every(i=>owns(i.key))));
@@ -67,34 +71,38 @@ const {chromium}=require('playwright');
     assert.ok(await page.locator('#crate-open').isDisabled());
     await page.locator('#crate-popup [data-dismiss]').last().tap();
     await page.locator('#select-team').tap();await screenshot('Preparation');
-    assert.deepEqual(await page.evaluate(()=>savedEquipment.map(i=>i.weapon)),Array(5).fill('pistol-0'));
+    assert.deepEqual(await page.evaluate(()=>savedEquipment.map(i=>i.weapon)),['pistol-0','smg-0','sniper-0','rocket-0','ar-0']);
+    assert.deepEqual(await page.evaluate(()=>Object.keys(armory.counts).filter(k=>gearByKey.get(k)?.weapon).sort()),['ar-0','pistol-0','rocket-0','smg-0','sniper-0']);
     assert.deepEqual(await page.locator('[data-slot="weapon"]').evaluate(e=>[e.innerText,e.querySelector('img').src.split('/').pop()]),['C','C.png']);
     await page.locator('[data-slot="weapon"]').tap();
     await page.locator('#gear-detail').waitFor();
     assert.equal(await page.locator('#item-title').textContent(),'시작 권총');
     assert.ok(await page.locator('#item-action').isDisabled());
-    assert.equal(await page.locator('[data-item]').count(),10);
-    await page.locator('[data-item="carbine-6"]').tap();
+    assert.equal(await page.locator('[data-item]').count(),5);
+    await page.locator('[data-item="pistol-6"]').tap();
     assert.match(await page.locator('#item-action').innerText(),/합성/);
-    assert.equal(await page.locator('#item-detail').innerText(),'1발 피해 240');
+    assert.equal(await page.locator('#item-detail').innerText(),'1발 피해 192');
     const rack=await page.locator('#gear-inventory').boundingBox(),detail=await page.locator('#gear-detail').boundingBox();
     assert.ok(detail.y>=rack.y+rack.height-1 && detail.y+detail.height<=853);
-    await page.locator('#prep-save').tap();await page.locator('#start').tap();
+    await page.locator('#prep-save').tap();await newSortie();
     await page.locator('#hud').waitFor();
     await screenshot('Combat');
     await page.evaluate(()=>{
       for(let i=0;i<boxPrice;i++)damageEnemy({type:0,x:run.x+50,y:run.y+30,hp:1},2);
     });
-    await page.waitForFunction(()=>armory.diamonds===boxPrice);
+    await page.waitForFunction(()=>armory.diamonds===boxPrice,null,{polling:20});
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();
     await page.locator('#shop').tap();
-    await page.evaluate(()=>{window.realRandom=Math.random;Math.random=()=>.23});
-    await page.locator('#crate-open').tap();
+    await page.evaluate(async()=>{await awardDiamonds(2*boxPrice);window.realRandom=Math.random;Math.random=()=>.01});
+    for(let n=1;n<=3;n++){
+      await page.locator('#crate-open').tap();await page.waitForFunction(n=>armory.boxes===n,n,{polling:20});
+    }
     await page.waitForFunction(()=>document.querySelectorAll('#crate-result b').length===2);
     await screenshot('Crate');
     await page.evaluate(()=>{Math.random=window.realRandom});
-    const drop=await page.evaluate(()=>Object.keys(armory.counts).map(k=>gearByKey.get(k)).find(i=>i.weapon&&i.key!=='pistol-0'));
-    assert.equal(drop.family,'carbine');
+    const drop=await page.evaluate(()=>Object.keys(armory.counts).map(k=>gearByKey.get(k)).find(i=>i.weapon&&i.rank==='B'));
+    assert.equal(drop.family,'pistol');
+    assert.equal(await page.locator('#crate-family').count(),0);
     assert.equal(await page.evaluate(()=>armory.diamonds),0);
     assert.ok(await page.locator('#crate-open').isDisabled());
     await page.reload();await page.locator('#select-team:enabled').tap();
@@ -102,7 +110,7 @@ const {chromium}=require('playwright');
     await page.locator('[data-inspect="0"]').tap();
     await page.locator('[data-item="'+drop.key+'"]').tap();await screenshot('Item');
     assert.equal(await page.evaluate(()=>draftEquipment[0].weapon),'pistol-0');
-    await page.locator('#item-action').tap();await page.locator('#prep-save').tap();await page.locator('#start').tap();
+    await page.locator('#item-action').tap();await page.locator('#prep-save').tap();await newSortie();
     const actual=await page.evaluate(()=>{
       const seen=new Set(),original=ctx.drawImage;
       ctx.drawImage=function(img,...args){seen.add(img);return original.call(this,img,...args)};
@@ -116,7 +124,7 @@ const {chromium}=require('playwright');
       for(const [id,family] of weaponFamilies.entries()){
         const member=run.squad[id];
         for(const i of equipmentCatalog.filter(x=>x.weapon)){
-          const allowed=i.family==='pistol'||i.family===family;
+          const allowed=i.family===family;
           if(canEquip(id,'weapon',i)!==allowed)failures.push(i.key);
           if(!allowed)continue;
           const original=ctx.drawImage,seen=new Set();
@@ -139,7 +147,8 @@ const {chromium}=require('playwright');
     });
     assert.deepEqual(cases,[]);
     const hits=await page.evaluate(()=>{
-      run.floor='surface';run.up.fill(0);run.activeSkill=null;
+      run.floor='surface';run.activeSkill=null;
+      for(const member of run.squad)member.gear.critChance=0;
       const hits={};
       for(const item of equipmentCatalog.filter(i=>i.weapon)){
         const id=Math.max(0,weaponFamilies.indexOf(item.family));
@@ -157,9 +166,9 @@ const {chromium}=require('playwright');
       }
       return hits;
     });
-    assert.deepEqual(hits,{pistol:[16,26,40,88,192],carbine:[20,32,50,110,240],
+    assert.deepEqual(hits,{pistol:[16,26,40,88,192],
       smg:[11,18,28,61,132],sniper:[38,61,95,209,456],rocket:[22,35,55,121,264],ar:[14,22,35,77,168]});
-    await page.reload();await page.locator('#start:enabled').tap();
+    await page.reload();await newSortie();
     assert.equal(await page.evaluate(()=>run.squad[0].weapon.key),drop.key);
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();await page.locator('#select-team').tap();
     await page.locator('#change-crew').tap();await page.locator('[data-pick="2"]').tap();await page.locator('[data-pick="4"]').tap();await page.locator('#save-team').tap();
@@ -170,15 +179,16 @@ const {chromium}=require('playwright');
       return [s.counts['top-3'],s.counts['boots-1'],s.counts['top-4']??0]}),[5,2,0]);
     // Migrate the old duplicated B/A patterns without making them paid entitlements.
     await page.evaluate(()=>{
-      localStorage.setItem(armoryKey,JSON.stringify({diamonds:500,owned:['smg-2','smg-4','smg-5','shield-4','boots-4']}));
-      localStorage.setItem(equipmentKey,JSON.stringify([{shield:'shield-4'},{weapon:'smg-4',boots:'boots-4'}]));
+      localStorage.setItem(armoryKey,JSON.stringify({diamonds:500,counts:{'smg-2':1,'smg-4':1,'smg-5':1,'shield-4':1,'boots-4':1,'carbine-3@2':2,'pistol-3@2':1}}));
+      localStorage.setItem(equipmentKey,JSON.stringify([{weapon:'carbine-3@2',shield:'shield-4'},{weapon:'pistol-3@2',boots:'boots-4'},{weapon:'pistol-3@2'}]));
     });
     await page.reload();await page.locator('#select-team:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[savedEquipment[1].weapon,savedEquipment[0].shield,
-      savedEquipment[1].boots,owns('smg-1'),owns('smg-6'),armory.diamonds]),['smg-3','shield-3','boots-3',true,false,500]);
+      savedEquipment[1].boots,owns('smg-1'),owns('smg-6'),armory.diamonds,
+      savedEquipment[0].weapon,armory.counts['pistol-3@2'],savedEquipment[2].weapon]),['smg-3','shield-3','boots-3',true,false,500,'pistol-3@2',3,'sniper-0']);
     await page.locator('[data-inspect="1"]').tap();
     await page.locator('#gear-rank').selectOption('S+');
-    assert.equal(await page.locator('[data-item]').count(),2);
+    assert.equal(await page.locator('[data-item]').count(),1);
     await page.locator('[data-item="smg-6"]').tap();
     assert.equal(await page.locator('#item-title').innerText(),'쌍도깨비');
     assert.ok(await page.locator('#item-action').isDisabled());
@@ -197,7 +207,7 @@ const {chromium}=require('playwright');
     const exhausted=await page.evaluate(async()=>{
       const drops=[];
       while(true){
-        const before=armory.diamonds,result=await openWeaponCrate('smg');
+        const before=armory.diamonds,result=await openWeaponCrate();
         if(!result.drops)return {drops,before,after:armory.diamonds};
         drops.push(...result.drops.map(i=>i.rank));
       }

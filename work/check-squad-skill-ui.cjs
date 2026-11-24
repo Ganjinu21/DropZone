@@ -15,7 +15,7 @@ const {chromium} = require('playwright');
     // Drive the game's real update/render functions at a deterministic frame rate.
     await page.addInitScript(() => { window.requestAnimationFrame = () => 0; });
     await page.addInitScript(()=>{
-      const keys=['carbine-0','smg-0','sniper-0','rocket-0','ar-0'];
+      const keys=['pistol-0','smg-0','sniper-0','rocket-3','ar-0'];
       localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
       localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
     });
@@ -25,11 +25,21 @@ const {chromium} = require('playwright');
     await page.evaluate(() => Promise.all([gunAudio.loading, skillAudio.loading]));
     const party = page.locator('#party [data-operator]');
     assert.equal(await party.count(), 3);
+    assert.ok(await page.locator('#cast').isDisabled());
+    await page.keyboard.press('Space');
+    assert.ok(await page.evaluate(()=>!run.activeSkill));
     await page.evaluate(() => {
       window.skillUI = {
         sounds: [], drawn: new Set(),
         roster() { return run.squad.filter(member => member.deployed).map(member => member.id); },
+        equipBase() {
+          const member=run.squad[run.lead];
+          member.weapon=gearByKey.get(weaponFamilies[run.lead]+'-3');
+          member.loadout={...member.loadout,weapon:member.weapon.key};
+          updateHud();
+        },
         setup() {
+          this.equipBase();
           Object.assign(run,{x:1257,y:1004,heading:0,spawn:999,remaining:999,marks:[],effects:[],cues:[]});
           Object.assign(run.camera,{x:run.x,y:run.y});
           for (const member of run.squad) Object.assign(member,{x:1280,y:1004,flip:1,cool:999});
@@ -55,10 +65,12 @@ const {chromium} = require('playwright');
       };
       // Capture real draws and decoded audio starts; a populated asset list alone
       // wouldn't detect a missing render hook or a sound played by a benched leader.
-      const sprites = new Map([...Object.keys(skillArt),'crewBodies','crewStride','rocket-0','smg-0-skill','sniper-0-skill'].map(key => [art[key],key]));
+      const sprites = new Map([...Object.keys(skillArt),'crewBodies','crewStride','rocket-3','smg-3-skill','sniper-3-skill'].map(key => [art[key],key]));
       const draw = ctx.drawImage.bind(ctx);
       ctx.drawImage = (image,...args) => {
         if (sprites.has(image)) skillUI.drawn.add(sprites.get(image));
+        // Dressed bodies share an atlas: the first cell is idle, the next eight are walking frames.
+        if(crewOutfits.some(outfit=>outfit?.sheet===image))skillUI.drawn.add(args[0]>=192?'crewStride':'crewBodies');
         return draw(image,...args);
       };
       const audio = new Map([...skillAudio.buffers,...gunAudio.buffers].map(([name,buffer])=>[buffer,name]));
@@ -71,9 +83,9 @@ const {chromium} = require('playwright');
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[0,1,2]);
     const expected = [
       {sound:'cannon', sprites:['mechFold','bunker','crewStride','bulkRounds']},
-      {sound:'smgA', sprites:['crewBodies','smg-0-skill','ravenRounds']},
-      {sound:'pierce', sprites:['crewBodies','sniper-0-skill','lynxBeam','lynxPierce']},
-      {sound:'burst', sprites:['crewBodies','rocket-0','hammerFx','hammerBlast']}
+      {sound:'smgA', sprites:['crewBodies','smg-3-skill','ravenRounds']},
+      {sound:'pierce', sprites:['crewBodies','sniper-3-skill','lynxBeam','lynxPierce']},
+      {sound:'burst', sprites:['crewBodies','rocket-3','hammerFx','hammerBlast']}
     ];
     for (const [id,cast] of expected.entries()) {
       if (id===3) {
@@ -149,9 +161,12 @@ const {chromium} = require('playwright');
     await page.locator('#pause').tap();
     await page.locator('#homebtn').tap();
     await page.locator('#start:enabled').tap();
+    await page.locator('#replace-confirm').tap();
     assert.deepEqual(await page.evaluate(() => run.squad.map(m=>squadSkillCooldown(m.id))),[0,0,0,0,0]);
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[1,2,3]);
     await party.nth(2).tap();
+    assert.ok(await page.locator('#cast').isDisabled(),'new sortie retained the previous test loadout');
+    await page.evaluate(()=>skillUI.equipBase());
     await page.keyboard.press('Space');
     assert.equal(await page.evaluate(() => run.activeSkill?.id),2);
     const crossing = await page.evaluate(() => {

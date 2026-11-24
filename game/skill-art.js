@@ -1,7 +1,7 @@
 'use strict';
 
 const skillArt = Object.fromEntries(Object.entries({
-  bunker: 'bunker', mechFold: 'bulk-fold', bulkRounds: 'bulk-ballistics',
+  bunker: 'field-bunker', mechFold: 'field-fold', bulkRounds: 'bulk-ballistics',
   ravenRounds: 'raven-ballistics', lynxPierce: 'lynx-pierce', lynxBeam: 'lynx-beam',
   hammerFx: 'hammer-fx', hammerBlast: 'hammer-blast'
 }).map(([id, name]) => [id, 'art/skills/' + name + '.png']));
@@ -23,6 +23,16 @@ function skillFlash(sheet, row, col, w, h, px, py, x, y, angle = 0, scale = 1) {
   ctx.scale(scale, scale);
   skillCell(sheet, col, row, w, h, 0, 0, px, py);
   ctx.restore();
+}
+
+// The short spin streaks, sight glint, and mortar legs share the hard edges
+// and metal highlights of the equipment sprites, including on a diagonal.
+function skillPixelLine(x1,y1,x2,y2,color,thickness=1){
+  const dx=x2-x1,dy=y2-y1,steps=Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dy))));
+  ctx.fillStyle=color;
+  for(let i=0;i<=steps;i++){
+    ctx.fillRect(Math.round(x1+dx*i/steps),Math.round(y1+dy*i/steps),thickness,thickness);
+  }
 }
 
 function skillAimPose(m, s) {
@@ -47,6 +57,8 @@ function rifleSkillItem(m){
 // Each position comes from the corresponding frame's gun tip. Combat calls this
 // before it spawns the round; camera movement never changes an in-flight origin.
 function skillShotSocket(m, s, angle, hand = 0) {
+  if(s?.awakened && m.id===0)return mechShotSocket(s,angle);
+  if(s?.awakened && m.id===3)return siegeShotSocket(m,s,hand);
   if (m.id === 0) {
     const west = Math.cos(angle) < 0, front = Math.sin(angle) >= 0;
     const u = front ? (west ? .145 : .86) : (west ? .10 : .90);
@@ -68,9 +80,10 @@ function skillShotSocket(m, s, angle, hand = 0) {
   const tip = m.id===1?fit.forward[hand]:fit.firingTip;
   const pitch = Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle)));
   const u = tip[0]-pose.px, v = tip[1]-pose.py;
+  const offset=torsoOffset(pose.py-pose.fy,torsoSlope(pitch));
   return {
-    x:m.x + flip*(pose.px-pose.fx + u*Math.cos(pitch)-v*Math.sin(pitch)),
-    y:m.y + crewTorsoY(m) + pose.py-pose.fy + u*Math.sin(pitch)+v*Math.cos(pitch)
+    x:Math.round(m.x) + flip*(pose.px-pose.fx + offset.x + u*Math.cos(pitch)-v*Math.sin(pitch)),
+    y:Math.round(m.y) + crewTorsoY(m) + pose.py-pose.fy + offset.y + u*Math.sin(pitch)+v*Math.cos(pitch)
   };
 }
 
@@ -81,11 +94,19 @@ function drawRifleSkill(m, s) {
   ctx.save();
   ctx.translate(Math.round(m.x), Math.round(m.y));
   ctx.scale(flip, 1);
-  drawCrewBody(ctx,m,m.moving);
-  ctx.translate(p.px-p.fx, p.py-p.fy+crewTorsoY(m));
+  drawCrewBody(ctx,m,m.moving,pitch);
+  const offset=torsoOffset(p.py-p.fy,torsoSlope(pitch));
+  ctx.translate(p.px-p.fx+offset.x, p.py-p.fy+crewTorsoY(m)+offset.y);
   ctx.rotate(pitch);
   const item=rifleSkillItem(m);
   skillCell(art[item.artKey+'-skill'],p.col,0,p.w,p.h,0,0,p.px,p.py);
+  if(m.id===2 && s.phase==='charge'){
+    const [tipX,tipY]=weaponSockets.sniper[item.tier].firingTip;
+    const x=tipX-p.px-3,y=tipY-p.py-2;
+    ctx.fillStyle='#497783';ctx.fillRect(x-1,y,4,1);
+    ctx.fillStyle='#b1d9d2';ctx.fillRect(x,y-1,2,3);
+    if(s.age>.22){ctx.fillStyle='#f4e4bd';ctx.fillRect(x,y,3,1)}
+  }
   const glove=fieldGear(m.loadout,'gloves');
   if(glove)for(const [x,y] of skillGrips[item.family][p.col]){
     ctx.drawImage(glove,x-p.px-4,y-p.py-2,8,5);
@@ -101,8 +122,8 @@ function drawSpinner(m, s) {
       for (let j=0;j<5;j++) {
         const a=tip-1.7+j*.34, b=a+.32;
         ctx.globalAlpha=(j+1)*.14;
-        line(m.x+Math.cos(a)*41,m.y-25+Math.sin(a)*14,
-          m.x+Math.cos(b)*41,m.y-25+Math.sin(b)*14,j>2?'#ffc37b':'#c46650',1+j*.5);
+        skillPixelLine(m.x+Math.cos(a)*41,m.y-25+Math.sin(a)*14,
+          m.x+Math.cos(b)*41,m.y-25+Math.sin(b)*14,j>2?'#f2cd94':'#ae7154',j>2?2:1);
       }
     }
     ctx.restore();
@@ -139,10 +160,11 @@ function hammerMortarPose(m,s){
   const elapsed=s.age-s.lastFire;
   const recoil=elapsed>=0&&elapsed<.12?Math.sin(elapsed/.12*Math.PI)*2:0;
   return {plant,facing,image,w,h,bore,x:Math.round(1+13*plant),y:-32+15*plant,
-    pitch:-plant*1.16,reach:w-13-recoil,recoil};
+    pitch:-plant*1.16,reach:w-13-6*plant-recoil,recoil};
 }
 
 function drawHammerSkill(m,s){
+  if(s.awakened){drawSiegeLauncher(m,s);return}
   const pose=hammerMortarPose(m,s);
   const {plant,facing,image,w,h,bore,x,y,pitch,reach}=pose;
   ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(facing,1);
@@ -153,9 +175,14 @@ function drawHammerSkill(m,s){
   ctx.drawImage(body,cell,0,192,82,-32,-60+sink,96,41);
   if(plant>.12){
     const open=12*plant;
-    line(x,y+1,x-open,y+19*plant,'#263032',3);
-    line(x,y+1,x+open,y+19*plant,'#263032',3);
-    line(x,y+1,x+open,y+19*plant,'#858474',1);
+    const sole=Math.round(y+17*plant);
+    skillPixelLine(x,y+1,x-open,sole-1,'#29272a',2);
+    skillPixelLine(x,y+1,x+open,sole-1,'#29272a',2);
+    skillPixelLine(x,y+2,x+open,sole-1,'#948c74');
+    if(plant>.8){
+      ctx.fillStyle='#2c2c2b';ctx.fillRect(x-11,sole-1,8,2);
+      ctx.fillStyle='#a4987d';ctx.fillRect(x-9,sole-1,5,1);
+    }
   }
   ctx.translate(x,y);ctx.rotate(pitch);
   ctx.drawImage(image,reach-w,-Math.round(h*bore),w,h);
@@ -250,6 +277,11 @@ function drawBunker(s) {
 }
 
 function drawSkillRound(shot,x,y,angle) {
+  if(shot.awakened && shot.id===1 && shot.skillRound){
+    const tail=Math.min(26,Math.hypot(x-shot.x,y-shot.y));
+    skillPixelLine(x-tail*Math.cos(angle),y-tail*Math.sin(angle),x,y,'#69bbba',2);
+    ctx.fillStyle='#f2f7c9';ctx.fillRect(Math.round(x),Math.round(y),3,1);return true;
+  }
   if (!shot.lead || shot.family==='pistol') return false;
   if (shot.id === 0) {
     skillFlash(art.bulkRounds,0,0,40,32,33,16,x,y,angle,shot.skillRound ? .82 : 1);
@@ -290,6 +322,7 @@ function drawShellFlight(e) {
 }
 
 function drawSkillGround(e) {
+  if(e.awakened && e.id===3)drawSiegeShock(e);
   if (e.skillFx === 'shellArc') {
     const t = 1-(e.duration-e.age)/(e.large ? .40 : .23);
     if (t>0) skillFlash(art.hammerFx,0,Math.min(7,Math.floor(t*8)),64,64,32,32,
@@ -308,6 +341,7 @@ function drawSkillGround(e) {
 }
 
 function drawSkillFX(e) {
+  if(e.awakened && drawAwakenedEffect(e))return;
   const t = clamp(e.age/e.duration,0,1);
   switch (e.skillFx) {
     case 'railBeam': {

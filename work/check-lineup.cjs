@@ -24,7 +24,8 @@ const launchSquad = require('./select-test-squad.cjs');
     assert.equal(await page.locator('[data-item="shield-0"]').count(),1);
     await page.locator('[data-inspect="1"]').tap();
     assert.equal(await page.locator('[data-slot="shield"]').count(),0);
-    assert.equal(await page.locator('[data-item="pistol-0"]').count(),1);
+    assert.equal(await page.locator('[data-item="pistol-0"]').count(),0);
+    assert.equal(await page.locator('[data-item="smg-0"]').count(),1);
     await page.locator('#change-crew').tap();
     assert.equal(await page.locator('[data-pick]').count(),5);
     await page.locator('[data-pick="1"]').tap();
@@ -45,7 +46,8 @@ const launchSquad = require('./select-test-squad.cjs');
     const partyStatus=await page.evaluate(()=>{
       setLeader(0);
       const afterInvalidTag=run.lead;
-      run.up.fill(5); run.up[0]=0;
+      for(const id of run.lineup){run.up[id*2]=3;run.squad[id].gear.evadeChance=0}
+      run.up[firepower]=3;
       openUpgrade();
       const offered=offers.slice();
       const upgradeMode=mode;applyUpgrade();

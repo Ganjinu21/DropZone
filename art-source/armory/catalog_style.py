@@ -1,5 +1,6 @@
 """Paint the approved equipment silhouettes on the same pixel grid as the field operators."""
 import json
+from grade_clothing import ranked_clothing
 from bisect import bisect
 from functools import lru_cache
 from pathlib import Path
@@ -153,110 +154,22 @@ def paint_shield(image,field):
     return image
 
 
-def starter_gear(slot):
-    """Complete single items, drawn at equipment scale with the CCT kit's ink and cloth ramps."""
-    sizes={'gloves':(31,23),'boots':(43,34),'pants':(47,44),'top':(47,45)}
-    im=Image.new('RGBA',sizes[slot]); d=ImageDraw.Draw(im)
-    shadow='#4c382d'; cloth='#846341'; tan='#ac8558'; light='#d1aa77'
-    rubber='#3c3433'; steel='#786d62'
-    def patch(points,fill,edge=INK):
-        mask=Image.new('L',im.size)
-        ImageDraw.Draw(mask).polygon(points,fill=255)
-        bounds=mask.getbbox()
-        x0,y0,x1,y1=bounds
-        rgb=ImageColor.getrgb(fill)
-        raised=tuple(round(c*.78+v*.22) for c,v in zip(rgb,(255,212,156)))
-        lit=tuple(round(c*.65+v*.35) for c,v in zip(rgb,(255,219,165)))
-        shade=tuple(round(c*.68+v*.32) for c,v in zip(rgb,(38,27,27)))
-        ink=ImageColor.getrgb(edge)
-        def inside(x,y):
-            return 0<=x<mask.width and 0<=y<mask.height and mask.getpixel((x,y))
-        for y in range(y0,y1):
-            for x in range(x0,x1):
-                if not inside(x,y):continue
-                u=(x-x0)/max(1,x1-x0-1);v=(y-y0)/max(1,y1-y0-1)
-                if not all(inside(x+dx,y+dy) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1))):
-                    color=ink
-                elif not inside(x-2,y-2):
-                    color=lit if u+v<.78 else raised
-                elif not inside(x+2,y+2) or u+v>1.48:
-                    color=shade
-                else:
-                    color=raised if u+.85*v<.62 else rgb
-                im.putpixel((x,y),(*color,255))
-    def line(points,fill,width=1):d.line(points,fill=fill,width=width)
-    if slot=='gloves':
-        patch([(0,10),(4,8),(7,6),(11,4),(14,3),(21,3),(22,4),(27,5),(29,6),(29,9),(26,11),(24,11),(25,14),(22,18),(17,20),(11,20),(5,17),(2,17)],shadow)
-        patch([(2,10),(7,8),(9,11),(8,16),(4,16),(2,14)],cloth)
-        patch([(8,9),(12,5),(18,4),(21,5),(24,8),(21,12),(17,15),(12,16),(9,14)],tan)
-        patch([(12,6),(15,5),(18,5),(19,7),(17,9),(12,10)],rubber)
-        line([(13,6),(16,6),(17,5)],steel);line([(9,10),(11,8),(12,8)],light)
-        for x,y in ((18,11),(20,13),(17,15)):
-            line([(x,y),(x+2,y-1),(x+3,y-1)],cloth)
-        line([(7,16),(10,17),(13,18),(16,17)],'#57412f')
-        d.point((19,10),fill=light)
-        line([(23,6),(26,6),(27,7)],light);line([(4,11),(5,10),(6,10)],light)
-    elif slot=='boots':
-        patch([(5,1),(15,2),(20,0),(23,2),(22,10),(25,17),(27,20),(35,22),(39,25),(41,29),(40,31),(35,33),(11,33),(6,31),(2,31),(1,27),(3,22),(3,13)],shadow)
-        patch([(5,3),(10,4),(17,4),(20,2),(21,6),(18,8),(15,10),(7,9)],cloth)
-        patch([(4,11),(10,11),(16,9),(20,9),(21,14),(17,17),(19,21),(15,24),(8,24),(5,22)],tan)
-        patch([(16,18),(22,14),(24,18),(24,20),(30,23),(35,24),(38,27),(31,28),(19,26),(12,24)],cloth)
-        patch([(2,26),(10,25),(17,25),(24,27),(33,28),(39,27),(41,29),(38,31),(32,32),(10,31),(8,29),(4,30),(2,29)],rubber)
-        for x in (10,16,22,28,34):line([(x,29),(x+1,30)],steel)
-        for x,y in ((14,11),(15,14),(17,17)):
-            line([(x-1,y),(x+1,y+1),(x+5,y-2)],rubber,2)
-            line([(x,y),(x+2,y),(x+4,y-1)],light)
-        line([(5,17),(7,18),(9,20),(11,21)],shadow)
-        line([(5,16),(8,17),(10,19)],light)
-        line([(22,22),(25,22),(27,24)],tan)
-        line([(6,13),(8,11),(11,11)],light);line([(28,24),(32,24),(34,25)],light)
-    elif slot=='pants':
-        patch([(13,1),(29,1),(34,4),(34,10),(35,17),(39,23),(40,28),(45,35),(44,41),(36,43),(32,40),(30,33),(26,29),(22,24),(20,26),(18,34),(14,42),(6,42),(3,39),(7,28),(9,22),(8,16),(11,8)],shadow)
-        patch([(13,5),(21,6),(26,5),(24,14),(21,21),(16,27),(14,32),(8,30),(12,21),(11,17)],cloth)
-        patch([(25,5),(31,5),(31,12),(35,19),(34,22),(28,24),(23,18),(21,15)],tan)
-        for x,y in ((9,24),(29,21)):
-            patch([(x,y+2),(x+4,y),(x+8,y+1),(x+8,y+5),(x+5,y+8),(x,y+7)],cloth)
-            line([(x+1,y+2),(x+5,y+1),(x+7,y+2)],light)
-        line([(9,32),(13,32),(11,39),(8,39)],tan,2);line([(34,30),(38,29),(42,38)],tan,2)
-        patch([(10,11),(17,10),(18,11),(16,17),(11,18),(10,16)],tan)
-        line([(11,11),(16,10)],light);line([(12,3),(23,4),(33,3)],rubber,2);d.rectangle((23,2,26,5),outline=steel)
-        line([(14,7),(16,7),(17,8)],light);line([(12,20),(14,19),(16,19)],light)
-        line([(8,36),(11,35),(12,35)],shadow);line([(34,36),(37,36),(39,38)],cloth)
-        line([(28,9),(30,11),(30,13)],shadow)
-    elif slot=='top':
-        patch([(9,3),(14,1),(18,2),(19,6),(28,7),(32,3),(37,3),(39,9),(42,14),(42,21),(39,24),(40,36),(36,41),(26,43),(12,42),(7,40),(6,33),(8,23),(3,20),(2,13),(5,7)],shadow)
-        patch([(6,8),(10,4),(14,4),(15,7),(12,13),(10,19),(5,19),(4,16)],tan)
-        line([(6,9),(9,6),(12,5)],light,2)
-        patch([(14,13),(18,8),(27,9),(31,6),(35,6),(36,14),(38,17),(35,25),(29,29),(13,26),(11,21)],cloth)
-        patch([(16,13),(27,12),(31,11),(33,15),(31,19),(16,21),(13,18)],tan)
-        for y in (15,17):line([(16,y),(22,y),(28,y-1)],light if y==15 else cloth)
-        for x,y in ((8,27),(16,26),(24,26),(32,24)):
-            patch([(x,y+1),(x+6,y),(x+7,y+1),(x+7,y+9),(x+5,y+11),(x,y+10)],cloth)
-            line([(x+1,y+4),(x+3,y+5),(x+6,y+4)],shadow)
-            line([(x+1,y+2),(x+5,y+1)],light)
-            d.point((x+3,y+5),fill='#bda789')
-        line([(9,8),(10,7),(13,6)],light);line([(6,15),(8,13),(11,13)],cloth,2)
-        line([(15,22),(21,23),(29,22),(33,20)],shadow,2)
-        line([(15,21),(21,22),(27,21)],tan)
-        line([(13,39),(24,40),(36,37)],tan,2);d.rectangle((24,38,27,40),outline=steel)
-    return im.crop(im.getbbox())
-
-
-def build_catalog(destination):
+def build_catalog(destination, families=None):
     master=Image.open(MASTERS)
     rects=json.loads(master.info['sourceRects'])
     for key,(x,y,w,h) in rects.items():
         family,variant=key.split('/')
+        if families and family not in families:
+            continue
         rank=next(r for r in reversed(RANKS) if variant==r or variant.startswith(r+'-'))
         src=master.crop((x,y,x+w,y+h))
-        if family in ('top','gloves','pants','boots') and rank=='C':
-            image=starter_gear(family)
-        else:
-            image=finish(src,family,rank)
-            if family in ARMS:
-                image=paint_weapon(image,family,rank,variant.endswith('-far'))
-            elif family=='shield':
-                image=paint_shield(image,variant.endswith('-field'))
+        image=finish(src,family,rank)
+        if family in ARMS:
+            image=paint_weapon(image,family,rank,variant.endswith('-far'))
+        elif family=='shield':
+            image=paint_shield(image,variant.endswith('-field'))
+        if family in CLOTH:
+            image=ranked_clothing(family,rank,image)
         image.save(destination/(key+'.png'),optimize=True)
 
 

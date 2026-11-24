@@ -10,7 +10,7 @@ const {chromium} = require('playwright');
     const errors = [];
     page.on('pageerror',error=>errors.push(error.message));
     await page.addInitScript(()=>{
-      const keys=['carbine-0','smg-0','sniper-0','rocket-0','ar-0'];
+      const keys=['pistol-0','smg-0','sniper-0','rocket-0','ar-0'];
       localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
       localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
     });
@@ -20,12 +20,16 @@ const {chromium} = require('playwright');
     await page.waitForFunction(()=>skillAudio.buffers.size===10);
     const result = await page.evaluate(()=>{
       const foes=(...cells)=>cells.map(([x,y])=>({x,y,type:0,hp:500,max:500,speed:0,phase:0,hit:0,flip:1}));
-      const startAt=(id,enemies)=>{
+      const startAt=(id,enemies,variant=3)=>{
         cancelSquadSkill();
         if (run.lead!==id) setLeader(id);
         run.x=1280; run.y=1004;
         for (const m of run.squad) Object.assign(m,{x:run.x,y:run.y,cool:9,hurt:0,flip:1,moving:false});
         run.enemies=enemies; run.effects=[]; run.cues=[]; run.marks=[]; run.mark=null;
+        const member=run.squad[id];member.weapon=gearByKey.get(weaponFamilies[id]+'-'+variant);
+        member.loadout={...member.loadout,weapon:member.weapon.key};
+        member.burstRecharges=[];
+        run.squad[id].gear.critChance=0;run.squad[id].gear.evadeChance=0;
         run.squad[id].skillReadyAt=0;
       };
       const simulate=(seconds,onStep=()=>{})=>{
@@ -39,6 +43,8 @@ const {chromium} = require('playwright');
       };
       window.skillFixture={foes,startAt,simulate};
       const result={};
+      result.forms=['-0','-1','-3','-3@5','-5','-5@5','-6'].map(suffix=>
+        weaponSkillForm(gearByKey.get('smg'+suffix)));
       // Capture the actual flight vector of each directional shot, including empty sectors.
       startAt(0,foes([1370,1004]));
       activateSquadSkill();
@@ -75,6 +81,22 @@ const {chromium} = require('playwright');
       const beams=new Set();
       simulate(2.6,()=>{for(const fx of run.effects)if(fx.skillFx==='railBeam')beams.add(fx)});
       result.lynx={beams:beams.size,damaged:run.enemies.map(e=>500-e.hp)};
+      startAt(1,foes(),6);
+      const chargeStart=run.t,casts=[];
+      for(let n=0;n<3;n++){
+        casts.push(activateSquadSkill());simulate(3.05);
+      }
+      result.charges={casts,blocked:!activateSquadSkill(),deadlines:ravenPendingCharges().map(t=>Math.round(t-chargeStart))};
+      run.t=chargeStart+10;
+      result.charges.firstRefill=activateSquadSkill() && ravenPendingCharges().length===3;
+      const [decoy,boss]=foes([1210,1004],[1400,1004]);
+      Object.assign(boss,{boss:true,type:2,hp:50000,max:50000});
+      startAt(2,[decoy,boss],6);
+      activateSquadSkill();simulate(.95);
+      result.focus={charged:boss.hp===boss.max && run.activeSkill.phase==='charge'};
+      const focusedBeams=new Set();
+      simulate(1.7,()=>{for(const fx of run.effects)if(fx.skillFx==='railBeam' && fx.awakened)focusedBeams.add(fx)});
+      Object.assign(result.focus,{beams:focusedBeams.size,centered:run.mark===boss,damage:boss.max-boss.hp,decoy:decoy.hp});
       pause();
       return result;
     });
@@ -100,6 +122,19 @@ const {chromium} = require('playwright');
         }
       });
       result.hammer.salvo=[shots.size,blasts.size];
+      const [stronghold]=foes([1380,1004]);
+      stronghold.hp=stronghold.max=100000;
+      startAt(3,[stronghold],6);
+      activateSquadSkill();
+      const rockets=new Set(),blastSites=new Set();
+      simulate(3.85,()=>{
+        for(const effect of run.effects){
+          if(effect.awakened && effect.skillFx==='shellArc')rockets.add(effect);
+          if(effect.awakened && effect.skillFx==='blast')blastSites.add(effect.x+','+effect.y);
+        }
+      });
+      result.siege={rockets:rockets.size,apertures:new Set([...rockets].map(e=>e.salvoIndex)).size,
+        sites:blastSites.size,hurt:stronghold.hp<stronghold.max};
       // A grenade that was already launched may finish on its original floor after a tag,
       // but cannot hurt the newly active floor or play its originating operator's audio there.
       startAt(3,foes([1380,1004]));
@@ -117,6 +152,10 @@ const {chromium} = require('playwright');
       return result;
     }));
     console.log(JSON.stringify(result));
+    assert.deepEqual(result.forms,[0,0,1,1,1,1,2]);
+    assert.deepEqual(result.charges,{casts:[true,true,true],blocked:true,deadlines:[10,20,30],firstRefill:true});
+    assert.deepEqual(result.focus,{charged:true,beams:1,centered:true,damage:7308,decoy:500});
+    assert.ok(result.siege.rockets===12 && result.siege.apertures===4 && result.siege.sites>=3 && result.siege.hurt);
     assert.equal(result.bulk.lock,true);
     assert.equal(result.bulk.protected,true);
     assert.ok(result.bulk.shots>=10 && result.bulk.sectors===4 && result.bulk.hurt);
@@ -127,9 +166,9 @@ const {chromium} = require('playwright');
     assert.equal(result.lynx.beams,4);
     assert.ok(result.lynx.damaged.every(d=>d>=58));
     assert.equal(result.hammer.before,500);
-    assert.deepEqual(result.hammer.impact,[22,22]);
+    assert.deepEqual(result.hammer.impact,[55,55]);
     assert.deepEqual(result.hammer.salvo,[8,8]);
-    assert.deepEqual(result.oldFloor,{oldHp:478,newHp:500,sounds:0});
+    assert.deepEqual(result.oldFloor,{oldHp:445,newHp:500,sounds:0});
     assert.deepEqual(errors,[]);
   } finally {await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -4,18 +4,17 @@
 // are drawn on top of the shared helmet at their original body coordinates.
 const assaultVest={vest:[29,37,55,44],cloth:[30,42,43,36,55,40,64,45,79,44,86,56,77,62,73,72,83,73,84,79,66,83,34,81,37,73,50,70,46,62,41,64,36,69,29,61]};
 const radioVest={vest:[34,39,48,43],cloth:[34,45,45,39,54,42,59,48,75,47,82,52,80,60,75,67,81,73,79,80,62,84,38,81,39,74,53,70,49,63,43,65,40,71,34,64]};
-const crewFits=[
-  {...assaultVest,helmet:[38,8,45,31],details:[[45,25,57,24,62,20,80,20,86,23,83,32,76,34,63,34,58,31,57,38,47,40,44,36]]},
-  {...assaultVest,helmet:[39,10,43,27],details:[[38,24,49,22,64,19,74,19,81,22,82,27,75,28,69,26,59,27,49,30,43,33,38,31]]},
-  {...radioVest,helmet:[41,10,45,32],details:[[34,48,42,42,52,39,60,31,67,26,76,22,84,24,91,29,91,35,86,37,83,29,77,26,70,28,64,34,61,42,55,48,48,46,39,49]]},
-  {...assaultVest,helmet:[38,9,45,31],details:[[40,29,44,22,56,16,61,16,63,19,57,23,51,24,45,30],[44,32,51,28,58,30,60,35,55,40,46,40,43,36]]},
-  {...radioVest,helmet:[43,5,54,35],details:[[68,7,91,6,97,12,98,20,92,25,73,24,67,20],[48,23,60,20,62,26,50,30,47,30]]}
-];
+const crewFits=[assaultVest,assaultVest,radioVest,assaultVest,radioVest];
+const portraitRoles=['bulk','raven','lynx','hammer','cct'];
+function wornPortrait(id,row){
+  const rank=gearByKey.get(row?.helmet)?.rank??'C';
+  return rank==='C'?ART['face'+id]:'art/armory/portraits/'+portraitRoles[id]+'-'+(rank==='S+'?'S-plus':rank)+'.png';
+}
 const crewOutfits=[];
 const wornSlots=['helmet','top','pants','boots'];
 function fieldGear(row,slot){
   const item=gearByKey.get(row?.[slot]);
-  return item?.tier>0?art[item.key]:null;
+  return item?art[item.key]:null;
 }
 function traceGearSeam(g,points){
   g.moveTo(points[0],points[1]);
@@ -26,20 +25,21 @@ function fitVest(g,image,fit){
   g.save();g.beginPath();traceGearSeam(g,fit.cloth);
   g.clip();g.drawImage(image,...fit.vest);g.restore();
 }
-function fitHelmet(g,image,fit,id){
-  g.drawImage(image,...fit.helmet);
-  g.save();g.beginPath();
-  for(const feature of fit.details)traceGearSeam(g,feature);
-  g.clip();g.drawImage(art.crewBodies,id*192,0,192,128,0,0,192,128);g.restore();
+function drawClassCloth(g,id,row,cell){
+  if(id!==1 && id!==2)return;
+  const helmet=gearByKey.get(row.helmet),tier=helmet?.tier??0;
+  const flutter=[1,1,2,2,1,1,0,0,1][cell];
+  const clothRow=(id===1?0:3)+flutter;
+  g.drawImage(art.classCloth,112*tier,88*clothRow,112,88,0,0,112,88);
+  if(id===2 && helmet?.rank==='S+')g.drawImage(art.lynxOptics,62,0);
 }
 function crewOutfitSheet(m){
-  const row=m.loadout;
-  if(!row)return null;
+  const row=m.loadout||{};
   const cached=crewOutfits[m.id];
   if(cached && wornSlots.every(slot=>cached.keys[slot]===row[slot]))return cached.sheet;
   const [helmet,top,pants,boots]=wornSlots.map(slot=>fieldGear(row,slot));
   let sheet=null;
-  if(helmet||top||pants||boots){
+  if(helmet||top||pants||boots||m.id===1||m.id===2){
     sheet=document.createElement('canvas');sheet.width=192*9;sheet.height=128;
     const g=sheet.getContext('2d'),fit=crewFits[m.id];
     g.imageSmoothingEnabled=false;
@@ -54,8 +54,12 @@ function crewOutfitSheet(m){
         if(garment)g.drawImage(garment,cell*112,m.id*56,112,56,8,68,112,56);
       }
       g.translate(0,cell?2*crewStepY[frame]:0);
+      if(helmet){
+        g.clearRect(0,0,192,48);
+        g.drawImage(helmet,m.id*192,0,192,48,0,0,192,48);
+      }
       if(top)fitVest(g,top,fit);
-      if(helmet)fitHelmet(g,helmet,fit,m.id);
+      drawClassCloth(g,m.id,row,cell);
       g.restore();
     }
   }

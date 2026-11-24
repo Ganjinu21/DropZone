@@ -102,20 +102,38 @@ async function exerciseFormation(page) {
           g.clearRect(0,0,canvas.width,canvas.height);
           const actor={...m,x:cx,y:feet,flip:i%2?-1:1,aimPitch:.2,shotColumn:1};
           let tip,shield=false,far=false;
+          const bulkLayers=[];
           const drawImage=g.drawImage;
           g.drawImage=function(image,...args){
             if(image===art[weapon.artKey]){
               const [x,y,w,h]=args.slice(-4), p=weaponMount(actor,1,2);
               tip=this.getTransform().transformPoint({x:x+w,y:y+h*p.bore});
+              if(id===0)bulkLayers.push({part:'pistol',x:tip.x});
             }
-            if(image===art['shield-3'])shield=true;
+            if(image===art['shield-3']){
+              shield=true;
+              const [x,y]=args.slice(-4);
+              const edge=this.getTransform().transformPoint({x,y:y+15});
+              bulkLayers.push({part:'shield',x:edge.x});
+            }
+            if(id===0 && image===art.specialistHands){
+              const [sx,,, ,x,y]=args;
+              const left=sx===76;
+              const palm=this.getTransform().transformPoint({x:x+((left?86:64)-sx)/2,y:y+32});
+              bulkLayers.push({part:left?'left':'right',x:palm.x});
+            }
             if(image===art[weapon.artKey+'-far'])far=true;
             return drawImage.call(this,image,...args);
           };
           try{drawMemberGear(g,actor,0,true)}finally{g.drawImage=drawImage}
           const shot=combatMuzzle(actor,1,true);
           check(tip && Math.hypot(tip.x-shot.x,tip.y-shot.y)<.01,'barrel detached on '+id+' phase '+i);
-          if(id===0)check(shield,'shield missing while moving');
+          if(id===0){
+            check(shield && bulkLayers.map(p=>p.part).join(',')==='shield,left,pistol,right','shield and trigger hand depth');
+            const [guard,left,pistol,right]=bulkLayers.map(p=>p.x);
+            check(Math.abs(guard-left)<1 && (right-left)*actor.flip>4 && (pistol-right)*actor.flip>5,
+              'shield grip or pistol grip detached on facing '+actor.flip);
+          }
           if(id===1)check(far,'second SMG missing while moving');
         }
         check(legs.size===8,'duplicate walking legs on '+id);
@@ -123,6 +141,49 @@ async function exerciseFormation(page) {
         render(m,1,false);const idle=canvas.toDataURL();
         render({...m,gait:m.gait+13},1,false);
         check(canvas.toDataURL()===idle,'idle depends on distance for '+id);
+      }
+      // Check actual rendered head placement and the pixels below the belt, for
+      // both bearings during walking and idle while recoil has completely settled.
+      for(const base of run.squad)for(const flip of [-1,1])for(const moving of [false,true]){
+        const m={...base,x:cx,y:feet,flip,moving,gait:5,aimTarget:{hp:30}};
+        const captureBody=(pitch)=>{
+          const g=mirror;
+          let head;
+          g.clearRect(0,0,canvas.width,canvas.height);
+          const original=g.drawImage;
+          g.drawImage=function(image,...args){
+            const [sx,sy,sw,sh,x,y,w,h]=args;
+            if(sw===192 && sh>50){
+              head=this.getTransform().transformPoint({x:x+w*64/192,y:y+12*h/sh});
+            }
+            return original.call(this,image,...args);
+          };
+          g.save();g.translate(m.x,m.y);g.scale(flip,1);
+          try{drawCrewBody(g,m,moving,pitch)}finally{g.restore();g.drawImage=original}
+          return {head,feet:g.getImageData(0,(feet-12)*2,mirrorCanvas.width,30).data.filter((_,i)=>i%4===3)};
+        };
+        const level=captureBody(0);
+        for(const sign of [-1,1]){
+          const tx=cx+flip*66,ty=feet-28+sign*83;
+          combatAim(m,tx,ty,1);
+          const body=captureBody(m.aimPitch),aimed=combatMuzzle(m,1,true,m.aimPitch,0);
+          const miss=Math.abs((tx-aimed.x)*Math.sin(m.aimPitch)-(ty-aimed.y)*flip*Math.cos(m.aimPitch));
+          check(miss<.05,'shot line misses target on '+m.id+' by '+miss);
+          check((body.head.x-level.head.x)*flip*sign>4 && (body.head.y-level.head.y)*sign>.2,
+            'head not leaning with target '+m.id+' on bearing '+sign);
+          check(body.feet.every((a,i)=>(a>127)===(level.feet[i]>127)),'aim displaced planted feet '+m.id);
+          let tip;
+          const weaponImage=art[m.weapon.artKey],original=g.drawImage;
+          g.drawImage=function(image,...args){
+            if(image===weaponImage){
+              const [x,y,w,h]=args.slice(-4),mount=weaponMount(m,1);
+              tip=this.getTransform().transformPoint({x:x+w,y:y+h*mount.bore});
+            }
+            return original.call(this,image,...args);
+          };
+          try{drawMemberGear(g,m,Infinity,moving)}finally{g.drawImage=original}
+          check(tip && Math.hypot(tip.x-aimed.x,tip.y-aimed.y)<.01,'held aim or effect socket detached '+m.id);
+        }
       }
       // A patrol and a fast leash return must advance stride by actual distance traveled.
       const ally=run.radioTeam[0],nav=routes.surface;
@@ -151,9 +212,10 @@ async function exerciseFormation(page) {
         const draw=ctx.drawImage,chief=run.squad[4];
         let body=false,gun=false;
         ctx.drawImage=function(image,...args){
-          if(image===art.crewStride){
-            const [sx,sy,w,h]=args;
-            body=sy/h===4 && sx/w===crewStrideFrame(support)
+          const outfit=crewOutfitSheet(chief);
+          if(image===(outfit||art.crewStride)){
+            const [sx,sy,w]=args;
+            body=(outfit?sy===0 && sx/w===crewStrideFrame(support)+1:sy===4*128 && sx/w===crewStrideFrame(support))
               && Math.abs(Math.abs(this.getTransform().a)-summonScale)<1e-5;
           }
           if(image===art[chief.weapon.artKey])gun=true;
@@ -167,7 +229,7 @@ async function exerciseFormation(page) {
     // This catches a transparent margin, disappearing thin barrel or mismatched far-hand sprite.
     await page.evaluate(()=>{
       const canvas=document.createElement('canvas'),g=canvas.getContext('2d',{willReadFrequently:true});
-      for(const family of ['pistol',...weaponFamilies]){
+      for(const family of weaponFamilies){
         const models=new Set();
         for(const item of equipmentCatalog.filter(i=>i.family===family)){
           const id=Math.max(0,weaponFamilies.indexOf(family));
@@ -230,6 +292,57 @@ async function exerciseFormation(page) {
       assert.equal(planes,[1+(i>>3),'body',3+(i>>3)].join(','));
       assert.equal(dy,1);
     });
+    // Class cloth follows the equipped helmet even when it and the held gun
+    // have opposite ranks. Only the S+ crown may expose a cyan optics cluster.
+    await page.evaluate(()=>{
+      const test=document.createElement('canvas');test.width=192;test.height=128;
+      const g=test.getContext('2d',{willReadFrequently:true});g.imageSmoothingEnabled=false;
+      const swatches=[[144,122,91],[121,130,92],[119,133,138],[188,83,81],[182,74,79]];
+      const tiers=[0,1,3,5,6];
+      for(const id of [1,2])for(const [tier,code] of tiers.entries()){
+        for(const held of [0,6]){
+          const m={...run.squad[id],weapon:gearByKey.get(weaponFamilies[id]+'-'+held),
+            loadout:{...savedEquipment[id],helmet:'helmet-'+code,top:'top-6'}};
+          const sheet=crewOutfitSheet(m);
+          for(const cell of [0,2,7]){
+            g.clearRect(0,0,192,128);
+            g.drawImage(sheet,cell*192,0,192,128,0,0,192,128);
+            const dy=cell?2*crewStepY[cell-1]:0;
+            function pixel(x,y){return Array.from(g.getImageData(x,y+dy,1,1).data).slice(0,3)}
+            const paint=id===2?pixel(47,24):pixel(62,43);
+            if(id===2 && paint.join()!==swatches[tier].join())throw Error('Lynx hood did not follow helmet '+[code,held,cell]);
+            if(id===1 && (paint[0]<130 || paint[0]<paint[1]*1.4))throw Error('missing scarf over assault vest');
+            if(id===1 && pixel(32,56).join()===pixel(42,47).join())throw Error('rolled sleeve missing');
+            const lamps=g.getImageData(66,1+dy,35,19).data;
+            let lit=0;
+            for(let i=0;i<lamps.length;i+=4)if(lamps[i+3]>128 && lamps[i+1]>150 && lamps[i+1]-lamps[i]>55 && lamps[i+2]-lamps[i]>45)lit++;
+            if((lit>6)!==(tier===4))throw Error('four lens rig covered or present at wrong tier '+[id,code,held,cell,lit]);
+          }
+        }
+      }
+    });
+    // Follow the same living enemy between trigger pulls, including after it
+    // crosses the shoulder. Lose the lock immediately on a floor change or KO.
+    await page.evaluate(()=>{
+      const chief=run.squad[run.lead],enemy={x:chief.x+28,y:chief.y-48,type:0,hp:999,max:999};
+      run.activeSkill=null;run.enemies=[enemy];chief.ammoKey=null;
+      shoot(chief);
+      if(chief.aimTarget!==enemy || chief.aimPitch>=0)throw Error('did not acquire upper target');
+      chief.cool=10;enemy.y=chief.y+43;enemy.x=chief.x-25;
+      moveFormation(1/60);
+      if(chief.aimPitch<=0 || chief.flip!==-1)throw Error('did not track the crossed target between shots');
+      if(run.radioTeam){
+        const ally=run.radioTeam[0];Object.assign(ally,{x:chief.x,y:chief.y,grace:1,cool:10});
+        updateRadioSupport(1/60);
+        if(ally.aimTarget!==enemy || ally.aimPitch<=0 || ally.flip!==-1)throw Error('summon did not hold lower target');
+        enemy.y=ally.y-60;updateRadioSupport(1/60);
+        if(ally.aimPitch>=0)throw Error('summon did not raise sights between shots');
+      }
+      run.enemies=[];moveFormation(1/60);
+      if(chief.aimTarget)throw Error('lock crossed to old floor');
+      run.enemies=[enemy];chief.aimTarget=enemy;enemy.hp=0;moveFormation(1/60);
+      if(chief.aimTarget)throw Error('lock on defeated opponent');
+    });
     await page.emulateMedia({reducedMotion:'reduce'});
     const reduced=await page.evaluate(()=>{
       const m={...run.squad[4],moving:true},y=shoulderAt({...m,gait:0}).y;
@@ -237,6 +350,6 @@ async function exerciseFormation(page) {
     });
     assert.ok(reduced,'reduced motion still bobs the firing socket');
     assert.deepEqual(errors,[]);
-    console.log('Verified all five operators, 40 moving poses with armor and muzzle alignment, both facings, idle and CCT patrols.');
+    console.log('Verified 40 movement frames, 40 uphill/downhill aim and bearing combinations, grounded feet, shield and pistol contacts, field muzzle alignment and CCT patrols.');
   }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

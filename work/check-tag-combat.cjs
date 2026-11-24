@@ -10,7 +10,7 @@ const {chromium} = require('playwright');
     const errors=[];
     page.on('pageerror', e=>errors.push(e.message));
     await page.addInitScript(()=>{
-      const keys=['carbine-0','smg-0','sniper-0','rocket-0','ar-0'];
+      const keys=['pistol-0','smg-0','sniper-0','rocket-0','ar-0'];
       localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
       localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
     });
@@ -23,6 +23,7 @@ const {chromium} = require('playwright');
       mode='qa';
       run.t=5;run.floor='surface';run.marks=[];run.cues=[];run.effects=[];
       run.squad.forEach(m=>Object.assign(m,{x:1280,y:1004,flip:1,moving:false}));
+      for(const m of run.squad)Object.assign(m.gear,{critChance:0,evadeChance:0});
       const foe=(dx,type=0)=>({type,x:1280+dx,y:1004+enemyChest[type]-18,
         hp:120,max:120,phase:0,hit:0,flip:-1,speed:0});
       const setTargets=(...enemies)=>{run.enemies=enemies;run.marks=[]};
@@ -47,7 +48,8 @@ const {chromium} = require('playwright');
       run.up[4]=1;
       setTargets(heavy,far,further);
       shoot(lynx);advanceRounds(.4);
-      const thirdHit=further.hp;
+      const rankedHit=[far.hp,further.hp];
+      run.up[4]=0;
       const supports=[];
       for (const member of [bulk,raven,lynx]) {
         setLeader((member.id+1)%3);
@@ -64,16 +66,16 @@ const {chromium} = require('playwright');
       const rear=before-bulk.hp;
       setLeader(1);
       const close=foe(8);setTargets(close);shoot(raven);advanceRounds(.016);
-      return {beat,early,inFlight,afterBurst,heavyMarked,pierced,thirdHit,supports,front,rear,pointBlank:close.hp};
+      return {beat,early,inFlight,afterBurst,heavyMarked,pierced,rankedHit,supports,front,rear,pointBlank:close.hp};
     });
     assert.deepEqual(results.beat.map(([c])=>c),[1,3,1,3]);
     assert.ok(results.beat[3][1]>results.beat[0][1]*3);
     assert.deepEqual([results.early,results.inFlight,results.afterBurst],[120,120,76]);
     assert.equal(results.heavyMarked,true);
     assert.deepEqual(results.pierced,[65,82,120]);
-    assert.equal(results.thirdHit,82);
-    assert.deepEqual(results.supports,[[1,.76*(1/1.03),100,120],[1,.106*(1/1.03),109,120],[1,1.16*(1/1.03),82,82]]);
-    assert.ok(Math.abs(results.front-3.6*.97)<.001 && Math.abs(results.rear-8*.97)<.001);
+    assert.deepEqual(results.rankedHit,[36,120]);
+    assert.deepEqual(results.supports,[[1,1.18,113,120],[1,.106,109,120],[1,1.16,82,82]]);
+    assert.ok(Math.abs(results.front-3.6)<.001 && results.rear===8);
     assert.equal(results.pointBlank,109);
     const audio=await page.evaluate(()=>{
       const played=[];
@@ -125,6 +127,32 @@ const {chromium} = require('playwright');
     assert.deepEqual(audio.outgoing,audible('lynx'));
     assert.deepEqual(audio.promoted,audible());
     assert.deepEqual(audio.fresh,audible('bulk','hit'));
+    const armorRolls=await page.evaluate(()=>{
+      const member=run.squad[1],random=Math.random;
+      const result=[];
+      try{
+        // Resolve a reserve operator's shot and an unguarded hit on that operator.
+        run.lead=2;
+        for(const rank of rankedTiers){
+          const row={...member.loadout,helmet:'helmet-'+rank.variant,pants:'pants-'+rank.variant};
+          const gear=gearStats(1,run.squad.map(m=>m===member?row:m.loadout));
+          member.gear=gear;
+          for(const succeeds of [true,false]){
+            const enemy={x:member.x+8,y:member.y,type:0,hp:100,max:100};
+            const floor={cues:[],effects:[]};
+            Math.random=()=>gear.critChance+(succeeds?-.00001:0);
+            roundImpact({id:1,damage:10,family:'smg',angle:0,hit:new Set(),remaining:1},enemy,0,0,floor);
+            const hp=member.hp=member.max;
+            run.cues=[];
+            Math.random=()=>gear.evadeChance+(succeeds?-.00001:0);
+            absorbContact(enemy,member,routes[run.floor],10);
+            result.push([100-enemy.hp,hp-member.hp,floor.cues.some(c=>c.kind==='critical'),run.cues.some(c=>c.kind==='evade')]);
+          }
+        }
+      }finally{Math.random=random}
+      return result;
+    });
+    assert.deepEqual(armorRolls,Array.from({length:5},()=>[[15,0,true,true],[10,10,false,false]]).flat());
     assert.deepEqual(errors,[]);
     console.log('Raven cadence, moving rounds, Lynx priority/pierce, support roles, shield facing, point-blank shots, all seven audio buffers and leader-only fire/impact across tags passed.');
   } finally {await browser.close()}

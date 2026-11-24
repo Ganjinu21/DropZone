@@ -6,7 +6,7 @@ from PIL import Image, ImageChops
 from locomotion import BODY_Y, CELL, RIGS, ROOT, dress_leg, legs_and_coat, walk_targets
 
 CROP = (8,68,120,124)
-RANKS = ('B','A','S','S-plus')
+RANKS = ('C','B','A','S','S-plus')
 SLOTS = ('pants','boots')
 
 

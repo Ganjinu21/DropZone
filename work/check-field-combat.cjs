@@ -37,6 +37,24 @@ const {chromium} = require('playwright');
       Object.assign(run.radioTeam[0],{x:run.x+120,y:run.y});
       for(let i=0;i<60;i++)updateRadioSupport(1/60);
       need(dist(run.radioTeam[0],run)<80,'Support did not return');
+      // Force XP thresholds, then choose only cards offered by the actual level-up flow.
+      // When Bulk is absent, take a repair kit or strengthen another deployed weapon.
+      function levelUp(){run.xp=run.need;update(.001);need(mode==='upgrade','No level-up selection')}
+      setLeader(4);need(!activateSquadSkill() && !run.cobra,'C-grade Cobra unlocked');
+      setLeader(0);need(!activateSquadSkill() && $('cast').disabled,'Starting bunker unlocked');
+      const baseDamage=basicHitDamage(bulk,basicWeaponProfile(bulk,true));
+      for(let level=0;weaponRank(0)<3 && level<50;level++){
+        levelUp();
+        need(offers.length===3 && new Set(offers).size===3,'Invalid card count');
+        need(offers.every(k=>k>=fieldKit || run.lineup.includes(Math.floor(k/2))),'Reserve upgrade offered');
+        need(!offers.some(key=>key<fieldKit && key%2),'Obsolete awakening card');
+        const index=offers.indexOf(0);
+        choose(index>=0?index:offers.findIndex(k=>k>=fieldKit));applyUpgrade();
+      }
+      need(weaponRank(0)===3 && basicHitDamage(bulk,basicWeaponProfile(bulk,true))===Math.round(baseDamage*1.6),'Three weapon boosts');
+      need(!activateSquadSkill() && $('cast').disabled,'Run boost unlocked C-grade bunker');
+      bulk.weapon=gearByKey.get('pistol-3');bulk.loadout={...bulk.loadout,weapon:bulk.weapon.key};
+      updateHud();need(!$('cast').disabled,'A-grade weapon did not unlock bunker');
       need(activateSquadSkill(),'Bunker did not deploy');
       const fort=run.activeSkill;
       need(run.radioTeam.every(m=>m.x===fort.x && m.y===fort.y),'Support did not board');
@@ -49,7 +67,7 @@ const {chromium} = require('playwright');
       const health=fort.hp;
       run.xp=run.need;update(.01);
       need(mode==='upgrade' && run.activeSkill===fort,'XP interrupted bunker');
-      applyUpgrade();
+      choose(offers.findIndex(k=>k>=fieldKit));applyUpgrade();
       need(run.activeSkill===fort && fort.hp===health,'Upgrade reset bunker durability');
       switchLead(4);need(run.lead===0,'Tag exited bunker');
       advanceStage();need(run.activeSkill===fort,'Stage transition removed bunker');
@@ -62,7 +80,7 @@ const {chromium} = require('playwright');
       need(run.effects.some(e=>e.skillFx==='blast') && bulk.hp>=before && run.radioTeam.every((a,i)=>a.hp===allyHP[i]),'Explosion or occupant protection');
       hitSquadMember(target,hammer,nav,10000); // collapse grants brief exit protection
       need(hammer.hp>0,'Immediate exit damage');
-      hammer.hurt=0;hitSquadMember(target,hammer,nav,10000);
+      hammer.gear.evadeChance=0;hammer.hurt=0;hitSquadMember(target,hammer,nav,10000);
       need(hammer.hp===0 && hammer.downFloor==='surface','Downed position not recorded');
       Object.assign(bulk,{x:hammer.x,y:hammer.y,moving:false});run.moving=false;
       updateRescues(2.9);need(hammer.hp===0,'Early revive');
@@ -80,15 +98,26 @@ const {chromium} = require('playwright');
       }
       chief.hp=chief.max*.25;run.radioTeam[0].hp=0;
       getOffer(fieldKit);applyUpgrade();
-      need(Math.abs(chief.hp-chief.max*.55)<.001 && run.radioTeam[0].hp===0,'Field kit healing');
-      const rank=run.up[firepower];getOffer(firepower);applyUpgrade();
-      const shot=enemy(100,100);damageEnemy(shot,100);
-      need(Math.abs(shot.max-shot.hp-(110+rank*10))<.001,'Firepower multiplier');
-      for(let i=0;i<100;i++){
-        openUpgrade();
-        if(offers.includes(fieldKit) && offers.includes(firepower))break;
+      need(Math.abs(chief.hp-chief.max*.75)<.001 && run.radioTeam[0].hp===0,'Field kit healing');
+      const hpRank=run.up[vitality];getOffer(vitality);applyUpgrade();
+      need(chief.max===Math.round(chief.baseMax*(1+.3*(hpRank+1))) &&
+           Math.abs(chief.hp/chief.max-.75)<.0001 && run.radioTeam[0].hp===0,'Maximum HP and downed states');
+      while(run.up[firepower]<3){
+        getOffer(firepower);applyUpgrade();
+        const shot=enemy(100,100);damageEnemy(shot,100);
+        need(Math.abs(shot.max-shot.hp-(100+run.up[firepower]*10))<.001,'Firepower multiplier');
       }
-      need(new Set(offers).size===3,'Duplicate upgrade choices');
+      run.crystals=[{x:run.x+30,y:run.y,val:2},{x:run.x+90,y:run.y,val:3},{x:run.x+400,y:run.y,val:7}];
+      const xp=run.xp;getOffer(magnet);applyUpgrade();
+      need(run.xp===xp+5 && run.crystals.length===1 && run.magnetUntil===run.t+magnetSeconds,'Instant local magnet collection');
+      setLeader(4);
+      chief.weapon=gearByKey.get('ar-5');chief.loadout={...chief.loadout,weapon:chief.weapon.key};
+      need(weaponRank(4)===0 && activateSquadSkill() && run.cobra && !run.cobra.awakened,'S-grade Cobra unavailable without run boosts');
+      run.swap=0;switchLead(0);
+      need(run.lead===0 && run.cobra,'CCT support lost after lead switch');
+      for(const id of run.lineup)run.up[id*2]=3;
+      openUpgrade();
+      need(offers.length===3 && new Set(offers).size===3 && !offers.includes(firepower),'Exhausted pool or damage cap');
       return {patrol:stops.map(a=>a.size),bunkerHP:health,revived:hammer.max*.3};
     });
     for(const width of [320,393,430]){

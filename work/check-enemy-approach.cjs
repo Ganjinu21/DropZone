@@ -19,6 +19,7 @@ const {chromium} = require('playwright');
     await page.evaluate(()=>{
       const check=(condition,message)=>{if(!condition)throw Error(message)};
       const dt=1/60;
+      for(const m of run.squad)m.gear.evadeChance=0;
       function arrange(x,y) {
         Object.assign(run,{x,y,heading:0,spawn:999,remaining:999,enemies:[]});
         for(const [slot,id] of run.lineup.entries()){

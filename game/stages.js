@@ -32,7 +32,7 @@ function announceEncounter(kind,title,detail,seconds) {
 }
 function advanceStage() {
   if(run.stage===stages.length){end(true);return;}
-  if(run.activeSkill?.id!==0)cancelSquadSkill();
+  if(!deployedBunker())cancelSquadSkill();
   // Remove stragglers and rounds from both floors. Earned XP and equipment carry over.
   for(const state of [run,run.floors.surface,run.floors.metro]){
     state.enemies.length=0;

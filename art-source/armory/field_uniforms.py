@@ -5,6 +5,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 from locomotion import CELL, stride_sheet
 import specialists
+from field_headgear import publish_base_and_helmets
 
 ROLES = ('bulk', 'raven', 'lynx', 'hammer', 'cct')
 EDGE = '#211c20'
@@ -268,15 +269,11 @@ def publish(out):
     out=Path(out)
     bodies=Image.new('RGBA',(len(ROLES)*CELL[0],CELL[1]))
     arms=Image.new('RGBA',bodies.size)
-    for i,role in enumerate(ROLES):
-        dressed=uniform(role)
+    starters=publish_base_and_helmets(out,[uniform(role) for role in ROLES])
+    for i,(role,dressed) in enumerate(zip(ROLES,starters)):
         body,hands=separate_arms(dressed,'cct' if role in ('cct','lynx') else 'hammer')
         bodies.paste(body,(i*CELL[0],0))
         arms.paste(hands,(i*CELL[0],0))
-        if role!='cct':
-            portrait=dressed.crop((26,1,100,75)).resize((112,112),Image.Resampling.NEAREST)
-            portrait.save(out/(role+'-portrait.png'),optimize=True)
-    specialists.portrait('cct').save(out/'cct-portrait.png')
     bodies.save(out/'bodies.png',optimize=True)
     arms.save(out/'specialist-hands.png',optimize=True)
     stride_sheet(out/'crew-stride.png')

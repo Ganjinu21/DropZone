@@ -49,14 +49,15 @@ const tagArt = {
     if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     return [[i.key,itemImage(i)]];
   })),
-  ...Object.fromEntries(equipmentCatalog.filter(i=>armorStats[i.family] && i.tier>0).map(i=>{
-    const fitted=i.family==='pants'||i.family==='boots';
+  ...Object.fromEntries(equipmentCatalog.filter(i=>armorStats[i.family]).map(i=>{
+    const fitted=['helmet','pants','boots'].includes(i.family);
     return [i.key,fitted?'art/armory/worn/'+i.family+'-'+(i.rank==='S+'?'S-plus':i.rank)+'.png':itemImage(i)];
   })),
   crewStride:'art/armory/crew-stride.png',
+  classCloth:'art/armory/worn/class-cloth.png',lynxOptics:'art/armory/worn/lynx-optics.png',
   crewBodies:'art/armory/bodies.png',specialistHands:'art/armory/specialist-hands.png',
   combatUnits: 'combat-units.png',
-  cobra:'art/prep/cobra.png',
+  cobra:'art/skills/field-cobra.png',
   infectedBosses: 'art/bosses/infected.png',
   tagRig: 'art/tag-combat/units-rig.png',
   tagEquip: 'art/tag-combat/units-equip.png',
@@ -77,17 +78,28 @@ function crewStrideFrame(m){
 function crewTorsoY(m){
   return m.moving && !reduceMotion.matches?crewStepY[crewStrideFrame(m)]:0;
 }
-function shoulderAt(m) {
-  return {x:Math.round(m.x),y:Math.round(m.y)+shoulder.y-60+crewTorsoY(m)};
+// A bent torso stays joined to the planted hips. All upper-body attachments
+// use the same facing-local offset as the pixels of the dressed operator.
+function torsoSlope(pitch){
+  const lean=Math.sin(pitch);
+  return {forward:lean*(lean>0?.31:.22),down:lean*(lean>0?.16:.025)};
+}
+function torsoOffset(y,slope){
+  const aboveHip=-20-y;
+  return {x:aboveHip*slope.forward,y:aboveHip*slope.down};
+}
+function shoulderAt(m,pitch=m.aimPitch||0){
+  const y=shoulder.y-60,offset=torsoOffset(y,torsoSlope(pitch));
+  return {x:Math.round(m.x)+(m.flip||1)*offset.x,y:Math.round(m.y)+y+crewTorsoY(m)+offset.y};
 }
 
 // Widths are in game pixels. The same native art stays sharp in the larger locker preview.
-const fieldWidths={pistol:[18,19,20,21,22],carbine:[29,30,32,34,36],smg:[23,24,25,26,28],
+const fieldWidths={pistol:[18,19,20,21,22],smg:[23,24,25,26,28],
   sniper:[49,52,54,57,60],rocket:[46,47,49,51,53],ar:[34,35,37,39,41]};
 // Rear and forward palm centers on the CCT rig, in field pixels from the shoulder.
 const rifleHands=[[0,-1],[11,0]];
 const fieldHands={
-  pistol:[[0,-1],[3,0]], carbine:rifleHands, smg:[[0,-1],[11,-4]],
+  pistol:[[6,-2],[3,0]], smg:[[0,-1],[11,-4]],
   sniper:[[0,2],[11,3]], rocket:[[0,-3],[8,-4]], ar:rifleHands
 };
 function weaponMount(m,col,recoil=0){
@@ -100,23 +112,38 @@ function weaponMount(m,col,recoil=0){
     gripX:x-recoil,gripY:y,bore:fit.bore};
 }
 function combatAim(m,tx,ty,col){
-  const pivot=shoulderAt(m),dx=tx-pivot.x,dy=ty-pivot.y;
-  m.flip=dx<0?-1:dx>0?1:m.flip;
+  const facing=tx-Math.round(m.x);
+  if(facing)m.flip=Math.sign(facing);
   const mount=weaponMount(m,col),offset=mount.y+mount.h*mount.bore;
-  m.aimPitch=Math.atan2(dy,Math.abs(dx))-Math.asin(clamp(offset/Math.max(1,Math.hypot(dx,dy)),-1,1));
+  // Lean shifts the shoulder by at most three pixels. Solve from the displaced
+  // pivot so the visible bore also points at the target on steep diagonals.
+  let pitch=0;
+  for(let pass=0;pass<3;pass++){
+    const pivot=shoulderAt(m,pitch),dx=(tx-pivot.x)*m.flip,dy=ty-pivot.y;
+    pitch=Math.atan2(dy,dx)-Math.asin(clamp(offset/Math.max(1,Math.hypot(dx,dy)),-1,1));
+  }
+  m.aimPitch=pitch;
   m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
 }
-function combatMuzzle(m,col,lead,pitch=m.aimPitch??0){
-  const pivot=shoulderAt(m),part=weaponMount(m,col,2);
+function combatMuzzle(m,col,lead,pitch=m.aimPitch??0,recoil=2){
+  const pivot=shoulderAt(m,pitch),part=weaponMount(m,col,recoil);
   const u=part.x+part.w,v=part.y+part.h*part.bore;
   return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
 }
-function drawCrewBody(g,m,moving){
+function drawCrewBody(g,m,moving,pitch=0){
   const sheet=crewOutfitSheet(m),frame=crewStrideFrame(m);
   const sprite=sheet || (moving?art.crewStride:art.crewBodies);
   const x=sheet?(moving?frame+1:0)*192:(moving?frame:m.id)*192;
   const y=!sheet && moving?m.id*128:0;
-  if(moving && reduceMotion.matches && crewStepY[frame]){
+  if(Math.abs(pitch)>.001){
+    const step=moving?crewStepY[frame]:0,split=80+2*step;
+    const hip=-20+(reduceMotion.matches?0:step),slope=torsoSlope(pitch);
+    g.drawImage(sprite,x,y+split,192,128-split,-32,hip,96,4-hip);
+    g.save();g.translate(0,hip);
+    g.transform(1,0,-slope.forward,1-slope.down,0,0);
+    g.drawImage(sprite,x,y,192,split,-32,-split/2,96,split/2);
+    g.restore();
+  }else if(moving && reduceMotion.matches && crewStepY[frame]){
     // Pin the torso while retaining the authored ground-contact position.
     const hip=80, shift=crewStepY[frame]*2, split=hip+shift;
     g.drawImage(sprite,x,y,192,split,-32,-60-shift/2,96,split/2);
@@ -131,16 +158,40 @@ function drawCrewHand(g,id,forward,x,y,glove){
   g.drawImage(art.specialistHands,id*192+sx,0,width,128,sx/2-32+offsetX,-32+offsetY,width/2,64);
   if(glove)g.drawImage(glove,x-4,y-3,8,6);
 }
+
+// Everything is drawn in the facing-local frame. The left hand stays around the
+// inside rail of the shield while the right forearm follows the pistol's pitch.
+function drawBulkGuard(g,m,offset,bob,glove,moving){
+  const sway=moving && !reduceMotion.matches?[0,1,1,0,0,-1,-1,0][crewStrideFrame(m)]:0;
+  g.save();g.translate(sway+offset.x,-28+bob+offset.y);
+  const shield=art[m.shieldItem||'shield-0'];
+  g.drawImage(shield,-6,-11,22,34);
+  // Rear edge of the diagonal plate, the two strap lugs and their raised grip.
+  g.fillStyle='#29282c';g.fillRect(-7,-3,5,2);g.fillRect(-7,9,5,2);g.fillRect(-8,-2,3,12);
+  g.fillStyle='#826b4d';g.fillRect(-7,-1,2,10);
+  g.fillStyle='#c9b588';g.fillRect(-6,-3,2,1);g.fillRect(-5,9,2,1);
+  drawCrewHand(g,0,true,-6,4,glove);
+  g.fillStyle='#29282c';g.fillRect(-8,7,3,1);
+  g.restore();
+}
+
+const carryPitch=[0,.027,.018,0,-.018,-.027,-.018,0];
+function firingKick(age){
+  return age<.055?2:age<.105?1:0;
+}
 function drawMemberGear(g,m,age,moving=false){
   const id=m.id,dy=moving?crewTorsoY(m):0,glove=fieldGear(m.loadout,'gloves');
   const family=m.weapon.family;
   g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
-  drawCrewBody(g,m,moving);
-  if(id===0)g.drawImage(art[m.shieldItem||'shield-0'],-19,-39+dy,25,37);
-  g.save();g.translate(0,-28+dy);
-  g.rotate((m.aimPitch||0)*clamp((.34-age)/.12,0,1));
+  const rest=moving && !reduceMotion.matches?carryPitch[crewStrideFrame(m)]:0;
+  const aim=m.aimTarget?.hp>0?1:clamp((.34-age)/.12,0,1);
+  const pitch=(m.aimPitch||0)*aim,offset=torsoOffset(-28,torsoSlope(pitch));
+  drawCrewBody(g,m,moving,pitch);
+  if(id===0)drawBulkGuard(g,m,offset,dy,glove,moving);
+  g.save();g.translate(offset.x,-28+dy+offset.y);
+  g.rotate(pitch+rest*(1-aim));
   for(const col of (family==='smg'?[3,1]:[1])){
-    const kick=age<.055 && (m.shotColumn||1)===col?2:0;
+    const kick=(m.shotColumn||1)===col?firingKick(age):0;
     const mount=weaponMount(m,col,kick);
     g.drawImage(mount.image,mount.x,mount.y,mount.w,mount.h);
     if(family==='ar'){
@@ -217,7 +268,7 @@ function drawDowned(m) {
   footShadow(m.x,m.y,14);
   ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));
   ctx.save();const scale=.72*(m.side?summonScale:1);ctx.scale(scale,scale);ctx.rotate(-Math.PI*.45);
-  drawMemberGear(ctx,{...m,id:m.id??4,loadout:m.loadout||run.squad[4].loadout,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1},Infinity);
+  drawMemberGear(ctx,{...m,id:m.id??4,loadout:m.loadout||run.squad[4].loadout,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1,aimPitch:0,aimTarget:null},Infinity);
   ctx.restore();
   const progress=(m.reviveTime||0)/3;
   ctx.fillStyle='#152322';ctx.fillRect(-24,-32,48,15);
@@ -240,6 +291,7 @@ function drawHero(m) {
   else if(skill?.phase==='spin')drawSpinner(m,skill);
   else if(skill)drawRifleSkill(m,skill);
   else drawEquippedMember(m);
+  if(skill?.awakened && (m.id===1 || m.id===2))drawPulseArms(m,skill);
   if (lead) leaderChevron(m.x, m.y - [57,55,55,51,55][m.id]);
 }
 
@@ -336,7 +388,15 @@ function drawTracer(mark) {
 }
 
 function drawEffect(e) {
-  if(e.clip==='support_tracer'){line(e.x,e.y,e.tx,e.ty,'#ffe1a7',1.6);return}
+  if(e.clip==='support_tracer'){
+    if(e.awakened){drawStrafeTrace(e);return}
+    const progress=reduceMotion.matches?1:clamp(e.age/e.duration,0,1);
+    const head=.18+.82*progress,tail=Math.max(0,head-.36);
+    const dx=e.tx-e.x,dy=e.ty-e.y;
+    skillPixelLine(e.x+dx*tail,e.y+dy*tail,e.x+dx*head,e.y+dy*head,'#c28d5a');
+    ctx.fillStyle='#f5d8a0';ctx.fillRect(Math.round(e.x+dx*head),Math.round(e.y+dy*head),2,1);
+    return;
+  }
   if (e.skillFx) { drawSkillFX(e); return; }
   if (e.clip === 'brass') {
     if (reduceMotion.matches) return;
@@ -348,9 +408,9 @@ function drawEffect(e) {
   } else if (e.clip && e.clip.endsWith('_muzzle')) {
     const m = run.squad[e.id];
     if (!m || m.deployed === false || m.hp <= 0 || m.lastShot !== e.shotTime ||
-      (m.id === run.lead) !== e.lead || run.activeSkill?.id === 0) return;
-    const tip=combatMuzzle(m,e.col,e.lead,m.aimPitch);
-    drawTagEffect(e.clip, e.age, tip.x, tip.y, e.angle);
+      (m.id === run.lead) !== e.lead || deployedBunker() || (m.id===0 && run.activeSkill?.id===0)) return;
+    const tip=combatMuzzle(m,e.col,e.lead,m.aimPitch,firingKick(e.age));
+    drawTagEffect(e.clip,e.age,tip.x,tip.y,m.aimAngle??e.angle);
   } else if (e.clip === 'pierce_exit' || (e.clip === 'hit_spark' && e.lead)) {
     const col = Math.min(4,Math.floor(e.age/e.duration*5));
     if (e.id === 0) skillFlash(art.bulkRounds,2,col,40,32,16,16,e.x,e.y,e.angle);
@@ -407,7 +467,14 @@ function drawGroundCue(cue) {
 function drawAirCue(cue) {
   const t = clamp(cue.age / cue.duration, 0, 1);
   const opacity = ctx.globalAlpha;
-  if (cue.kind === 'swap') {
+  if (cue.kind==='critical' || cue.kind==='evade') {
+    const critical=cue.kind==='critical';
+    ctx.save();ctx.globalAlpha*=Math.min(1,(1-t)*3);
+    ctx.font='10px Arcade, sans-serif';ctx.textAlign='center';
+    ctx.lineWidth=2;ctx.strokeStyle='#302b2a';ctx.fillStyle=critical?'#ffcb70':'#9ee2d2';
+    const x=Math.round(cue.x),y=Math.round(cue.y-12-t*9),label=critical?'치명타':'회피';
+    ctx.strokeText(label,x,y);ctx.fillText(label,x,y);ctx.restore();
+  } else if (cue.kind === 'swap') {
     const m = run.squad[cue.id];
     drawTagEffect('tag_pulse', cue.age, m.x, m.y - 57);
   } else if (cue.kind === 'guard') {
@@ -443,7 +510,7 @@ function drawFloorCues(state, opacity, visible, draw) {
   for (const cue of state.cues) {
     const attached = cue.kind === 'swap' || cue.kind === 'hurt' || cue.kind === 'equip';
     const anchor = attached ? run.squad[cue.id] : cue;
-    if (attached && (anchor.deployed === false || run.activeSkill?.id === 0)) continue;
+    if (attached && (anchor.deployed === false || deployedBunker() || (anchor.id===0 && run.activeSkill?.id===0))) continue;
     if ((!attached && !opacity) || !visible(anchor.x, anchor.y)) continue;
     ctx.globalAlpha = attached ? 1 : opacity;
     draw(cue);
@@ -521,10 +588,13 @@ function render() {
   ctx.globalAlpha = 1;
   drawBossWarnings(ctx);
   ctx.restore();
-  if (run.activeSkill?.id === 0) actors.push({o:run.activeSkill,draw:drawBunker});
-  else for (const o of run.squad) if (o.hp > 0 && o.deployed !== false) actors.push({o,draw:drawHero});
+  const vehicle=run.activeSkill?.id===0?run.activeSkill:null;
+  if(vehicle)actors.push({o:vehicle,draw:vehicle.awakened?drawMech:drawBunker});
+  if(!deployedBunker())for(const o of run.squad){
+    if(o.hp>0 && o.deployed && !(vehicle && o.id===0))actors.push({o,draw:drawHero});
+  }
   for(const m of [...run.squad,...(run.radioTeam||[])])if(m.hp<=0 && m.downFloor===run.floor)actors.push({o:m,draw:drawDowned});
-  if(run.activeSkill?.id!==0)for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:cctRadioSprite});
+  if(!deployedBunker())for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:cctRadioSprite});
   actors.sort((a, b) => a.o.y - b.o.y);
   for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}
   ctx.globalAlpha=1;
@@ -551,7 +621,7 @@ function render() {
 function tick(now) {
   const dt = last ? Math.min(.04, (now - last) / 1000) : 0;
   last = now;
-  if (mode === 'play') update(dt);
+  if (mode === 'play') {update(dt);autosaveBattle();}
   if (mode !== 'home') render();
   requestAnimationFrame(tick);
 }
@@ -568,7 +638,7 @@ function flashTint(image) {
   return canvas;
 }
 
-Promise.all(Object.entries({ ...ART, ...tagArt, ...skillArt }).map(([id, url]) =>
+Promise.all(Object.entries({ ...ART, ...tagArt, ...skillArt, ...awakenedArt }).map(([id, url]) =>
   new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => { art[id] = img; resolve(); };

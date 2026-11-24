@@ -56,7 +56,7 @@ function tickBossAttack(dt, nav) {
       pattern.nextShell=.55;
     }
   }
-  const targets=run.activeSkill?.id===0?[leader]:run.squad;
+  const targets=deployedBunker()?[leader]:run.squad;
   for (const mark of pattern.marks) {
     mark.age+=dt;
     if (mark.age<cfg.windup || mark.done) continue;

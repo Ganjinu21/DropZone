@@ -18,7 +18,7 @@ const {chromium}=require('playwright');
     await page.locator('#item-fuse').tap();
     await page.waitForFunction(()=>detailKey==='smg-3@1',null,{polling:50,timeout:4000});
     assert.equal(await page.locator('#item-detail').innerText(),'1발 피해 31');
-    assert.match(await page.locator('#item-magazine').innerText(),/16발 × 2.*1\.78초/);
+    assert.match(await page.locator('#item-magazine').innerText(),/16발 × 2.*1\.76초/);
     await page.locator('#item-action').tap();
     if(process.env.PREVIEW_DIR)await page.screenshot({path:path.join(process.env.PREVIEW_DIR,'Weapon-Fusion.png')});
     await page.locator('#prep-save').tap();await page.reload();
@@ -46,9 +46,10 @@ const {chromium}=require('playwright');
       }
       return result;
     });
-    assert.equal(mags.length,30);
+    assert.equal(mags.length,25);
     const enhancedHits=await page.evaluate(()=>{
       let checks=0;
+      for(const member of run.squad)member.gear.critChance=0;
       for(const w of gearByKey.values()){
         if(!w.level)continue;
         const id=Math.max(0,weaponFamilies.indexOf(w.family)),m=run.squad[id];
@@ -61,7 +62,7 @@ const {chromium}=require('playwright');
       }
       return checks;
     });
-    assert.equal(enhancedHits,60);
+    assert.equal(enhancedHits,50);
     const tagged=await page.evaluate(()=>{
       const m=run.squad[1],w=gearByKey.get('smg-3@1');
       m.weapon=w;run.lead=1;magazineReady(m,w);m.ammo=1;
@@ -77,21 +78,29 @@ const {chromium}=require('playwright');
     await page.locator('#shop:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[developerMode,armory.diamonds,owns('smg-3@1')]),[false,0,false]);
     const draws=await page.evaluate(async()=>{
-      await awardDiamonds(33*boxPrice);
+      await awardDiamonds(40*boxPrice);
       const results=[],original=Math.random;Math.random=()=>.99;
       try{
-        for(let i=0;i<33;i++)results.push((await openWeaponCrate('rocket')).drops[0].rank);
+        let repeatedGear;
+        for(let i=0;i<40;i++){
+          const {drops}=await openWeaponCrate();
+          if(drops.length!==2 || !drops[0].weapon || drops[1].weapon)throw Error('Expected weapon and gear');
+          repeatedGear??=drops[1].key;
+          if(drops[1].key!==repeatedGear)throw Error('Owned equipment removed from drop pool');
+          results.push(drops[0].rank);
+        }
+        if(armory.counts[repeatedGear]!==40)throw Error('Duplicate equipment was discarded');
         const before=armory.boxes;
-        const last=await Promise.all([openWeaponCrate('ar'),openWeaponCrate('ar')]);
+        const last=await Promise.all([openWeaponCrate(),openWeaponCrate()]);
         if(last.some(r=>r.drops)||armory.boxes!==before||armory.diamonds!==0)throw Error('Unpaid box');
         await awardDiamonds(boxPrice);
-        const parallel=await Promise.all([openWeaponCrate('smg'),openWeaponCrate('ar')]);
+        const parallel=await Promise.all([openWeaponCrate(),openWeaponCrate()]);
         if(parallel.filter(r=>r.drops).length!==1 || armory.diamonds!==0)throw Error('Duplicate purchase');
       }finally{Math.random=original}
       return results;
     });
     assert.deepEqual(draws.slice(0,3),['C','C','B']);
-    assert.deepEqual(draws.flatMap((rank,i)=>rank==='A'?[i+1]:[]),[21,33]);
+    assert.deepEqual(draws.flatMap((rank,i)=>rank==='A'?[i+1]:[]),[20,40]);
     assert.ok(draws.every(rank=>['C','B','A'].includes(rank)));
 
     const result=await page.evaluate(async()=>{
@@ -119,6 +128,6 @@ const {chromium}=require('playwright');
     await page.locator('#profile-mode').tap();await page.locator('#select-team:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[developerMode,armory.diamonds,armory.counts['smg-3@1'],savedEquipment[1].weapon]),[true,3000,1,'smg-3@1']);
     assert.deepEqual(errors,[]);
-    console.log('30 magazines, alternating hands, saved upgraded loadout, isolated profiles, box guarantees, concurrent spending and 144 A → S+ verified.');
+    console.log('25 magazines, alternating hands, saved upgraded loadout, isolated profiles, random gear, 20th-box guarantees, concurrent spending and 144 A → S+ verified.');
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

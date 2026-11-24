@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 from PIL import Image, ImageDraw
 from field_crew import squad_icons
+from catalog_style import build_catalog, CLOTH
 from field_uniforms import publish as publish_uniforms
 from leg_armor import build_worn_armor
 import specialists
@@ -51,6 +52,7 @@ for family in families:
                 d.rectangle((w//2+4,y+3,w//2+7,y+5),fill="#454f4d")
                 d.point((w//2+6,y+5),fill=accent)
         cropped(canvas).save(out/f"{family}-{variant}.png")
+build_catalog(out/'catalog',CLOTH)
 publish_uniforms(out)
 build_worn_armor(out)
 squad_icons(out)

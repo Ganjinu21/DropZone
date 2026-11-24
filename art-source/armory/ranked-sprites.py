@@ -67,16 +67,20 @@ def field_sleeve(canvas,shoulder,wrist,far,role):
     """Paint a bent sleeve on the same light ramp as the CCT's rolled field jacket."""
     x,y=shoulder
     u,v=wrist
-    mid=(round(.60*x+.40*u),round(.60*y+.40*v))
+    sleeve=.29 if role==1 else .40
+    mid=(round(x+(u-x)*sleeve),round(y+(v-y)*sleeve))
     ink='#312728'
     d=ImageDraw.Draw(canvas)
     d.line((shoulder,wrist),fill=ink,width=5)
     d.line((shoulder,wrist),fill='#885f47' if far else '#c99665',width=3)
+    if role==1:
+        d.line((mid,wrist),fill='#b6815a' if far else '#de9d68',width=3)
+        if not far:d.line((mid,((mid[0]+u)//2,(mid[1]+v)//2)),fill='#efb684')
     d.polygon([(x-3,y-2),(x-1,y-4),(x+2,y-4),(mid[0]+2,mid[1]-2),
                (mid[0]+1,mid[1]+2),(x+1,y+3),(x-3,y+1)],
               fill='#68533f' if far else '#927851',outline=ink)
     d.line([(x-2,y-2),(x,y-3),(x+2,y-3)],fill='#a28a64' if far else '#d2b382')
-    d.line([(mid[0]-1,mid[1]+1),mid,(mid[0]+1,mid[1]-1)],fill='#534237')
+    d.line([(mid[0]-1,mid[1]+1),mid,(mid[0]+1,mid[1]-1)],fill='#a69870' if role==1 else '#534237')
 
 
 def field_glove(canvas,x,y,far,role):
