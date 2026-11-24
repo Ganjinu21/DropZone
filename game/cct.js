@@ -1,8 +1,11 @@
 'use strict';
 
-function cctRadioSprite(member, size=64) {
-  ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(size/64,size/64);
-  drawMemberGear(ctx,{...member,id:4,x:0,y:0,weapon:gearByKey.get('ar-0')},member.shoot>0?0:Infinity,member.moving);
+const summonScale=.8;
+const summonDamageRatio=.8;
+
+function cctRadioSprite(member){
+  ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(summonScale,summonScale);
+  drawMemberGear(ctx,{...member,id:4,x:0,y:0,weapon:run.squad[4].weapon},member.shoot>0?0:Infinity,member.moving);
   ctx.restore();
 }
 function callCobra(member){
@@ -77,7 +80,17 @@ function updateRadioSupport(dt){
       ally.hp-=enemy.contactDamage||8;ally.grace=.75;
       if(ally.hp<=0){ally.hp=0;ally.downFloor=run.floor;ally.reviveTime=0;ally.respawn=6;continue}
     }
-    if(ally.cool<=0){ally.flip=enemy.x<ally.x?-1:1;fireSupport({x:ally.x+ally.flip*14,y:ally.y-23},enemy,5);ally.shoot=.16;ally.cool=1.25}
+    if(ally.cool<=0){
+      const pose={...ally,id:4,weapon:chief.weapon};
+      // Aim in the summon's unscaled coordinate space before mapping its muzzle to the floor.
+      combatAim(pose,ally.x+(enemy.x-ally.x)/summonScale,ally.y+(chestY(enemy)-ally.y)/summonScale,1);
+      ally.flip=pose.flip;ally.aimPitch=pose.aimPitch;
+      const barrel=combatMuzzle(pose,1,false);
+      const source={x:ally.x+(barrel.x-ally.x)*summonScale,y:ally.y+(barrel.y-ally.y)*summonScale};
+      const damage=basicHitDamage(chief,basicWeaponProfile(chief,chief.id===run.lead));
+      fireSupport(source,enemy,damage*summonDamageRatio);
+      ally.shoot=.16;ally.cool=1.25;
+    }
   }
   const craft=run.cobra;
   if(!craft)return;

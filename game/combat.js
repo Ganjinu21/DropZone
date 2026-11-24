@@ -98,12 +98,28 @@ function launchRound(member, barrel, target, weapon, lead, damage) {
   });
 }
 
+const shieldCarbine={...loadouts[0],damage:20};
+function equippedProfile(item,lead=true){
+  if(item.family==='pistol')return lead?loadouts[0]:sidearm;
+  if(item.family==='carbine')return shieldCarbine;
+  return loadouts[weaponFamilies.indexOf(item.family)];
+}
+function equipmentDamage(item,profile=equippedProfile(item),upgrade=0){
+  return Math.round(weaponDamage(profile,upgrade)*(1+item.power/100));
+}
+function basicWeaponProfile(member,lead){
+  return equippedProfile(member.weapon,lead);
+}
+function basicHitDamage(member,weapon){
+  return equipmentDamage(member.weapon,weapon,run.up[weapon.damageUpgrade]??0);
+}
+
 function shoot(member) {
   if (member.hp<=0 || member.deployed===false) return;
   const skill=run.activeSkill;
   if (skill && (skill.id===0 || skill.id===member.id)) return;
   const lead=member.id===run.lead,family=member.weapon.family;
-  const weapon=family==='pistol' ? (lead?loadouts[0]:sidearm) : loadouts[member.id];
+  const weapon=basicWeaponProfile(member,lead);
   const sniper=family==='sniper',dual=family==='smg';
   const targets=combatTargets(member,weapon.range,sniper);
   if (!targets.length) {
@@ -123,7 +139,7 @@ function shoot(member) {
   const barrel=combatMuzzle(member,col,lead);
   member.aimAngle=Math.atan2(Math.sin(member.aimPitch),member.flip*Math.cos(member.aimPitch));
   member.lastShot=run.t; member.shotColumn=col; member.shoot=.22;
-  const damage=Math.round(weaponDamage(weapon,run.up[weapon.damageUpgrade])*member.gear.damage);
+  const damage=basicHitDamage(member,weapon);
   const count=dual && lead ? 1+run.up[3] : 1;
   for (const {enemy} of targets.slice(0,count)) launchRound(member,barrel,enemy,weapon,lead,damage);
 

@@ -43,11 +43,16 @@ function drawUnit(frame, row, x, y, flip, width = 64, height = 64) {
 const tagRoles = ['bulk', 'raven', 'lynx'];
 const shoulder = { x: 32, y: 32 };
 const tagArt = {
-  ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon).map(i=>[i.key,itemImage(i)])),
+  ...Object.fromEntries(equipmentCatalog.filter(i=>i.asset).flatMap(i=>{
+    if(i.family==='shield')return [[i.key,i.asset+'-field.png']];
+    if(i.family==='smg')return [[i.key,i.asset+'-near.png'],[i.key+'-far',i.asset+'-far.png'],[i.key+'-pair',itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
+    if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
+    return [[i.key,itemImage(i)]];
+  })),
   crewStride:'art/armory/crew-stride.png',
-  cctPatch:'art/armory/cct-patch.png',crewBodies:'art/armory/bodies.png',crewShield:'art/armory/shield.png',
+  crewBodies:'art/armory/bodies.png',specialistHands:'art/armory/specialist-hands.png',
   combatUnits: 'combat-units.png',
-  cctPoses:'art/prep/cct-poses.png', cctRifle:'art/prep/ar.png', cobra:'art/prep/cobra.png',
+  cobra:'art/prep/cobra.png',
   infectedBosses: 'art/bosses/infected.png',
   tagRig: 'art/tag-combat/units-rig.png',
   tagEquip: 'art/tag-combat/units-equip.png',
@@ -60,30 +65,38 @@ function tagCell(atlas, col, row, x, y) {
 }
 
 // Gameplay and rendering use the same shoulder, gait offset and weapon socket.
-function shoulderAt(m) {
+function strideBob(m) {
   const gait = (m.gait ?? 0) / 30 + m.id * .31;
   const stride = Math.sin(gait * TAU);
-  const bob = m.moving && !reduceMotion.matches ? Math.round(Math.abs(stride) * 1.7) : 0;
+  return !reduceMotion.matches ? Math.round(Math.abs(stride) * 1.7) : 0;
+}
+function shoulderAt(m) {
+  const bob=m.moving?strideBob(m):0;
   return { x: Math.round(m.x), y: Math.round(m.y) + shoulder.y - 60 - bob };
 }
 
+// Widths are in game pixels. The same native art stays sharp in the larger locker preview.
+const fieldWidths={pistol:[16,17,18,19,21],carbine:[27,29,31,33,35],smg:[21,22,23,25,26],
+  sniper:[49,52,54,57,60],rocket:[46,47,49,51,53],ar:[34,35,37,39,41]};
 function weaponMount(m,col,recoil=0){
-  const image=art[m.weapon.key], family=m.weapon.family;
-  const x=family==='sniper'?-12:family==='pistol'?7:family==='rocket'?-7:1;
-  const far=family==='smg' && col===3;
-  const y=family==='rocket'?-11:family==='sniper'?-9:-5;
-  return {image,x:x+(far?6:0)-recoil,y:y-(far?7:0),bore:family==='rocket'?.36:family==='sniper'?.47:.23};
+  const {family,tier,key}=m.weapon,far=family==='smg' && col===3;
+  const image=art[far?key+'-far':key];
+  const w=fieldWidths[family][tier],h=Math.round(w*image.height/image.width);
+  const x=family==='sniper'?-12:family==='pistol'?7:family==='rocket'?-16:family==='ar'?-10:1;
+  const bore={pistol:.20,carbine:.40,smg:.36,sniper:.38,rocket:.53,ar:.36}[family];
+  const y=family==='rocket'?-12:family==='sniper'?-Math.round(h*bore):family==='ar'?-11:-5;
+  return {image,w,h,x:x+(far?6:0)-recoil,y:y-(far?7:0),bore};
 }
 function combatAim(m,tx,ty,col){
   const pivot=shoulderAt(m),dx=tx-pivot.x,dy=ty-pivot.y;
   m.flip=dx<0?-1:dx>0?1:m.flip;
-  const mount=weaponMount(m,col),offset=mount.y+mount.image.height*mount.bore;
+  const mount=weaponMount(m,col),offset=mount.y+mount.h*mount.bore;
   m.aimPitch=Math.atan2(dy,Math.abs(dx))-Math.asin(clamp(offset/Math.max(1,Math.hypot(dx,dy)),-1,1));
   m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
 }
 function combatMuzzle(m,col,lead,pitch=m.aimPitch??0){
   const pivot=shoulderAt(m),part=weaponMount(m,col,2);
-  const u=part.x+part.image.width,v=part.y+part.image.height*part.bore;
+  const u=part.x+part.w,v=part.y+part.h*part.bore;
   return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
 }
 function drawWalkingLegs(g,m){
@@ -92,32 +105,41 @@ function drawWalkingLegs(g,m){
 }
 function drawMemberGear(g,m,age,moving=false){
   const id=m.id, pose=art.crewBodies;
-  const bob=moving&&!reduceMotion.matches?Math.round(Math.abs(Math.sin(m.gait/30*TAU))*1.7):0;
+  const bob=moving?strideBob(m):0;
   g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
   if(moving){
     drawWalkingLegs(g,m);
-    g.drawImage(pose,id*96,0,96,41,-32,-60-bob,96,41);
-  }else g.drawImage(pose,id*96,0,96,64,-32,-60-bob,96,64);
-  if(id===4){
-    g.save();g.translate(-10,-52-bob);
-    if(m.flip<0){g.translate(art.cctPatch.width,0);g.scale(-1,1)}
-    g.drawImage(art.cctPatch,0,0);g.restore();
-  }
-  if(id===0)g.drawImage(art.crewShield,-19,-39-bob,25,37);
-  g.translate(0,-28-bob);
+    g.drawImage(pose,id*192,0,192,82,-32,-60-bob,96,41);
+  }else g.drawImage(pose,id*192,0,192,128,-32,-60-bob,96,64);
+  if(id===0)g.drawImage(art[m.shieldItem||'shield-0'],-19,-39-bob,25,37);
+  g.save();g.translate(0,-28-bob);
   g.rotate((m.aimPitch||0)*clamp((.34-age)/.12,0,1));
   for(const col of (m.weapon.family==='smg'?[3,1]:[1])){
     const kick=age<.055 && (m.shotColumn||1)===col?2:0;
     const mount=weaponMount(m,col,kick);
-    g.drawImage(mount.image,mount.x,mount.y);
-    const gripX=mount.x+(m.weapon.family==='sniper'?17:3),gripY=mount.y+Math.round(mount.image.height*.65);
-    g.fillStyle='#393f37';g.fillRect(gripX-4,gripY,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY,3,2);
+    g.drawImage(mount.image,mount.x,mount.y,mount.w,mount.h);
+    if(id>=3){
+      const family=m.weapon.family;
+      if(family==='ar'){
+        const end=mount.x+mount.w,beamY=Math.round(mount.y+mount.h*mount.bore);
+        g.fillStyle='#94322e';g.fillRect(end+1,beamY,2,1);g.fillRect(end+5,beamY,1,1);
+        g.fillStyle='#ff5147';g.fillRect(end+8,beamY-1,2,2);
+      }
+    }else{
+      const gripX=mount.x+(m.weapon.family==='sniper'?17:3),gripY=mount.y+Math.round(mount.h*.65);
+      g.fillStyle='#393f37';g.fillRect(gripX-4,gripY,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY,3,2);
+    }
   }
+  g.restore();
+  if(id>=3)g.drawImage(art.specialistHands,(id-3)*192,0,192,128,-32,-60-bob,96,64);
   g.restore();
 }
 function drawCrewPreview(canvas,id,row){
   const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
-  drawMemberGear(g,{id,weapon:gearByKey.get(row.weapon),flip:1,x:gearByKey.get(row.weapon).family==='sniper'?29:38,y:60},Infinity);
+  const weapon=gearByKey.get(row.weapon);
+  g.save();g.scale(canvas.width/84,canvas.height/64);
+  drawMemberGear(g,{id,weapon,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?29:38,y:60},Infinity);
+  g.restore();
 }
 function drawEquippedMember(m){
   const age=run.t-(m.lastShot??-Infinity);
@@ -169,8 +191,8 @@ function leaderChevron(x, y) {
 function drawDowned(m) {
   footShadow(m.x,m.y,14);
   ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));
-  ctx.save();ctx.scale(.72,.72);ctx.rotate(-Math.PI*.45);
-  drawMemberGear(ctx,{...m,id:m.id??4,weapon:m.weapon||gearByKey.get('ar-0'),x:5,y:13,flip:1},Infinity);
+  ctx.save();const scale=.72*(m.side?summonScale:1);ctx.scale(scale,scale);ctx.rotate(-Math.PI*.45);
+  drawMemberGear(ctx,{...m,id:m.id??4,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1},Infinity);
   ctx.restore();
   const progress=(m.reviveTime||0)/3;
   ctx.fillStyle='#152322';ctx.fillRect(-24,-32,48,15);
@@ -477,7 +499,7 @@ function render() {
   if (run.activeSkill?.id === 0) actors.push({o:run.activeSkill,draw:drawBunker});
   else for (const o of run.squad) if (o.hp > 0 && o.deployed !== false) actors.push({o,draw:drawHero});
   for(const m of [...run.squad,...(run.radioTeam||[])])if(m.hp<=0 && m.downFloor===run.floor)actors.push({o:m,draw:drawDowned});
-  if(run.activeSkill?.id!==0)for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:m=>cctRadioSprite(m,55)});
+  if(run.activeSkill?.id!==0)for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:cctRadioSprite});
   actors.sort((a, b) => a.o.y - b.o.y);
   for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}
   ctx.globalAlpha=1;
@@ -531,7 +553,6 @@ Promise.all(Object.entries({ ...ART, ...tagArt, ...skillArt }).map(([id, url]) =
     art.tagRigHit = flashTint(art.tagRig);
     art.infectedBossHit = flashTint(art.infectedBosses);
     art.tagEquipHit = flashTint(art.tagEquip);
-    art.hammerCarryHit = flashTint(art.hammerCarry);
     makeMap();
     $('home').style.backgroundImage = 'linear-gradient(90deg,rgba(9,19,26,.86),rgba(12,21,27,.42) 45%,transparent 70%),url(' + ART.lobby + ')';
     setLobbyReady();

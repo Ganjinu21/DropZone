@@ -144,7 +144,7 @@ function fireSkillBullet(member,skill,heading,target,hand) {
   const bulk=skill.id===0;
   const shot=skillRay(member,skill,heading,target,bulk?285:315,hand);
   const speed=bulk?650:860;
-  Object.assign(shot,{speed,duration:shot.length/speed,damage:bulk?21:9+2*(run.up[2]??0),
+  Object.assign(shot,{speed,duration:shot.length/speed,damage:bulk?21:Math.round((9+2*(run.up[2]??0))*(1+member.weapon.power/100)),
     remaining:1,skillRound:bulk?'bulk':'raven'});
   run.marks.push(shot);
   run.effects.push({skillFx:bulk?'bunkerFire':'smgFire',x:shot.x,y:shot.y,angle:shot.angle,
@@ -159,7 +159,7 @@ function fireRailBeam(member,skill) {
   member.flip=Math.cos(angle)<0?-1:1;
   skill.angle=angle;
   const beam=skillRay(member,skill,angle,target,520,0);
-  beam.damage=58+10*(run.up[5]??0);
+  beam.damage=Math.round((58+10*(run.up[5]??0))*(1+member.weapon.power/100));
   beam.remaining=Infinity;
   if (beam.contact) roundImpact(beam,beam.contact,beam.x,beam.y,run);
   for (const {enemy,enter} of rayCollisions(beam,run,run.floor,0,beam.length)) {
@@ -183,7 +183,7 @@ function fireMortar(member,target,skill) {
   const duration=clamp((large?.48:.30)+travel/1000,.32,.86);
   run.effects.push({skillFx:'shellArc',id:3,lead:true,large,angle,age:0,duration,
     x:barrel.x,y:barrel.y,tx:target.x,ty:target.y,
-    damage:Math.round(weaponDamage(loadouts[3],rank)*member.gear.damage)+(large?18:0),radius:(large?60:37)+5*(run.up[7]??0)});
+    damage:equipmentDamage(member.weapon,loadouts[3],rank)+(large?18:0),radius:(large?60:37)+5*(run.up[7]??0)});
   skillAudio.play(3,large?'thump':'lob',large?.54:.45);
 }
 

@@ -2,7 +2,8 @@
 import importlib.util
 from pathlib import Path
 from PIL import Image, ImageDraw
-from field_crew import controller, stride_sheet, squad_icons
+from field_crew import stride_sheet, squad_icons
+import specialists
 
 root = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("unit_art", root / "work/art/tag-combat/units.py")
@@ -16,6 +17,9 @@ def cropped(im):
     return im.crop(im.getchannel("A").getbbox())
 for family in families:
     for variant,accent in enumerate(colors):
+        if family in ('ar','rocket'):
+            specialists.weapon(family,variant,accent).save(out/f'{family}-{variant}.png')
+            continue
         canvas = Image.new("RGBA",(72,29)); d=ImageDraw.Draw(canvas)
         if family in ("pistol","sniper"):
             sprite = cropped(units.COMPACT if family=="pistol" else units.RIFLE)
@@ -45,15 +49,19 @@ for family in families:
                 d.rectangle((w//2+4,y+3,w//2+7,y+5),fill="#454f4d")
                 d.point((w//2+6,y+5),fill=accent)
         cropped(canvas).save(out/f"{family}-{variant}.png")
-bodies=Image.new('RGBA',(96*5,64))
+hands=Image.new('RGBA',(384,128))
+bodies=Image.new('RGBA',(96*5*2,64*2))
 for role in range(5):
-    if role in (0,1,2): body=units.operator(role)
-    elif role==3:
-        body=units.layer(); hammer=Image.open(root/'game/art/skills/hammer-carry.png').convert('RGBA').resize((34,55),Image.Resampling.NEAREST);body.alpha_composite(hammer,(14,5))
+    if role<3:
+        body=units.operator(role).resize((192,128), Image.Resampling.NEAREST)
     else:
-        body=controller(units.operator(1))
-    bodies.alpha_composite(body,(role*96,0))
+        name='hammer' if role==3 else 'cct'
+        body=specialists.body(name)
+        hands.alpha_composite(specialists.hands(name),((role-3)*192,0))
+        specialists.portrait(name).save(out/f'{name}-portrait.png')
+    bodies.alpha_composite(body,(role*192,0))
 bodies.save(out/'bodies.png')
+hands.save(out/'specialist-hands.png')
 stride_sheet(out/'crew-stride.png')
 squad_icons(out)
 shield=cropped(units.SHIELD);shield.save(out/'shield.png')
@@ -67,20 +75,6 @@ for x in (8,33):
     d.line((x+1,15,x+1,32),fill='#e0c48c')
 d.rectangle((20,22,28,29),fill='#192c30');d.polygon([(21,25),(24,22),(27,25),(24,28)],fill='#93d4c7')
 im.save(out/'crate.png')
-# A square-pixel cloth tab with a contrasting stitched edge remains readable at 1x.
-patch=Image.new('RGBA',(15,8),'#29271f')
-pen=ImageDraw.Draw(patch)
-pen.rectangle((1,1,13,6),fill='#493e2b')
-pen.line((1,0,13,0),fill='#a98962')
-letters={'C':('111','100','100','100','111'),'T':('111','010','010','010','010')}
-for index,letter in enumerate('CCT'):
-    for y,row in enumerate(letters[letter]):
-        for x,bit in enumerate(row):
-            if bit=='1':pen.point((2+index*4+x,1+y),fill='#ffe6aa')
-patch.save(out/'cct-patch.png')
-portrait=bodies.crop((384+9,5,384+55,51))
-portrait.alpha_composite(patch,(22-9,8-5))
-portrait.save(out/'cct-portrait.png')
 # Button symbols on the same 16-pixel grid as the in-game equipment.
 glyphs={
 'bunks':["11..........","11.22..2222.","11222222222.","111111111111","11........11","11.22..2222.","11222222222.","111111111111","11........11"],

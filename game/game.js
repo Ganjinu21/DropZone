@@ -5,7 +5,7 @@ const TAU=Math.PI*2;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const names=['벌크','레이븐','링스','해머','CCT'], roles=['돌격병','SMG 양손잡이','저격병','로켓병','공중통제사'];
 const memberHealth=[145,98,85,102,94];
-ART.face3='art/skills/hammer-face.png';
+ART.face3='art/armory/hammer-portrait.png';
 ART.face4='art/armory/cct-portrait.png';
 const formationSlots = [[23, 0], [-15, -24], [-18, 24]];
 const swapTime = 1.5;
@@ -80,13 +80,13 @@ function spawn(a=Math.random()*TAU,d=Math.max(viewW,viewH)*.57,boss=false,rush=f
 const upgrades=[
  ['방패 보강','벌크가 선두일 때 전방에서 받는 피해를 줄입니다.','피해 감소',n=>(55+n*6)+'%'],
  ['충격파','벌크가 선두에서 방어할 때 충격파가 더 멀리 퍼집니다.','충격 반경',n=>((32+n*13)/10).toFixed(1)+' m'],
- ['연장 점사','레이븐이 선두에서 쏘는 쌍권총의 탄환 피해가 증가합니다.','탄환 피해',n=>String(weaponDamage(loadouts[1],n))],
+ ['연장 점사','레이븐이 선두에서 쏘는 듀얼 SMG의 탄환 피해가 증가합니다.','탄환 피해',n=>String(equipmentDamage(run.squad[1].weapon,loadouts[1],n))],
  ['분산 사격','레이븐의 선두 점사가 추가 표적에도 탄환을 발사합니다.','동시 표적',n=>(1+n)+'명'],
  ['관통탄','링스의 선두 저격이 한 줄에 있는 적을 더 관통합니다.','추가 관통',n=>(1+n)+'명'],
- ['정밀 조준','링스의 선두 저격 피해가 증가합니다. 중장갑 적에게 특히 강합니다.','기본 피해',n=>String(weaponDamage(loadouts[2],n))],
- ['고폭탄','해머의 기본 포탄과 집중 포격의 폭발 피해가 증가합니다.','기본 피해',n=>String(22+6*n)],
+ ['정밀 조준','링스의 선두 저격 피해가 증가합니다. 중장갑 적에게 특히 강합니다.','기본 피해',n=>String(equipmentDamage(run.squad[2].weapon,loadouts[2],n))],
+ ['고폭탄','해머의 기본 포탄과 집중 포격의 폭발 피해가 증가합니다.','기본 피해',n=>String(equipmentDamage(run.squad[3].weapon,loadouts[3],n))],
  ['확산 탄두','해머의 기본 포탄과 집중 포격이 더 넓게 폭발합니다.','기본 반경',n=>((37+5*n)/10).toFixed(1)+' m'],
- ['조준 보정','통제관의 소총 탄환 피해를 높입니다.','탄환 피해',n=>String(14+4*n)],
+ ['조준 보정','통제관의 소총 탄환 피해를 높입니다.','탄환 피해',n=>String(equipmentDamage(run.squad[4].weapon,loadouts[4],n))],
  ['지원 편대','코브라의 지원 사격 피해를 높입니다.','지원 피해',n=>String(19+3*n)],
  ['응급 처치','생존한 분대원과 지원병의 체력을 즉시 회복합니다.','최대 체력',()=> '30%'],
  ['화력 강화','기본 공격, 특수 스킬, 지원 사격의 피해가 증가합니다.','피해 보너스',n=> '+'+(n*10)+'%']
@@ -111,7 +111,7 @@ function openUpgrade(){
    const rank = run.up[key];
    const common=key>=fieldKit,operator=common?'squad':Math.floor(key/2);
    const sharedIcon=key===fieldKit?'art/armory/field-kit.png':'art/armory/squad-damage.png';
-   const icon=common?sharedIcon:key===6?'art/skills/hammer-installed.png':key===8?'art/prep/ar.png':key===9?'art/prep/cobra.png':'augment-'+key+'.png';
+   const icon=common?sharedIcon:key===6||key===7?itemImage(gearByKey.get('rocket-0')):key===8?itemImage(gearByKey.get('ar-0')):key===9?'art/prep/cobra.png':'augment-'+key+'.png';
    return `<button class="card" data-i="${index}" data-operator="${operator}">
      <span class="who"><img src="${common?sharedIcon:ART['face'+operator]}" alt="">${common?'분대':names[operator]}<em>${key===fieldKit?'즉시':'Lv. '+(rank+1)}</em></span>
      <span class="item"><img src="${icon}" alt=""></span>
@@ -184,7 +184,8 @@ function showLoadout(){
  }).join('');
  panel.querySelectorAll('canvas').forEach((canvas,slot)=>{
    const i=run.lineup[slot];
-   const icon=art[run.squad[i].weapon.key];canvas.width=64;canvas.height=40;
+   const weapon=run.squad[i].weapon;
+   const icon=art[weapon.family==='smg'?weapon.key+'-pair':weapon.key];canvas.width=64;canvas.height=40;
    const g=canvas.getContext('2d'),scale=Math.min(58/icon.width,32/icon.height);
    g.imageSmoothingEnabled=false;g.drawImage(icon,(64-icon.width*scale)/2,(40-icon.height*scale)/2,icon.width*scale,icon.height*scale);
  });

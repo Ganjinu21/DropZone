@@ -11,40 +11,6 @@ uniforms = [
     ('#c3a079','#937956','#6b5a43','#82775c','#453d32'),
 ]
 
-def controller(body):
-    im = body.copy()
-    # Radio pack, vest and sleeves retain the folds of the base operator.
-    shades = ['#292923','#494339','#68563f','#88704e','#aa8b64','#c7ad84','#dfc49b']
-    for y in range(64):
-        for x in range(65):
-            r,g,b,a = im.getpixel((x,y))
-            if a:
-                shade = min(6, int((r*.32+g*.56+b*.12)/33))
-                im.putpixel((x,y),(*bytes.fromhex(shades[shade][1:]),a))
-    d=ImageDraw.Draw(im)
-    d.rectangle((17,0,46,26),fill=(0,0,0,0))
-    d.line([(12,29),(11,10),(10,7)],fill='#292d27',width=2)
-    d.polygon([(17,22),(17,15),(20,9),(26,6),(35,5),(41,8),(44,14),(43,21),(39,23),(34,26),(23,25)],fill='#302f28')
-    d.polygon([(18,19),(19,14),(23,10),(28,7),(35,7),(40,9),(43,14),(39,18),(27,20)],fill='#ab8d66')
-    d.polygon([(21,15),(24,10),(30,8),(33,8),(29,12),(31,14),(27,15)],fill='#dcc39a')
-    d.polygon([(31,9),(36,8),(40,11),(38,13),(35,12)],fill='#7e765a')
-    d.polygon([(24,22),(28,19),(40,18),(42,21),(37,24),(36,28),(31,29),(27,26)],fill='#b79976')
-    d.polygon([(26,23),(32,24),(40,21),(39,25),(35,29),(30,29)],fill='#706453')
-    d.line([(28,25),(33,26),(38,24)],fill='#cfb58f')
-    d.rectangle((17,19,22,24),fill='#403e34');d.rectangle((18,19,21,22),fill='#867859')
-    d.line([(22,23),(24,26),(28,27)],fill='#32352e')
-    # Four separate housings in a shallow arc. A dark rim and a single glass glint
-    # keep all four apertures legible against a tan helmet at native resolution.
-    for x,y in [(21,17),(27,16),(33,16),(39,17)]:
-        d.rectangle((x,y-2,x+4,y+3),fill='#413d32')
-        d.rectangle((x+1,y-2,x+3,y-1),fill='#d7b890')
-        d.rectangle((x,y,x+4,y+4),fill='#262e2e')
-        d.rectangle((x+1,y+1,x+3,y+3),fill='#426367')
-        d.point((x+1,y+1),fill='#abccc0')
-    for x,y in [(20,32),(25,35),(29,31),(33,38),(17,41)]:
-        d.line((x,y,x+2,y),fill='#beb090');d.point((x+2,y+1),fill='#657054')
-    return im
-
 def stride_sheet(path):
     sheet=Image.new('RGBA',(8*64,5*24))
     for role,(lit,cloth,fold,pad,boot) in enumerate(uniforms):

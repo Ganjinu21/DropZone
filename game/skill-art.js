@@ -4,11 +4,9 @@ const skillArt = Object.fromEntries(Object.entries({
   bunker: 'bunker', mechFold: 'bulk-fold', squadBoard: 'squad-board', bulkRounds: 'bulk-ballistics',
   ravenAim: 'raven-aim', ravenSpin: 'raven-spin', ravenEcho: 'raven-echo', ravenRounds: 'raven-ballistics',
   lynxAim: 'lynx-aim', lynxPierce: 'lynx-pierce', lynxBeam: 'lynx-beam',
-  hammerCarry: 'hammer-carry', hammerInstalled: 'hammer-installed', hammerMotion: 'hammer-motion',
   hammerFx: 'hammer-fx', hammerBlast: 'hammer-blast'
 }).map(([id, name]) => [id, 'art/skills/' + name + '.png']));
 
-const hammerScale = .415;
 const bunkerWidth = 112;
 const spinMuzzles = [
   [[90,40],[18,40]], [[83,48],[16,32]], [[71,53],[20,24]], [[57,55],[29,17]],
@@ -63,10 +61,10 @@ function skillShotSocket(m, s, angle, hand = 0) {
     return {x:s.x + (u-.5)*bunkerWidth, y:s.y + (v-.92)*bunkerWidth*art.bunker.height/art.bunker.width};
   }
   if (m.id === 3) {
-    if (!s) return {x:m.x + 19 * hammerFlip(m), y:m.y - 24};
-    const reach = (.72-.17)*art.hammerInstalled.width*hammerScale;
-    const rise = (.98-.28)*art.hammerInstalled.height*hammerScale;
-    return {x:s.x + reach*(s.plantFacing || hammerFlip(m)), y:s.y-rise};
+    if(!s)return combatMuzzle(m,1,true);
+    const pose=hammerMortarPose(m,s);
+    return {x:s.x+pose.facing*(pose.x+pose.reach*Math.cos(pose.pitch)),
+      y:s.y+pose.y+pose.reach*Math.sin(pose.pitch)};
   }
   if (s.phase === 'spin') {
     const tip = spinMuzzles[spinStep(s.angle)][hand];
@@ -96,7 +94,8 @@ function drawRifleSkill(m, s) {
   }else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
   ctx.translate(p.px-p.fx, p.py-p.fy);
   ctx.rotate(pitch);
-  skillCell(p.sheet,p.col,1,p.w,p.h,0,0,p.px,p.py);
+  const hands=art[m.weapon.key+'-skill'];
+  skillCell(hands||p.sheet,p.col,hands?0:1,p.w,p.h,0,0,p.px,p.py);
   ctx.restore();
 }
 
@@ -121,67 +120,42 @@ function drawSpinner(m, s) {
     }
     ctx.restore();
   }
-  skillCell(art.ravenSpin,i%8,Math.floor(i/8),112,72,m.x,m.y,54,65);
+  const spin=art[m.weapon.key+'-skill'];
+  skillCell(spin||art.ravenSpin,i%8,Math.floor(i/8)+(spin?1:0),112,72,m.x,m.y,54,65);
 }
 
-function drawHammerCarry(m, lead) {
-  const bob = m.moving && !reduceMotion.matches ? Math.round(Math.sin((m.gait || 0)*.23)*1.3) : 0;
-  const since = run.t-(m.lastShot ?? -Infinity), width = art.hammerCarry.width*hammerScale;
-  const height = art.hammerCarry.height*hammerScale;
-  ctx.save();
-  ctx.translate(Math.round(m.x), Math.round(m.y-bob));
-  ctx.scale(hammerFlip(m),1);
-  ctx.drawImage(m.hurt > .6 ? art.hammerCarryHit : art.hammerCarry,-width/2,-height,width,height);
-  if (lead && since < .25) {
-    const col = since < .08 ? 5 : since < .16 ? 6 : 7;
-    // The hand and short launcher share the reviewed kick / recover frames.
-    const gunX = [30,32,32][col-5], gunY = [26,29,31][col-5];
-    ctx.drawImage(art.hammerMotion, col*80+gunX,gunY,36,17,1,-27,24,12);
-  } else if (!lead) {
-    const pivot = shoulderAt(m), col = since < .045 ? 1 : since < .11 ? 2 : 0;
-    ctx.translate(0,pivot.y-m.y+bob);
-    ctx.rotate((m.aimPitch || 0)*clamp((.34-since)/.12,0,1));
-    tagCell(art.tagRig, col, 9, -32, -32);
-  }
-  ctx.restore();
+function hammerMortarPose(m,s){
+  const plant=clamp(Math.min(s.age/.64,(s.duration-s.age)/.40),0,1);
+  const facing=s.plantFacing||hammerFlip(m);
+  const weapon=m.weapon.family==='rocket'?m.weapon:gearByKey.get('rocket-0');
+  const {image,w,h,bore}=weaponMount({weapon},1);
+  const elapsed=s.age-s.lastFire;
+  const recoil=elapsed>=0&&elapsed<.12?Math.sin(elapsed/.12*Math.PI)*2:0;
+  return {plant,facing,image,w,h,bore,x:Math.round(1+13*plant),y:-32+15*plant,
+    pitch:-plant*1.16,reach:w-13-recoil,recoil};
 }
 
-function drawHammerSkill(m, s) {
-  const facing = s.plantFacing || hammerFlip(m);
-  const age = s.age, elapsed = age - s.lastFire;
-  const stowing = s.phase === 'recover' ? clamp((s.duration-age)/.38,0,1) : 1;
-  const plant = Math.min(clamp(age/.68,0,1), stowing);
-  if (plant < .12) { drawHammerCarry(m, true); return; }
-  ctx.save();
-  ctx.translate(Math.round(s.x),Math.round(s.y));
-  if (plant < .83) {
-    // Original reach, lift and slam are used between the two approved poses.
-    const col = Math.min(5,Math.floor(plant*7));
-    ctx.scale(facing,1);
-    const size = .77;
-    ctx.scale(size,size);
-    skillCell(art.hammerMotion,col,1,80,76,0,0,32,60);
-    const t = clamp((plant-.12)/.71,0,1);
-    ctx.save();
-    ctx.translate(-10+29*t,-15-Math.sin(t*Math.PI)*16+12*t);
-    ctx.rotate(.65*(1-t));
-    ctx.scale(-1,1);
-    // Crop the tube and bipod from the approved installed pose; the planting
-    // operator's near glove is drawn on top at the handoff.
-    ctx.drawImage(art.hammerInstalled,0,19,37,69,-14,-37,20,37);
-    ctx.restore();
-    skillCell(art.hammerMotion,col,2,80,76,0,0,32,60);
-  } else {
-    const w = art.hammerInstalled.width*hammerScale, h = art.hammerInstalled.height*hammerScale;
-    const kick = elapsed >= 0 && elapsed < .11 ? Math.sin(elapsed/.11*Math.PI)*1.7 : 0;
-    ctx.scale(-facing,1);
-    ctx.drawImage(art.hammerInstalled,-w*.72,-h*.98+kick,w,h-kick);
+function drawHammerSkill(m,s){
+  const pose=hammerMortarPose(m,s);
+  const {plant,facing,image,w,h,bore,x,y,pitch,reach}=pose;
+  ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(facing,1);
+  const sink=Math.round(8*plant);
+  // Keep the face and torso intact while the legs bend into the planted stance.
+  ctx.drawImage(art.crewBodies,3*192,82,192,46,-32,-19+sink,96,23-sink);
+  ctx.drawImage(art.crewBodies,3*192,0,192,82,-32,-60+sink,96,41);
+  if(plant>.12){
+    const open=12*plant;
+    line(x,y+1,x-open,y+19*plant,'#263032',3);
+    line(x,y+1,x+open,y+19*plant,'#263032',3);
+    line(x,y+1,x+open,y+19*plant,'#858474',1);
   }
+  ctx.translate(x,y);ctx.rotate(pitch);
+  ctx.drawImage(image,reach-w,-Math.round(h*bore),w,h);
+  ctx.fillStyle='#825136';ctx.fillRect(0,3,7,3);
+  ctx.fillStyle='#d69a67';ctx.fillRect(1,2,5,3);
   ctx.restore();
-  const contact = (age-.60)/.24;
-  if (contact >= 0 && contact < 1) {
-    skillFlash(art.hammerFx,1,Math.floor(contact*8),64,64,32,32,s.x+facing*17,s.y,0,.8);
-  }
+  const contact=(s.age-.60)/.24;
+  if(contact>=0 && contact<1)skillFlash(art.hammerFx,1,Math.floor(contact*8),64,64,32,32,s.x+facing*17,s.y,0,.8);
 }
 
 function boardBunker(s, p) {
@@ -192,7 +166,6 @@ function boardBunker(s, p) {
     ctx.save();
     ctx.globalAlpha *= Math.min(1,(1-p)*3);
     if (m.id < 3) skillCell(art.squadBoard,Math.min(3,Math.floor(p*4)),m.id,96,64,x,y,32,60);
-    else if(m.id===3)drawHammerCarry({...m,x,y},false);
     else drawEquippedMember({...m,x,y});
     ctx.restore();
   }
@@ -200,7 +173,7 @@ function boardBunker(s, p) {
     const from=s.radioFrom?.[i];
     if(ally.hp<=0 || !from)continue;
     ctx.save();ctx.globalAlpha*=Math.min(1,(1-p)*3);
-    cctRadioSprite({...ally,x:from.x+(s.x-from.x)*p,y:from.y+(s.y-from.y)*p,moving:true,gait:p*32},55);
+    cctRadioSprite({...ally,x:from.x+(s.x-from.x)*p,y:from.y+(s.y-from.y)*p,moving:true,gait:p*32});
     ctx.restore();
   }
 }

@@ -21,11 +21,16 @@ const {chromium}=require('playwright');
     await page.locator('#crate-popup [data-dismiss]').last().tap();
     await page.locator('#select-team').tap();await screenshot('Preparation');
     assert.deepEqual(await page.evaluate(()=>savedEquipment.map(i=>i.weapon)),Array(5).fill('pistol-0'));
-    assert.deepEqual(await page.locator('[data-slot="weapon"]').evaluate(e=>[e.innerText,e.querySelector('img').src.split('/').pop()]),['C','pistol-0.png']);
+    assert.deepEqual(await page.locator('[data-slot="weapon"]').evaluate(e=>[e.innerText,e.querySelector('img').src.split('/').pop()]),['C','C.png']);
     await page.locator('[data-slot="weapon"]').tap();
-    assert.equal(await page.locator('#item-title').textContent(),'보급 권총');
-    await page.locator('#item-action').tap();
-    assert.equal(await page.locator('[data-item]').count(),1);
+    assert.equal(await page.locator('#item-title').textContent(),'시작 권총');
+    assert.ok(await page.locator('#item-action').isDisabled());
+    assert.equal(await page.locator('[data-item]').count(),10);
+    await page.locator('[data-item="carbine-6"]').tap();
+    assert.match(await page.locator('#item-action').innerText(),/유료 전용/);
+    assert.equal(await page.locator('#item-detail').innerText(),'1발 피해 40');
+    const rack=await page.locator('#gear-inventory').boundingBox(),detail=await page.locator('#gear-detail').boundingBox();
+    assert.ok(detail.y>=rack.y+rack.height-1 && detail.y+detail.height<=853);
     await page.locator('#prep-save').tap();await page.locator('#start').tap();
     await page.locator('#hud').waitFor();
     await screenshot('Combat');
@@ -35,7 +40,7 @@ const {chromium}=require('playwright');
     await page.waitForFunction(()=>armory.diamonds===10);
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();
     await page.locator('#shop').tap();
-    await page.evaluate(()=>{window.realRandom=Math.random;Math.random=()=>.27});
+    await page.evaluate(()=>{window.realRandom=Math.random;Math.random=()=>.23});
     await page.locator('#crate-open').tap();
     await page.waitForFunction(()=>document.querySelectorAll('#crate-result b').length===2);
     await screenshot('Crate');
@@ -69,13 +74,43 @@ const {chromium}=require('playwright');
           const original=ctx.drawImage,seen=new Set();
           ctx.drawImage=function(img,...args){seen.add(img);return original.call(this,img,...args)};
           const before=member.weapon;member.weapon=i;
-          try{drawEquippedMember(member);if(!seen.has(art[i.key]))failures.push(i.key)}
+          try{
+            drawEquippedMember(member);
+            if(!seen.has(art[i.key]) || (i.family==='smg' && !seen.has(art[i.key+'-far'])))failures.push(i.key);
+          }
           finally{ctx.drawImage=original;member.weapon=before}
         }
+      }
+      for(const shield of equipmentCatalog.filter(i=>i.family==='shield')){
+        const drawn=[],original=ctx.drawImage;
+        ctx.drawImage=function(img,...args){drawn.push(img);return original.call(this,img,...args)};
+        try{drawEquippedMember({...run.squad[0],shieldItem:shield.key})}finally{ctx.drawImage=original}
+        if(!drawn.includes(art[shield.key]))failures.push(shield.key);
       }
       return failures;
     });
     assert.deepEqual(cases,[]);
+    const hits=await page.evaluate(()=>{
+      run.floor='surface';run.up.fill(0);run.activeSkill=null;
+      const hits={};
+      for(const item of equipmentCatalog.filter(i=>i.weapon)){
+        const id=Math.max(0,weaponFamilies.indexOf(item.family));
+        const member=run.squad[id];
+        Object.assign(member,{x:1280,y:1004,weapon:item,deployed:true,hp:100,flip:1,moving:false});
+        for(const lead of [true,false]){
+          run.lead=lead?id:(id+1)%5;
+          const enemy={type:0,x:1380,y:1004,hp:1000,hit:0};
+          run.enemies=[enemy];run.marks=[];run.effects=[];
+          shoot(member);advanceRounds(1);
+          const profile=equippedProfile(item,lead);
+          if(1000-enemy.hp!==equipmentDamage(item,profile))throw Error('Hit mismatch: '+item.key);
+          if(lead)(hits[item.family]??=[]).push(1000-enemy.hp);
+        }
+      }
+      return hits;
+    });
+    assert.deepEqual(hits,{pistol:[16,19,23,28,32],carbine:[20,24,29,35,40],
+      smg:[11,13,16,19,22],sniper:[38,46,55,67,76],rocket:[22,26,32,39,44],ar:[14,17,20,25,28]});
     await page.reload();await page.locator('#start:enabled').tap();
     assert.equal(await page.evaluate(()=>run.squad[0].weapon.key),drop.key);
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();await page.locator('#select-team').tap();
@@ -83,6 +118,42 @@ const {chromium}=require('playwright');
     await page.locator('[data-inspect="4"]').tap();
     assert.equal(await page.locator('#crew-name').textContent(),'CCT-공중통제사');
     await screenshot('CCT');
+    // Migrate the old duplicated B/A patterns without making them paid entitlements.
+    await page.evaluate(()=>{
+      localStorage.setItem(armoryKey,JSON.stringify({diamonds:500,owned:['smg-2','smg-4','smg-5','shield-4','boots-4']}));
+      localStorage.setItem(equipmentKey,JSON.stringify([{shield:'shield-4'},{weapon:'smg-4',boots:'boots-4'}]));
+    });
+    await page.reload();await page.locator('#select-team:enabled').tap();
+    assert.deepEqual(await page.evaluate(()=>[savedEquipment[1].weapon,savedEquipment[0].shield,
+      savedEquipment[1].boots,owns('smg-1'),owns('smg-6'),armory.diamonds]),['smg-3','shield-3','boots-4',true,false,500]);
+    await page.locator('[data-inspect="1"]').tap();
+    await page.locator('#gear-rank').selectOption('S+');
+    assert.equal(await page.locator('[data-item]').count(),2);
+    await page.locator('[data-item="smg-6"]').tap();
+    assert.equal(await page.locator('#item-title').innerText(),'쌍도깨비');
+    assert.ok(await page.locator('#item-action').isDisabled());
+    await page.locator('#gear-rank').selectOption('');
+    await page.locator('[data-item="smg-5"]').tap();
+    assert.ok(await page.locator('#item-action').isEnabled());
+    await screenshot('Raven-S');
+    await page.locator('[data-item="smg-6"]').tap();
+    await screenshot('Raven-S-plus');
+    await page.setViewportSize({width:320,height:568});
+    await page.locator('[data-item="smg-5"]').tap();await page.locator('#item-action').tap();
+    assert.equal(await page.evaluate(()=>draftEquipment[1].weapon),'smg-5');
+    const narrow=await page.locator('#gear-detail').boundingBox();
+    assert.ok(narrow.x>=0 && narrow.x+narrow.width<=320 && narrow.y+narrow.height<=569);
+    await page.locator('#prep-save').tap();
+    const exhausted=await page.evaluate(async()=>{
+      const drops=[];
+      while(true){
+        const before=armory.diamonds,result=await openWeaponCrate();
+        if(!result.drops)return {drops,before,after:armory.diamonds};
+        drops.push(...result.drops.map(i=>i.rank));
+      }
+    });
+    assert.ok(exhausted.drops.length>20 && !exhausted.drops.includes('S+'));
+    assert.equal(exhausted.before,exhausted.after);
     assert.deepEqual(errors,[]);console.log('Portrait start, locker, combat, earned currency, crate reload, class restrictions and equipped models on all five classes passed.');
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
