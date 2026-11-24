@@ -9,6 +9,11 @@ const {chromium} = require('playwright');
     const page = await browser.newPage({viewport:{width:914,height:412},isMobile:true,hasTouch:true});
     const errors=[];
     page.on('pageerror', e=>errors.push(e.message));
+    await page.addInitScript(()=>{
+      const keys=['carbine-0','smg-0','sniper-0','rocket-0','ar-0'];
+      localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
+      localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
+    });
     await page.goto(pathToFileURL(path.resolve('game/index.html')).href);
     await require('./select-test-squad.cjs')(page);
     await page.waitForFunction(()=>gunAudio.buffers.size===7);
@@ -67,7 +72,7 @@ const {chromium} = require('playwright');
     assert.equal(results.heavyMarked,true);
     assert.deepEqual(results.pierced,[65,82,120]);
     assert.equal(results.thirdHit,82);
-    assert.deepEqual(results.supports,Array.from({length:3},()=>[1,1.18,113,120]));
+    assert.deepEqual(results.supports,[[1,.76,104,120],[1,.106,109,120],[1,1.16,82,82]]);
     assert.ok(Math.abs(results.front-3.6)<.001 && results.rear===8);
     assert.equal(results.pointBlank,109);
     const audio=await page.evaluate(()=>{
@@ -111,9 +116,9 @@ const {chromium} = require('playwright');
     const audible=(...played)=>({played,hit:true,muzzle:true});
     const reserve={played:[],hit:false,muzzle:false};
     assert.deepEqual(audio.salvos,[
-      audible('bulk','hit'),audible(),audible(),reserve,
-      audible(),audible('raven-a','hit'),audible(),reserve,
-      audible(),audible(),audible('lynx','hit'),reserve
+      audible('bulk','hit'),audible(),audible(),reserve,reserve,
+      audible(),audible('raven-a','hit'),audible(),reserve,reserve,
+      audible(),audible(),audible('lynx','hit'),reserve,reserve
     ]);
     assert.deepEqual(audio.outgoing,audible('lynx'));
     assert.deepEqual(audio.promoted,audible());

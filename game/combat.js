@@ -4,7 +4,8 @@ const loadouts = [
   {name: 'bulk', range: 204, speed: 580, delay: .76, damage: 16, damagePerRank: 0},
   {name: 'raven', range: 252, speed: 735, delay: .49, damage: 11, damagePerRank: 5, damageUpgrade: 2},
   {name: 'lynx', range: 385, speed: 1090, delay: 1.16, damage: 38, damagePerRank: 11, damageUpgrade: 5, armoredMultiplier: 1.45},
-  {name: 'hammer', range: 300, delay: 1.27, damage: 22, damagePerRank: 6, damageUpgrade: 6}
+  {name: 'hammer', range: 300, delay: 1.27, damage: 22, damagePerRank: 6, damageUpgrade: 6},
+  {name:'support',range:275,speed:790,delay:.36,damage:14,damagePerRank:4,damageUpgrade:8}
 ];
 const sidearm = {name: 'support', range: 193, speed: 650, delay: 1.18, damage: 7, damagePerRank: 0};
 function weaponDamage(weapon, rank = 0) {
@@ -86,13 +87,13 @@ function launchRound(member, barrel, target, weapon, lead, damage) {
   const contact=dx*ux+dy*uy <= 0 || distance < 1;
   if (contact) {dx=ux; dy=uy}
   const angle=Math.atan2(dy,dx);
-  const pierce=lead && member.id===2;
+  const pierce=member.weapon.family==='sniper';
   const length=shotLength(member,target,pierce?166:18,contact?1:distance);
   run.marks.push({
     x:barrel.x, y:barrel.y, tx:barrel.x+Math.cos(angle)*length,
     ty:barrel.y+Math.sin(angle)*length, angle, id:member.id, lead,
     age:0, duration:length/weapon.speed, length, speed:weapon.speed,
-    sourceX:member.x, sourceY:member.y, damage, remaining:pierce?2+run.up[4]:1,
+    sourceX:member.x, sourceY:member.y, family:member.weapon.family, damage, remaining:pierce?2+(lead?run.up[4]:0):1,
     hit:new Set(), contact:contact?target:null
   });
 }
@@ -101,8 +102,9 @@ function shoot(member) {
   if (member.hp<=0 || member.deployed===false) return;
   const skill=run.activeSkill;
   if (skill && (skill.id===0 || skill.id===member.id)) return;
-  const lead=member.id===run.lead, weapon=lead?loadouts[member.id]:sidearm;
-  const sniper=lead && member.id===2, dual=lead && member.id===1;
+  const lead=member.id===run.lead,family=member.weapon.family;
+  const weapon=family==='pistol' ? (lead?loadouts[0]:sidearm) : loadouts[member.id];
+  const sniper=family==='sniper',dual=family==='smg';
   const targets=combatTargets(member,weapon.range,sniper);
   if (!targets.length) {
     member.cool=.075; member.burstIndex=0;
@@ -110,9 +112,9 @@ function shoot(member) {
     return;
   }
   const target=targets[0].enemy, beat=member.burstIndex || 0;
-  if (lead && member.id===3) {
+  if (family==='rocket') {
     fireMortar(member,target,null);
-    member.cool=weapon.delay;
+    member.cool=weapon.delay*member.gear.interval;
     return;
   }
   const col=dual && beat%2 ? 3 : 1;
@@ -121,21 +123,21 @@ function shoot(member) {
   const barrel=combatMuzzle(member,col,lead);
   member.aimAngle=Math.atan2(Math.sin(member.aimPitch),member.flip*Math.cos(member.aimPitch));
   member.lastShot=run.t; member.shotColumn=col; member.shoot=.22;
-  const damage=weaponDamage(weapon,run.up[weapon.damageUpgrade]);
-  const count=dual ? 1+run.up[3] : 1;
+  const damage=Math.round(weaponDamage(weapon,run.up[weapon.damageUpgrade])*member.gear.damage);
+  const count=dual && lead ? 1+run.up[3] : 1;
   for (const {enemy} of targets.slice(0,count)) launchRound(member,barrel,enemy,weapon,lead,damage);
 
   const state={id:member.id, lead, flip:member.flip, col, shotTime:run.t, angle:member.aimAngle, age:0};
-  run.effects.push({...state,clip:weapon.name+'_muzzle',x:barrel.x,y:barrel.y,duration:[.144,.096,.180,.089][lead?member.id:3]});
+  run.effects.push({...state,clip:weapon.name+'_muzzle',x:barrel.x,y:barrel.y,duration:[.144,.096,.180,.089,.10][lead?member.id:3]});
   const back=sniper?21:6;
   run.effects.push({...state,clip:'brass',x:barrel.x-back*Math.cos(state.angle),y:barrel.y-back*Math.sin(state.angle),duration:.23});
   if (lead) gunAudio.play(dual?(col===1?'raven-a':'raven-b'):weapon.name);
   member.burstIndex=dual?(beat+1)%4:0;
-  member.cool=dual && member.burstIndex!==0 ? .106 : weapon.delay;
+  member.cool=(dual && member.burstIndex!==0 ? .106 : weapon.delay)*member.gear.interval;
 }
 
 function roundImpact(shot, enemy, x, y, state) {
-  const pierce=shot.lead && shot.id===2;
+  const pierce=shot.family==='sniper' || (shot.lead && shot.id===2 && !shot.family);
   const heavyBonus=pierce && (enemy.boss || enemy.type===2)?loadouts[2].armoredMultiplier:1;
   damageEnemy(enemy,Math.round(shot.damage*heavyBonus),shot.angle,state);
   state.effects.push({clip:pierce?'pierce_exit':'hit_spark',x,y,id:shot.id,
@@ -197,7 +199,7 @@ function absorbContact(enemy, member, nav, damageOverride) {
   const angle=bulk.lastShot!=null && bulk.shoot>0 ? bulk.aimAngle : run.heading;
   const guard=run.lead===0 && (enemy.x-member.x)*Math.cos(angle)+(enemy.y-member.y)*Math.sin(angle)>0;
   const contactDamage=damageOverride ?? enemy.contactDamage ?? [8,6,15][enemy.type];
-  member.hp-=contactDamage*(guard?1-(.55+.06*run.up[0]):1);
+  member.hp-=contactDamage*(1-member.gear.protection)*(guard?1-Math.min(.95,.55+.06*run.up[0]+bulk.gear.guard):1);
   member.hurt=.7;
   combatCue('hurt',member.x,member.y,.28,member.id,Math.atan2(member.y-enemy.y,member.x-enemy.x));
   if (!guard) return;

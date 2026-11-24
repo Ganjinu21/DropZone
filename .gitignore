@@ -37,3 +37,5 @@ node_modules/
 !/work/check-zombie-stages.cjs
 !/work/select-test-squad.cjs
 !/work/check-lineup.cjs
+
+!/work/check-armory.cjs

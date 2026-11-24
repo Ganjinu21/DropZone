@@ -87,19 +87,8 @@ h1, h2, p { margin: 0; }
 #cards, #loadout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(6px, 1.05vw, 14px); }
 .card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
 .card, .operator, #loadout { text-align: left; }
-#rotate { display: none; }
+
 @media (orientation: portrait) {
-  #rotate {
-    position: absolute;
-    display: block;
-    text-align: center;
-    bottom: 0;
-    width: 100%;
-    padding: 6px 14px max(6px, env(safe-area-inset-bottom, 0px));
-    background: #101c24;
-    font-size: 12px;
-    pointer-events: none;
-  }
   .intro { max-width: 90%; }
   #home { background-position: 53% center; }
   .controlhint, #party { bottom: calc(var(--safe-bottom) + 28px); }

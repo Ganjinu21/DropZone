@@ -188,7 +188,8 @@ function boardBunker(s, p) {
     ctx.save();
     ctx.globalAlpha *= Math.min(1,(1-p)*3);
     if (m.id < 3) skillCell(art.squadBoard,Math.min(3,Math.floor(p*4)),m.id,96,64,x,y,32,60);
-    else drawHammerCarry({...m,x,y},false);
+    else if(m.id===3)drawHammerCarry({...m,x,y},false);
+    else cctRadioSprite({...m,x,y});
     ctx.restore();
   }
 }
@@ -263,7 +264,7 @@ function drawBunker(s) {
 }
 
 function drawSkillRound(shot,x,y,angle) {
-  if (!shot.lead) return false;
+  if (!shot.lead || shot.family==='pistol') return false;
   if (shot.id === 0) {
     skillFlash(art.bulkRounds,0,0,40,32,33,16,x,y,angle,shot.skillRound ? .82 : 1);
   } else if (shot.id === 1) {

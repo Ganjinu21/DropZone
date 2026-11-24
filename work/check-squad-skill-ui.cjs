@@ -14,6 +14,11 @@ const {chromium} = require('playwright');
     page.on('pageerror', error => errors.push(error.message));
     // Drive the game's real update/render functions at a deterministic frame rate.
     await page.addInitScript(() => { window.requestAnimationFrame = () => 0; });
+    await page.addInitScript(()=>{
+      const keys=['carbine-0','smg-0','sniper-0','rocket-0','ar-0'];
+      localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
+      localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
+    });
     await page.goto(pathToFileURL(path.join(__dirname, '../game/index.html')).href);
     const launch=require('./select-test-squad.cjs');
     await launch(page);
@@ -117,7 +122,7 @@ const {chromium} = require('playwright');
     await page.locator('#pause').tap();
     await page.locator('#homebtn').tap();
     await page.locator('#start:enabled').tap();
-    assert.deepEqual(await page.evaluate(() => run.squad.map(m=>squadSkillCooldown(m.id))),[0,0,0,0]);
+    assert.deepEqual(await page.evaluate(() => run.squad.map(m=>squadSkillCooldown(m.id))),[0,0,0,0,0]);
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[1,2,3]);
     await party.nth(2).tap();
     await page.keyboard.press('Space');

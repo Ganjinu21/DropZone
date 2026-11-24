@@ -10,11 +10,13 @@
   <link rel="stylesheet" href="arcade.css">
   <link rel="stylesheet" href="lobby.css">
   <link rel="stylesheet" href="encounter.css">
+  <link rel="stylesheet" href="preparation.css">
 </head>
 <body>
   <canvas id="world" aria-label="을지로 전투 지역"></canvas>
   <main id="home" class="overlay">
     <section id="main-menu" aria-labelledby="game-title">
+      <div class="wallet" aria-label="보유 다이아"><i class="gem" aria-hidden="true"></i><span data-balance>0</span></div>
       <div class="title-block">
         <div class="location"><i class="map-pin" aria-hidden="true"></i>서울<span class="divider"></span>을지로3가</div>
         <h1 id="game-title">DROP ZONE<br><span>SQUAD</span><i aria-hidden="true"></i></h1>
@@ -22,9 +24,9 @@
       </div>
       <div class="lobby-controls">
         <nav aria-label="메인 메뉴">
+          <button id="select-team" type="button" disabled>생활관</button>
           <button id="start" class="menu-start" type="button" disabled>불러오는 중</button>
-          <button id="select-team" type="button" disabled><i class="team-glyph" aria-hidden="true"></i>캐릭터 선택</button>
-          <button id="shop" type="button" disabled><i class="shop-glyph" aria-hidden="true"></i>상점 <small>준비 중</small></button>
+          <button id="shop" type="button" disabled><img src="art/armory/crate.png" alt="">특수 무기 소환</button>
         </nav>
         <div class="controlhint">
           <div class="hint-touch"><span>드래그로 이동</span><i></i><span>대원 탭으로 교대</span><i></i><span>스킬 버튼으로 발동</span></div>
@@ -32,11 +34,29 @@
         </div>
       </div>
     </section>
+    <section id="prep-screen" aria-labelledby="prep-title" hidden>
+      <div class="prep-shell">
+        <header class="prep-head"><button id="prep-back" type="button" aria-label="메인 메뉴로 돌아가기">뒤로</button><h2 id="prep-title">생활관</h2>
+          <div class="prep-nav"><button type="button" id="change-crew">크루 변경</button><button type="button" id="prep-save">저장</button></div>
+        </header>
+        <div class="dressing"><div class="slot-column" id="slots-left"></div>
+          <div class="formation"><div id="crew-figures" role="group" aria-label="장비를 편집할 대원"></div>
+            <div class="crew-caption"><h3 id="crew-name"></h3><button type="button" id="make-leader">선두 지정</button></div>
+          </div><div class="slot-column" id="slots-right"></div></div>
+        <section class="locker" aria-label="공용 장비 보관함">
+          <div class="locker-head"><h3 id="locker-title"></h3><span id="locker-owner"></span><div class="locker-filters">
+            <label>랭크 <select id="gear-rank" aria-label="랭크 필터"><option value="">전체</option><option>S</option><option>A</option><option>B</option><option>C</option></select></label>
+            <label>정렬 <select id="gear-sort" aria-label="정렬 우선순위"><option value="rank">랭크 우선</option><option value="power">성능 우선</option><option value="name">이름순</option></select></label>
+          </div></div>
+          <div id="gear-inventory" role="group" aria-label="장착 가능한 아이템"></div>
+        </section>
+      </div>
+    </section>
     <section id="roster-screen" aria-labelledby="roster-title" hidden>
       <div class="roster-content">
         <header class="roster-header">
-          <button type="button" id="roster-back" aria-label="메인 메뉴로 돌아가기"></button>
-          <h2 id="roster-title">캐릭터 선택</h2>
+          <button type="button" id="roster-back" aria-label="생활관으로 돌아가기">뒤로</button>
+          <h2 id="roster-title">출발 크루 편성</h2>
           <div class="roster-count" aria-live="polite">편성 <strong id="roster-count">0 / 3</strong></div>
         </header>
         <p id="roster-help">세 명을 선택하세요. 첫 번째 대원이 선두에 섭니다.</p>
@@ -44,8 +64,7 @@
         <footer class="roster-footer">
           <p id="squad-line" aria-live="polite"></p>
           <div>
-            <button type="button" id="save-team" class="secondary" disabled>편성 저장</button>
-            <button type="button" id="deploy-team" class="action" disabled>게임 시작</button>
+            <button type="button" id="save-team" class="secondary" disabled>편성 적용</button>
           </div>
         </footer>
       </div>
@@ -83,7 +102,20 @@
       <footer><button id="resume" class="action"></button><button id="homebtn" class="secondary">타이틀로</button></footer>
     </div>
   </section>
-  <div id="rotate">가로로 돌려서 플레이하세요</div>
+  <dialog id="gear-popup" class="armory-popup" aria-labelledby="item-title">
+    <div class="popup-bar"><span id="item-context"></span><button type="button" data-dismiss aria-label="닫기">×</button></div>
+    <div class="item-showcase"><img id="item-icon" alt=""></div>
+    <h2 id="item-title"></h2><p id="item-detail"></p><p id="item-compare"></p>
+    <div class="popup-buttons"><button type="button" data-dismiss>닫기</button><button type="button" id="item-action"></button></div>
+  </dialog>
+  <dialog id="crate-popup" class="armory-popup" aria-labelledby="crate-title">
+    <div class="popup-bar"><div class="wallet"><i class="gem" aria-hidden="true"></i><span data-balance>0</span></div><button type="button" data-dismiss aria-label="닫기">×</button></div>
+    <img class="crate-art" src="art/armory/crate.png" alt=""><h2 id="crate-title">특수 무기 소환</h2>
+    <p>미보유 무기 1개와 남은 방어구 1개를 획득합니다.</p>
+    <p>일반 적 처치 +1 다이아 · 보스 처치 +5</p>
+    <div id="crate-result" role="status"></div>
+    <div class="popup-buttons"><button type="button" data-dismiss>닫기</button><button type="button" id="crate-open">◆ 10 소환</button></div>
+  </dialog>
   <script src="images.js"></script>
   <script src="streets.js"></script>
   <script src="street-wear.js"></script>
@@ -104,6 +136,8 @@
   <script src="stages.js"></script>
   <script src="bosses.js"></script>
   <script src="stage-hud.js"></script>
+  <script src="cct.js"></script>
+  <script src="equipment.js"></script>
   <script src="game.js"></script>
   <script src="lobby.js"></script>
   <script src="art/tag-combat/atlas.js"></script>

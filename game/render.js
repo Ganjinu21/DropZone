@@ -43,7 +43,10 @@ function drawUnit(frame, row, x, y, flip, width = 64, height = 64) {
 const tagRoles = ['bulk', 'raven', 'lynx'];
 const shoulder = { x: 32, y: 32 };
 const tagArt = {
+  ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon).map(i=>[i.key,itemImage(i)])),
+  cctPatch:'art/armory/cct-patch.png',crewBodies:'art/armory/bodies.png',crewShield:'art/armory/shield.png',
   combatUnits: 'combat-units.png',
+  cctPoses:'art/prep/cct-poses.png', cctRifle:'art/prep/ar.png', cobra:'art/prep/cobra.png',
   infectedBosses: 'art/bosses/infected.png',
   tagRig: 'art/tag-combat/units-rig.png',
   tagEquip: 'art/tag-combat/units-equip.png',
@@ -63,64 +66,59 @@ function shoulderAt(m) {
   return { x: Math.round(m.x), y: Math.round(m.y) + shoulder.y - 60 - bob };
 }
 
-function combatAim(m, tx, ty, col, lead) {
-  const pivot = shoulderAt(m);
-  const dx = tx - pivot.x, dy = ty - pivot.y;
-  m.flip = dx < 0 ? -1 : dx > 0 ? 1 : m.flip;
-  const [, my] = tagAtlas.muzzles[m.id === 3 ? 3 : m.id + (lead ? 0 : 3)][col];
-  // The far pistol points along a parallel line above the shoulder. Solve for
-  // the rotation that puts the target on that line, including steep shots.
-  const offset = my - shoulder.y;
-  const bearing = Math.atan2(dy, Math.abs(dx));
-  const correction = Math.asin(clamp(offset / Math.max(1, Math.hypot(dx, dy)), -1, 1));
-  m.aimPitch = bearing - correction;
-  m.aimAngle = Math.atan2(Math.sin(m.aimPitch), m.flip * Math.cos(m.aimPitch));
+function weaponMount(m,col,recoil=0){
+  const image=art[m.weapon.key], family=m.weapon.family;
+  const x=family==='sniper'?-12:family==='pistol'?7:family==='rocket'?-7:1;
+  const far=family==='smg' && col===3;
+  const y=family==='rocket'?-11:family==='sniper'?-9:-5;
+  return {image,x:x+(far?6:0)-recoil,y:y-(far?7:0),bore:family==='rocket'?.36:family==='sniper'?.47:.23};
 }
-
-function combatMuzzle(m, col, lead, pitch = m.aimPitch ?? 0) {
-  const pivot = shoulderAt(m);
-  const [mx, my] = tagAtlas.muzzles[m.id === 3 ? 3 : m.id + (lead ? 0 : 3)][col];
-  const u = mx - shoulder.x, v = my - shoulder.y;
-  const c = Math.cos(pitch), s = Math.sin(pitch);
-  return { x: pivot.x + m.flip * (u * c - v * s), y: pivot.y + u * s + v * c };
+function combatAim(m,tx,ty,col){
+  const pivot=shoulderAt(m),dx=tx-pivot.x,dy=ty-pivot.y;
+  m.flip=dx<0?-1:dx>0?1:m.flip;
+  const mount=weaponMount(m,col),offset=mount.y+mount.image.height*mount.bore;
+  m.aimPitch=Math.atan2(dy,Math.abs(dx))-Math.asin(clamp(offset/Math.max(1,Math.hypot(dx,dy)),-1,1));
+  m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
 }
-
-function equippedPose(m, lead) {
-  const age = run.t - (m.lastShot ?? -Infinity);
-  const row = m.id + (lead ? 0 : 3);
-  const clip = tagAtlas.clips[tagRoles[m.id] + (lead ? '_lead' : '_support')];
-  const fire = m.shotColumn === 3 && lead && m.id === 1 ? 3 : 1;
-  const idx = clip.frames.indexOf(fire);
-  const kick = clip.exposureMs[idx] / 1000;
-  const recover = clip.exposureMs[idx + 1] / 1000;
-  const col = age < kick ? fire : age < kick + recover ? fire + 1 : 0;
-  const aim = (m.aimPitch ?? 0) * clamp((.34 - age) / .12, 0, 1);
-  return { row, col, aim };
+function combatMuzzle(m,col,lead,pitch=m.aimPitch??0){
+  const pivot=shoulderAt(m),part=weaponMount(m,col,2);
+  const u=part.x+part.image.width,v=part.y+part.image.height*part.bore;
+  return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
 }
-
-function drawEquippedMember(m, lead) {
-  const pivot = shoulderAt(m), { row, col, aim } = equippedPose(m, lead);
-  const hit = m.hurt > .6;
-  const rig = hit ? art.tagRigHit : art.tagRig;
-  ctx.save();
-  ctx.translate(pivot.x, pivot.y);
-  ctx.scale(m.flip, 1);
-  const sinceTag = run.t - (m.leadChanged ?? -Infinity);
-  if (sinceTag < .24 && (m.lastShot == null || m.lastShot < m.leadChanged)) {
-    const frame = sinceTag < .042 ? 0 : sinceTag < .10 ? 1 : sinceTag < .158 ? 2 : 3;
-    tagCell(hit ? art.tagEquipHit : art.tagEquip, lead ? frame : 3 - frame, m.id, -32, -shoulder.y);
-  } else {
-    const walking = m.moving && !reduceMotion.matches;
-    const stride = Math.floor(((m.gait ?? 0) / 30 + m.id * .31) * 4) % 4;
-    const legRow = m.id + (walking ? 3 : 0) + (hit ? 6 : 0);
-    const legCol = walking ? 4 + stride : 4;
-    ctx.drawImage(art.combatUnits, legCol * 64, legRow * 64 + 40, 64, 24,
-      -32, 40 - shoulder.y, 64, 24);
-    tagCell(rig, col, row, -32, -shoulder.y);
-    ctx.rotate(aim);
-    tagCell(rig, col, row + 6, -32, -shoulder.y);
+function drawMemberGear(g,m,age,moving=false){
+  const id=m.id, pose=art.crewBodies;
+  const bob=moving&&!reduceMotion.matches?Math.round(Math.abs(Math.sin(m.gait/30*TAU))*1.7):0;
+  g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
+  if(moving && (id<3||id===4)){
+    const legRow=(id===4?1:id)+3,frame=4+Math.floor(m.gait/8)%4;
+    g.drawImage(art.combatUnits,frame*64,legRow*64+40,64,24,-32,-20,64,24);
+    g.drawImage(pose,id*96,0,96,41,-32,-60-bob,96,41);
+  }else g.drawImage(pose,id*96,0,96,64,-32,-60-bob,96,64);
+  if(id===4){
+    g.save();g.translate(-8,-49-bob);
+    if(m.flip<0){g.translate(art.cctPatch.width,0);g.scale(-1,1)}
+    g.drawImage(art.cctPatch,0,0);g.restore();
   }
-  ctx.restore();
+  if(id===0)g.drawImage(art.crewShield,-19,-39-bob,25,37);
+  g.translate(0,-28-bob);
+  g.rotate((m.aimPitch||0)*clamp((.34-age)/.12,0,1));
+  for(const col of (m.weapon.family==='smg'?[3,1]:[1])){
+    const kick=age<.055 && (m.shotColumn||1)===col?2:0;
+    const mount=weaponMount(m,col,kick);
+    g.drawImage(mount.image,mount.x,mount.y);
+    const gripX=mount.x+(m.weapon.family==='sniper'?17:3),gripY=mount.y+Math.round(mount.image.height*.65);
+    g.fillStyle='#393f37';g.fillRect(gripX-4,gripY,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY,3,2);
+  }
+  g.restore();
+}
+function drawCrewPreview(canvas,id,row){
+  const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
+  drawMemberGear(g,{id,weapon:gearByKey.get(row.weapon),flip:1,x:gearByKey.get(row.weapon).family==='sniper'?29:38,y:60},Infinity);
+}
+function drawEquippedMember(m){
+  const age=run.t-(m.lastShot??-Infinity);
+  ctx.save();if(m.hurt>.55)ctx.globalAlpha*=.72;
+  drawMemberGear(ctx,m,age,m.moving);ctx.restore();
 }
 
 function drawCrystal(g) {
@@ -172,13 +170,11 @@ function drawHero(m) {
     ellipse(m.x, m.y, 17, 5, '#edbf68', 1.5, .07, 3.07);
   }
   const skill = run.activeSkill?.id === m.id ? run.activeSkill : null;
-  if (m.id === 3) {
-    if (skill) drawHammerSkill(m,skill);
-    else drawHammerCarry(m,lead);
-  } else if (skill?.phase === 'spin') drawSpinner(m,skill);
-  else if (skill) drawRifleSkill(m,skill);
-  else drawEquippedMember(m, lead);
-  if (lead) leaderChevron(m.x, m.y - [57,55,55,51][m.id]);
+  if(skill?.id===3)drawHammerSkill(m,skill);
+  else if(skill?.phase==='spin')drawSpinner(m,skill);
+  else if(skill)drawRifleSkill(m,skill);
+  else drawEquippedMember(m);
+  if (lead) leaderChevron(m.x, m.y - [57,55,55,51,55][m.id]);
 }
 
 function drawBossSprite(stage, frame, x, y, flip, hit, height = 88) {
@@ -261,7 +257,7 @@ function drawTracer(mark) {
   const x = mark.x + dx * t, y = mark.y + dy * t;
   const angle = mark.angle ?? Math.atan2(dy, dx);
   if (drawSkillRound(mark,x,y,angle)) return;
-  if (mark.lead) {
+  if (mark.lead && mark.id<3 && mark.family!=='pistol') {
     drawTagEffect(tagRoles[mark.id] + '_bullet', mark.age, x, y, angle);
   } else {
     ctx.save();
@@ -274,6 +270,7 @@ function drawTracer(mark) {
 }
 
 function drawEffect(e) {
+  if(e.clip==='support_tracer'){line(e.x,e.y,e.tx,e.ty,'#ffe1a7',1.6);return}
   if (e.skillFx) { drawSkillFX(e); return; }
   if (e.clip === 'brass') {
     if (reduceMotion.matches) return;
@@ -286,10 +283,7 @@ function drawEffect(e) {
     const m = run.squad[e.id];
     if (!m || m.deployed === false || m.hp <= 0 || m.lastShot !== e.shotTime ||
       (m.id === run.lead) !== e.lead || run.activeSkill?.id === 0) return;
-    const pose = m.id === 3 ? {col:e.age < .045 ? 1 : e.age < .11 ? 2 : 0,aim:m.aimPitch} : equippedPose(m, e.lead);
-    // Raven's far barrel has a different resting socket from the near one.
-    const col = e.col === 3 && pose.col === 0 ? 4 : pose.col;
-    const tip = combatMuzzle(m, col, e.lead, pose.aim);
+    const tip=combatMuzzle(m,e.col,e.lead,m.aimPitch);
     drawTagEffect(e.clip, e.age, tip.x, tip.y, e.angle);
   } else if (e.clip === 'pierce_exit' || (e.clip === 'hit_spark' && e.lead)) {
     const col = Math.min(4,Math.floor(e.age/e.duration*5));
@@ -463,6 +457,7 @@ function render() {
   ctx.restore();
   if (run.activeSkill?.id === 0) actors.push({o:run.activeSkill,draw:drawBunker});
   else for (const o of run.squad) if (o.hp > 0 && o.deployed !== false) actors.push({o,draw:drawHero});
+  for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:m=>cctRadioSprite(m,55)});
   actors.sort((a, b) => a.o.y - b.o.y);
   for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}
   ctx.globalAlpha=1;
@@ -480,6 +475,7 @@ function render() {
     drawFloorCues(state, opacity, visible, drawAirCue);
   }
   ctx.globalAlpha = 1;
+  drawCobraSupport();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawScreenShade();
   drawStick();

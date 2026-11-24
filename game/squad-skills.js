@@ -4,7 +4,8 @@ const squadSkillDefs = [
   {name:'벙커 전개', duration:4.8, cooldown:15},
   {name:'쌍기관단총 난사', duration:3, cooldown:10},
   {name:'관통 사격', duration:2.55, cooldown:11},
-  {name:'박격포 포격', duration:3.65, cooldown:13}
+  {name:'박격포 포격', duration:3.65, cooldown:13},
+  {name:'코브라 공중지원',duration:7,cooldown:28}
 ];
 
 // Packaged as data so local desktop previews and the offline Android WebView
@@ -40,6 +41,7 @@ function activateSquadSkill() {
   if (mode!=='play' || run.activeSkill || squadSkillCooldown(run.lead)>0) return false;
   const member=run.squad[run.lead], id=member.id, def=squadSkillDefs[id];
   if (member.hp<=0 || member.deployed===false) return false;
+  if(id===4)return callCobra(member);
   const firstBeat=[.58,.18,.42,.82][id];
   const phase=['deploy','forward','charge','deploy'][id];
   const skill={id,phase,x:member.x,y:member.y,floor:run.floor,age:0,duration:def.duration,
@@ -139,12 +141,13 @@ function fireMortar(member,target,skill) {
   member.flip=Math.cos(angle)<0?-1:1;
   member.lastShot=run.t; member.shoot=.27; member.aimAngle=angle;
   if (skill) skill.angle=angle;
-  const barrel=skillShotSocket(member,skill,angle,0);
+  if(!large)combatAim(member,target.x,chestY(target),1);
+  const barrel=large?skillShotSocket(member,skill,angle,0):combatMuzzle(member,1,member.id===run.lead);
   const travel=Math.hypot(target.x-member.x,target.y-member.y);
   const duration=clamp((large?.48:.30)+travel/1000,.32,.86);
   run.effects.push({skillFx:'shellArc',id:3,lead:true,large,angle,age:0,duration,
     x:barrel.x,y:barrel.y,tx:target.x,ty:target.y,
-    damage:weaponDamage(loadouts[3],rank)+(large?18:0),radius:(large?60:37)+5*(run.up[7]??0)});
+    damage:Math.round(weaponDamage(loadouts[3],rank)*member.gear.damage)+(large?18:0),radius:(large?60:37)+5*(run.up[7]??0)});
   skillAudio.play(3,large?'thump':'lob',large?.54:.45);
 }
 

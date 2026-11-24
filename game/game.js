@@ -3,25 +3,27 @@ const $=id=>document.getElementById(id);
 const cv=$('world'),ctx=cv.getContext('2d',{alpha:false}), art={};
 const TAU=Math.PI*2;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-const names=['벌크','레이븐','링스','해머'], roles=['방어','돌격','저격','포격'];
-const memberHealth=[145,98,85,102];
+const names=['벌크','레이븐','링스','해머','CCT'], roles=['돌격병','SMG 양손잡이','저격병','로켓병','공중통제사'];
+const memberHealth=[145,98,85,102,94];
 ART.face3='art/skills/hammer-face.png';
+ART.face4='art/armory/cct-portrait.png';
 const formationSlots = [[23, 0], [-15, -24], [-18, 24]];
 const swapTime = 1.5;
 let mode='home',run,viewW=960,viewH=540,stick=null,pressed=new Set(),sound,last=0,selected=0,offers=[];
 function clock(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0')}
-function resize(){viewH=540;viewW=Math.round(viewH*innerWidth/innerHeight);cv.width=viewW;cv.height=viewH;ctx.imageSmoothingEnabled=false}
+function resize(){viewH=innerHeight>innerWidth?Math.round(420*innerHeight/innerWidth):540;viewW=Math.round(viewH*innerWidth/innerHeight);cv.width=viewW;cv.height=viewH;ctx.imageSmoothingEnabled=false}
 addEventListener('resize',resize);resize();
 function show(next){mode=next;for(const [id,visible] of Object.entries({home:next==='home',hud:next==='play',upgrade:next==='upgrade',dialog:['pause','end'].includes(next)}))$(id).hidden=!visible;if(next==='home')resetLobbyView();stick=null;pressed.clear()}
 function start(){
  const lineup=getSelectedSquad();
- if(lineup.length!==formationSlots.length){openSquadSelection();return}
+ if(lineup.length!==formationSlots.length){openPreparation();return}
  try{sound??=new (window.AudioContext||window.webkitAudioContext)();sound.resume().catch(()=>{});gunAudio.load(sound)}catch{}
  const pos=SURFACE.spawn;
  const squad=names.map((_,id)=>{
    const slot=lineup.indexOf(id), deployed=slot>=0;
    const [front,side]=formationSlots[slot] || [0,0];
-   return {id,deployed,x:pos.x+front,y:pos.y+side,hp:deployed?memberHealth[id]:0,max:memberHealth[id],
+   const gear=gearStats(id),max=memberHealth[id]+gear.health;
+   return {id,deployed,gear,weapon:gearByKey.get(savedEquipment[id].weapon),shieldItem:savedEquipment[id].shield,x:pos.x+front,y:pos.y+side,hp:deployed?max:0,max,
      cool:.15+id*.15,shoot:0,flip:1,hurt:0,gait:0,moving:false,moveSpeed:0,aimAngle:0};
  });
  run={...pos,floor:'surface',floors:{surface:freshFloor(),metro:freshFloor()},stair:-1,depth:0,t:0,level:1,xp:0,need:5,kills:0,lead:lineup[0],lineup:[...lineup],swap:0,face:1,dx:1,dy:0,heading:0,enemies:[],crystals:[],effects:[],marks:[],cues:[],pickupCool:0,stage:1,bossPhase:false,boss:null,walk:0,camera:{...pos},up:Array(upgrades.length).fill(0),squad,shield:0,lastHud:-1};
@@ -83,7 +85,9 @@ const upgrades=[
  ['관통탄','링스의 선두 저격이 한 줄에 있는 적을 더 관통합니다.','추가 관통',n=>(1+n)+'명'],
  ['정밀 조준','링스의 선두 저격 피해가 증가합니다. 중장갑 적에게 특히 강합니다.','기본 피해',n=>String(weaponDamage(loadouts[2],n))],
  ['고폭탄','해머의 기본 포탄과 집중 포격의 폭발 피해가 증가합니다.','기본 피해',n=>String(22+6*n)],
- ['확산 탄두','해머의 기본 포탄과 집중 포격이 더 넓게 폭발합니다.','기본 반경',n=>((37+5*n)/10).toFixed(1)+' m']
+ ['확산 탄두','해머의 기본 포탄과 집중 포격이 더 넓게 폭발합니다.','기본 반경',n=>((37+5*n)/10).toFixed(1)+' m'],
+ ['조준 보정','통제관의 소총 탄환 피해를 높입니다.','탄환 피해',n=>String(14+4*n)],
+ ['지원 편대','코브라의 지원 사격 피해를 높입니다.','지원 피해',n=>String(19+3*n)]
 ];
 function openUpgrade(){
  const pool=upgrades.map((_,i)=>i).filter(i=>run.up[i]<5 && run.squad[Math.floor(i/2)].deployed && run.squad[Math.floor(i/2)].hp>0);if(!pool.length)return;
@@ -97,7 +101,7 @@ function openUpgrade(){
    const operator = Math.floor(key / 2);
    return `<button class="card" data-i="${index}" data-operator="${operator}">
      <span class="who"><img src="${ART['face'+operator]}" alt="">${names[operator]}<em>Lv. ${rank+1}</em></span>
-     <span class="item"><img src="${key===6?'art/skills/hammer-installed.png':'augment-'+key+'.png'}" alt=""></span>
+     <span class="item"><img src="${key===6?'art/skills/hammer-installed.png':key===8?'art/prep/ar.png':key===9?'art/prep/cobra.png':'augment-'+key+'.png'}" alt=""></span>
      <strong>${name}</strong><p>${description}</p>
      <span class="num"><span>${stat}</span><span>${format(rank)} <span class="arrow">→</span> <b>${format(rank+1)}</b></span></span>
    </button>`;
@@ -126,7 +130,7 @@ function setLeader(i){
  run.lead=i;run.mark=null;run.swap=swapTime;
  const member=run.squad[i];
  combatCue('swap',member.x,member.y,.62,i,run.heading);
- const pitch=[330,392,494,294][i];
+ const pitch=[330,392,494,294,440][i];
  tone(pitch,.065,.026,'triangle',0,pitch);
  tone(pitch*1.5,.09,.021,'triangle',.063,pitch*1.5);
  updateHud();
@@ -142,7 +146,7 @@ function updateHud(){
    const i=Number(b.dataset.i),m=run.squad[i],lead=i===run.lead;
    b.classList.toggle('lead',lead);b.classList.toggle('hurt',m.hurt>.43);
    b.setAttribute('aria-pressed',String(lead));b.disabled=m.hp<=0;
-   b.querySelector('small').textContent=m.hp<=0?'이탈':lead?'선두':roles[i];
+   b.querySelector('small').textContent=m.hp<=0?'이탈':roles[i];
    b.querySelector('i').style.width=Math.max(0,100*m.hp/m.max)+'%';
  }
  const remaining=Math.ceil(squadSkillCooldown(run.lead)),active=!!run.activeSkill;
@@ -159,22 +163,14 @@ function showLoadout(){
      return level?label+' '+level:'';
    }).filter(Boolean).join(' · ');
    const hp=Math.max(0,Math.ceil(member.hp));
-   const weapon = ['방패 · 권총','쌍권총','관통 저격총','휴대 박격포'][i];
+   const weapon = member.weapon.label+(i===0?' · '+gearByKey.get(member.shieldItem).label:'');
    return `<div data-operator="${i}"><canvas aria-hidden="true"></canvas><strong>${names[i]}</strong><span>${weapon}</span><small>${enhancements || '기본 장비'}</small><span class="hp">HP ${hp}/${member.max}</span></div>`;
  }).join('');
  panel.querySelectorAll('canvas').forEach((canvas,slot)=>{
    const i=run.lineup[slot];
-   if(i===3){
-     canvas.width=64;canvas.height=48;
-     const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
-     const icon=art.hammerInstalled, scale=Math.min(64/icon.width,48/icon.height);
-     g.drawImage(icon,(64-icon.width*scale)/2,0,icon.width*scale,icon.height*scale);
-     return;
-   }
-   const [x,y,right,bottom]=tagAtlas.gearRects[i];
-   const w=right-x,h=bottom-y;
-   canvas.width=64;canvas.height=40;
-   canvas.getContext('2d').drawImage(art.tagGear,x,y+i*64,w,h,Math.floor((64-w)/2),Math.floor((40-h)/2),w,h);
+   const icon=art[run.squad[i].weapon.key];canvas.width=64;canvas.height=40;
+   const g=canvas.getContext('2d'),scale=Math.min(58/icon.width,32/icon.height);
+   g.imageSmoothingEnabled=false;g.drawImage(icon,(64-icon.width*scale)/2,(40-icon.height*scale)/2,icon.width*scale,icon.height*scale);
  });
 }
 function pause(){if(mode!=='play')return;show('pause');$('dialog').dataset.state='pause';showLoadout();$('dialogtitle').textContent='일시 정지';$('summary').textContent='생존 '+clock(run.t)+'　·　처치 '+run.kills;$('resume').textContent='계속하기'}
@@ -204,7 +200,7 @@ function combatCue(kind,x,y,duration,id=0,angle=0,size=1){
 function damageEnemy(e,power,angle=0,state=run){
  if(e.hp<=0)return;e.hp-=power;e.hit=.12;e.hitAngle=angle;
  if(e.hp>0)return;
- run.kills++;state.crystals.push({x:e.x,y:e.y,val:e.type===2?4:1});
+ run.kills++;awardDiamonds(e.boss?5:1);state.crystals.push({x:e.x,y:e.y,val:e.type===2?4:1});
  state.cues.push({kind:'down',x:e.x,y:e.y,duration:.28,id:e.type,bossStage:e.boss?(e.stage||run.stage):0,angle,flip:e.flip,age:0});
  if(e.type===2)state.effects.push({row:3,x:e.x,y:e.y,dir:1,w:58,duration:.46,id:e.type,angle,age:0});
 }
@@ -251,7 +247,7 @@ function update(dt){
  run.t+=dt;run.swap=Math.max(0,run.swap-dt);run.shield-=dt;
  let dx=(stick?.dx||0)+Number(pressed.has('KeyD')||pressed.has('ArrowRight'))-Number(pressed.has('KeyA')||pressed.has('ArrowLeft'));
  let dy=(stick?.dy||0)+Number(pressed.has('KeyS')||pressed.has('ArrowDown'))-Number(pressed.has('KeyW')||pressed.has('ArrowUp'));
- let l=squadSkillLocked()?0:Math.hypot(dx,dy);if(l>.05){run.dx=dx/l;run.dy=dy/l;let scale=105*dt/Math.max(l,1);nav.slide(run,dx*scale,dy*scale,10);run.walk+=dt*9}run.moving=l>.05;
+ let l=squadSkillLocked()?0:Math.hypot(dx,dy);if(l>.05){run.dx=dx/l;run.dy=dy/l;let scale=105*run.squad[run.lead].gear.movement*dt/Math.max(l,1);nav.slide(run,dx*scale,dy*scale,10);run.walk+=dt*9}run.moving=l>.05;
  if(run.moving){
    const desired=Math.atan2(run.dy,run.dx),delta=desired-run.heading;
    run.heading+=clamp(Math.atan2(Math.sin(delta),Math.cos(delta)),-9*dt,9*dt);
@@ -261,6 +257,7 @@ function update(dt){
  nav.aimAt(run.x,run.y);
  moveFormation(dt);
  tickSquadSkills(dt);
+ updateRadioSupport(dt);
  advanceRounds(dt);
  updatePursuit(dt);
  updateEncounter(dt);

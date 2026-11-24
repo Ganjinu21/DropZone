@@ -9,6 +9,11 @@ const {chromium} = require('playwright');
     const page = await browser.newPage({viewport:{width:914,height:412},isMobile:true,hasTouch:true});
     const errors = [];
     page.on('pageerror',error=>errors.push(error.message));
+    await page.addInitScript(()=>{
+      const keys=['carbine-0','smg-0','sniper-0','rocket-0','ar-0'];
+      localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
+      localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
+    });
     await page.goto(pathToFileURL(path.resolve('game/index.html')).href);
     const launch=require('./select-test-squad.cjs');
     await launch(page);
