@@ -25,21 +25,13 @@ function fitVest(g,image,fit){
   g.save();g.beginPath();traceGearSeam(g,fit.cloth);
   g.clip();g.drawImage(image,...fit.vest);g.restore();
 }
-function drawClassCloth(g,id,row,cell){
-  if(id!==1 && id!==2)return;
-  const helmet=gearByKey.get(row.helmet),tier=helmet?.tier??0;
-  const flutter=[1,1,2,2,1,1,0,0,1][cell];
-  const clothRow=(id===1?0:3)+flutter;
-  g.drawImage(art.classCloth,112*tier,88*clothRow,112,88,0,0,112,88);
-  if(id===2 && helmet?.rank==='S+')g.drawImage(art.lynxOptics,62,0);
-}
 function crewOutfitSheet(m){
   const row=m.loadout||{};
   const cached=crewOutfits[m.id];
   if(cached && wornSlots.every(slot=>cached.keys[slot]===row[slot]))return cached.sheet;
   const [helmet,top,pants,boots]=wornSlots.map(slot=>fieldGear(row,slot));
   let sheet=null;
-  if(helmet||top||pants||boots||m.id===1||m.id===2){
+  if(helmet||top||pants||boots){
     sheet=document.createElement('canvas');sheet.width=192*9;sheet.height=128;
     const g=sheet.getContext('2d'),fit=crewFits[m.id];
     g.imageSmoothingEnabled=false;
@@ -59,7 +51,6 @@ function crewOutfitSheet(m){
         g.drawImage(helmet,m.id*192,0,192,48,0,0,192,48);
       }
       if(top)fitVest(g,top,fit);
-      drawClassCloth(g,m.id,row,cell);
       g.restore();
     }
   }

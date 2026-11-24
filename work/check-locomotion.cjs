@@ -292,31 +292,33 @@ async function exerciseFormation(page) {
       assert.equal(planes,[1+(i>>3),'body',3+(i>>3)].join(','));
       assert.equal(dy,1);
     });
-    // Class cloth follows the equipped helmet even when it and the held gun
-    // have opposite ranks. Only the S+ crown may expose a cyan optics cluster.
+    // The worn helmet and vest must stay exposed on both specialist rigs,
+    // including when the weapon, helmet and vest have different ranks.
     await page.evaluate(()=>{
-      const test=document.createElement('canvas');test.width=192;test.height=128;
-      const g=test.getContext('2d',{willReadFrequently:true});g.imageSmoothingEnabled=false;
-      const swatches=[[144,122,91],[121,130,92],[119,133,138],[188,83,81],[182,74,79]];
-      const tiers=[0,1,3,5,6];
-      for(const id of [1,2])for(const [tier,code] of tiers.entries()){
+      const variants=rankedTiers.map(tier=>tier.variant);
+      for(const id of [1,2])for(const [tier,code] of variants.entries()){
+        const topCode=variants[variants.length-1-tier];
         for(const held of [0,6]){
-          const m={...run.squad[id],weapon:gearByKey.get(weaponFamilies[id]+'-'+held),
-            loadout:{...savedEquipment[id],helmet:'helmet-'+code,top:'top-6'}};
-          const sheet=crewOutfitSheet(m);
-          for(const cell of [0,2,7]){
-            g.clearRect(0,0,192,128);
-            g.drawImage(sheet,cell*192,0,192,128,0,0,192,128);
-            const dy=cell?2*crewStepY[cell-1]:0;
-            function pixel(x,y){return Array.from(g.getImageData(x,y+dy,1,1).data).slice(0,3)}
-            const paint=id===2?pixel(47,24):pixel(62,43);
-            if(id===2 && paint.join()!==swatches[tier].join())throw Error('Lynx hood did not follow helmet '+[code,held,cell]);
-            if(id===1 && (paint[0]<130 || paint[0]<paint[1]*1.4))throw Error('missing scarf over assault vest');
-            if(id===1 && pixel(32,56).join()===pixel(42,47).join())throw Error('rolled sleeve missing');
-            const lamps=g.getImageData(66,1+dy,35,19).data;
-            let lit=0;
-            for(let i=0;i<lamps.length;i+=4)if(lamps[i+3]>128 && lamps[i+1]>150 && lamps[i+1]-lamps[i]>55 && lamps[i+2]-lamps[i]>45)lit++;
-            if((lit>6)!==(tier===4))throw Error('four lens rig covered or present at wrong tier '+[id,code,held,cell,lit]);
+          const key=weaponFamilies[id]+'-'+held;
+          const row={...savedEquipment[id],helmet:'helmet-'+code,top:'top-'+topCode,weapon:key};
+          const m={...run.squad[id],weapon:gearByKey.get(key),loadout:row};
+          const helmet=fieldGear(row,'helmet'),vest=fieldGear(row,'top');
+          const frames=Array.from({length:9},()=>[]);
+          const prototype=CanvasRenderingContext2D.prototype,draw=prototype.drawImage;
+          crewOutfits[id]=null;
+          prototype.drawImage=function(image,...args){
+            const cell=this.getTransform().e/192;
+            if(Number.isInteger(cell) && frames[cell])frames[cell].push({image,args});
+            return draw.call(this,image,...args);
+          };
+          try{crewOutfitSheet(m)}finally{prototype.drawImage=draw}
+          for(const [cell,layers] of frames.entries()){
+            // The equipped helmet and vest are the visible top layers. Check
+            // the actual head frame as all five operators share the same atlas.
+            const hat=layers.at(-2),outer=layers.at(-1);
+            if(hat?.image!==helmet || hat.args[0]!==id*192 || outer?.image!==vest){
+              throw Error('Equipped gear hidden or incorrect '+[id,code,topCode,held,cell]);
+            }
           }
         }
       }

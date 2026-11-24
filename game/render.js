@@ -54,7 +54,6 @@ const tagArt = {
     return [i.key,fitted?'art/armory/worn/'+i.family+'-'+(i.rank==='S+'?'S-plus':i.rank)+'.png':itemImage(i)];
   })),
   crewStride:'art/armory/crew-stride.png',
-  classCloth:'art/armory/worn/class-cloth.png',lynxOptics:'art/armory/worn/lynx-optics.png',
   crewBodies:'art/armory/bodies.png',specialistHands:'art/armory/specialist-hands.png',
   combatUnits: 'combat-units.png',
   cobra:'art/skills/field-cobra.png',

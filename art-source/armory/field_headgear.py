@@ -1,6 +1,5 @@
 """Place each helmet around the operator's eyes with role insignia below the crown."""
 from PIL import Image, ImageDraw
-import class_cloth
 
 ROLES=('bulk','raven','lynx','hammer','cct')
 RANKS=('C','B','A','S','S-plus')
@@ -53,7 +52,6 @@ def publish_base_and_helmets(out,bodies):
     """Export replacement strips and portraits from the exact same native head pixels."""
     portraits=out/'portraits';portraits.mkdir(exist_ok=True)
     worn=out/'worn';worn.mkdir(exist_ok=True)
-    class_cloth.atlas(out)
     starters=[]
     for rank in RANKS:
         band=Image.new('RGBA',(192*len(ROLES),48))
@@ -62,15 +60,7 @@ def publish_base_and_helmets(out,bodies):
             band.paste(top,(i*192,0))
             dressed=body.copy()
             dressed.paste(top,(0,0))
-            portrait_body=dressed.copy()
-            if role in ('raven','lynx'):
-                paint=class_cloth.raven if role=='raven' else class_cloth.lynx
-                portrait_body.alpha_composite(paint(rank))
-                if role=='lynx' and rank=='S-plus':
-                    optics=class_cloth.lynx_optics(top)
-                    optics.save(worn/'lynx-optics.png',optimize=True)
-                    portrait_body.alpha_composite(optics,(62,0))
-            portrait=portrait_body.crop((27,0,103,76)).resize((112,112),Image.Resampling.NEAREST)
+            portrait=dressed.crop((27,0,103,76)).resize((112,112),Image.Resampling.NEAREST)
             if rank=='C':
                 portrait.save(out/(role+'-portrait.png'),optimize=True)
                 starters.append(dressed)
