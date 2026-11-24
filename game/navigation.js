@@ -111,7 +111,7 @@ class MapRoutes {
   }
   chase(who,goal,dt) {
     let tx=goal.x,ty=goal.y;
-    if(Math.abs(tx-who.x)+Math.abs(ty-who.y)>130 || !this.clear(who.x,who.y,tx,ty,4)) {
+    if(!this.clear(who.x,who.y,tx,ty,4)) {
       const here=this.node(who.x,who.y);
       if(here<0 || this.distance[here]<0)return;
       let next=here;
@@ -119,16 +119,16 @@ class MapRoutes {
         const j=here+this.offsets[d];
         if(this.distance[j]>=0 && this.distance[j]<this.distance[next])next=j;
       }
-      if(next!==here || !this.clear(who.x,who.y,tx,ty,4)){
-        if(!this.clear(who.x,who.y,this.cx(next),this.cy(next),4))next=here;
-        tx=this.cx(next);ty=this.cy(next);
-      }
+      if(next!==here && !this.clear(who.x,who.y,this.cx(next),this.cy(next),4))next=here;
+      tx=this.cx(next);ty=this.cy(next);
     }
     const dx=tx-who.x,dy=ty-who.y,len=Math.hypot(dx,dy);
     if(len<.01)return;
     if(Math.abs(dx)>1)who.flip=dx<0?-1:1;
     const step=Math.min(1,who.speed*dt/len);
-    this.slide(who,dx*step,dy*step,4);
+    // The whole segment to the goal or waypoint has clearance, including diagonal corners.
+    who.x+=dx*step;
+    who.y+=dy*step;
   }
 }
 

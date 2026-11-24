@@ -313,8 +313,9 @@ function update(dt){
  }
  updateStairDepth();
  nav=routes[run.floor];
- nav.aimAt(run.x,run.y);
  moveFormation(dt);
+ const leader=run.squad[run.lead];
+ nav.aimAt(leader.x,leader.y);
  tickSquadSkills(dt);
  updateRadioSupport(dt);
  updateRescues(dt);
@@ -324,16 +325,25 @@ function update(dt){
  if(mode!=='play')return;
  tickBossAttack(dt,nav);
  if(mode!=='play')return;
- let living=run.squad.filter(m=>m.deployed && m.hp>0);
- for(const e of run.enemies){if(e.hp<=0)continue;e.hit-=dt;
- let near=living[0];if(!near)break;for(const m of living)if(dist(m,e)<dist(near,e))near=m;
- let vx=near.x-e.x,vy=near.y-e.y,d=Math.hypot(vx,vy)||1;e.flip=vx<0?-1:1;
- if(d>10 && !e.charging)nav.chase(e,near,dt);
- if(!e.charging && d<(run.activeSkill?.id===0?38:19) && (near.hurt<=0 || run.activeSkill?.id===0) && nav.clear(e.x,e.y,near.x,near.y,0)){
- hitSquadMember(e,near,nav);
- if(mode!=='play')return;
- if(near.hp<=0)living=run.squad.filter(m=>m.deployed && m.hp>0);}
+ for(const e of run.enemies){
+   if(e.hp<=0)continue;
+   e.hit-=dt;
+   if(e.charging)continue;
+   const target=run.squad[run.lead];
+   e.flip=e.x>target.x?-1:1;
+   if(dist(e,target)>10)nav.chase(e,target,dt);
 
+   let near=target,closest=dist(e,target);
+   for(const m of run.squad){
+     if(m===target || !m.deployed || m.hp<=0)continue;
+     const distance=dist(e,m);
+     if(distance<closest){near=m;closest=distance}
+   }
+   const inBunker=run.activeSkill?.id===0;
+   if(closest<(inBunker?38:19) && (near.hurt<=0 || inBunker) && nav.clear(e.x,e.y,near.x,near.y,0)){
+     hitSquadMember(e,near,nav);
+     if(mode!=='play')return;
+   }
  }
  run.enemies=run.enemies.filter(e=>e.hp>0);
  run.pickupCool=Math.max(0,run.pickupCool-dt);

@@ -17,6 +17,8 @@ const path = require('path');
       const len=TransitKit.stairLength, report=[];
       for(const [i,e] of SURFACE.exits.entries()){
         start();
+        // The frame counts below walk the stairs at base speed, independent of equipped boots.
+        run.squad[run.lead].gear.movement=1;
         run.enemies=[];run.spawn=999;run.remaining=999;
         const stone={x:SURFACE.spawn.x,y:SURFACE.spawn.y,val:4};
         run.crystals=[stone];
