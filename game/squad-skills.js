@@ -1,7 +1,7 @@
 'use strict';
 
 const squadSkillDefs = [
-  {name:'벙커 전개', cooldown:15, durability:160},
+  {name:'벙커 전개', cooldown:15, recallCooldown:10, durability:160},
   {name:'쌍기관단총 난사', duration:3, cooldown:10},
   {name:'관통 사격', duration:2.55, cooldown:11},
   {name:'박격포 포격', duration:3.65, cooldown:13},
@@ -38,9 +38,14 @@ function squadSkillLocked() {
 }
 
 function activateSquadSkill() {
-  if (mode!=='play' || run.activeSkill || squadSkillCooldown(run.lead)>0) return false;
+  if (mode!=='play') return false;
   const member=run.squad[run.lead], id=member.id, def=squadSkillDefs[id];
   if (member.hp<=0 || member.deployed===false) return false;
+  if (id===0 && run.activeSkill?.id===0 && run.activeSkill.hp>0) {
+    cancelSquadSkill();
+    return true;
+  }
+  if (run.activeSkill || squadSkillCooldown(id)>0) return false;
   if(id===4)return callCobra(member);
   const firstBeat=[.58,.18,.42,.82][id];
   const phase=['deploy','forward','charge','deploy'][id];
@@ -57,7 +62,7 @@ function activateSquadSkill() {
   }
   if (id===3) skill.plantFacing=member.flip||1;
   run.activeSkill=skill;
-  member.skillReadyAt=run.t+def.cooldown;
+  if (id!==0) member.skillReadyAt=run.t+def.cooldown;
   member.burstIndex=0;
   if (squadSkillLocked()) run.squad.forEach(m=>{m.moving=false; m.moveSpeed=0});
   if (id===0 || id===2) skillAudio.play(id,'lock');
@@ -70,6 +75,10 @@ function cancelSquadSkill() {
   const skill=run.activeSkill;
   if (!skill) return;
   const member=run.squad[skill.id];
+  if (skill.id===0) {
+    const def=squadSkillDefs[0];
+    member.skillReadyAt=run.t+(skill.hp>0?def.recallCooldown:def.cooldown);
+  }
   member.cool=Math.max(.19,member.cool);
   member.shoot=0; member.burstIndex=0;
   run.activeSkill=null;
@@ -83,7 +92,6 @@ function hitBunker(enemy,nav,damage,isContact){
   fort.hp=Math.max(0,fort.hp-damage);
   if(fort.hp>0)return;
   cancelSquadSkill();
-  run.squad[0].skillReadyAt=run.t+squadSkillDefs[0].cooldown;
   for(const m of run.squad)if(m.deployed && m.hp>0)m.hurt=.85;
   for(const m of run.radioTeam||[])if(m.hp>0)m.grace=.85;
   run.effects.push({skillFx:'blast',id:0,x:fort.x,y:fort.y,radius:98,large:true,age:0,duration:1,angle:0});
@@ -100,7 +108,6 @@ function hitBunker(enemy,nav,damage,isContact){
       nav.slide(foe,dx,dy,4);
     }
   }
-  updateHud();
 }
 
 function skillAim(member,target,fallback) {

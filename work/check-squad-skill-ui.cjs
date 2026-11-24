@@ -109,6 +109,31 @@ const {chromium} = require('playwright');
       assert.ok(result.sounds.includes(cast.sound),'not played through Web Audio: '+cast.sound);
       await page.keyboard.press('Space');
       assert.equal(await page.evaluate(() => run.activeSkill),null,'cooldown allowed another UI cast');
+      if (id===0) {
+        assert.equal(result.cooldown,15,'destruction must start the full cooldown');
+        const button=page.locator('#cast');
+        await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt;updateHud()});
+        await button.tap();
+        await page.evaluate(()=>{
+          run.t+=20;
+          hitSquadMember(run.enemies[0],run.squad[0],routes[run.floor],run.activeSkill.hp-1);
+          updateHud();
+        });
+        assert.equal(await page.locator('#cast-name').textContent(),'벙커 해제');
+        const blasts=()=>page.evaluate(()=>run.effects.filter(fx=>fx.skillFx==='blast').length);
+        const before=await blasts();
+        await button.tap();
+        assert.equal(await blasts(),before,'manual release caused an explosion');
+        assert.equal(await page.locator('#cast-status').textContent(),'10초');
+        await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt-.01;updateHud()});
+        assert.ok(await button.isDisabled());
+        await page.keyboard.press('Space');
+        assert.equal(await page.evaluate(()=>run.activeSkill),null);
+        await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt;updateHud()});
+        await page.keyboard.press('Space');
+        assert.ok(await page.evaluate(()=>run.activeSkill?.hp===squadSkillDefs[0].durability));
+        await button.tap();
+      }
     }
     await page.evaluate(() => { skillUI.setup(); shoot(run.squad[3]); });
     assert.deepEqual(await page.evaluate(() => skillUI.sounds),['lob']);

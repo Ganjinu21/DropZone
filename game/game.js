@@ -169,10 +169,13 @@ function updateHud(){
    b.querySelector('small').textContent=m.hp<=0?'기절':m.reloadAt>run.t?'재장전':roles[i];
    b.querySelector('i').style.width=Math.max(0,100*m.hp/m.max)+'%';
  }
- const remaining=Math.ceil(squadSkillCooldown(run.lead)),active=!!run.activeSkill;
- $('cast-name').textContent=squadSkillDefs[run.lead].name;
- $('cast-status').textContent=active?'사용 중':remaining>0?remaining+'초':'스킬 발동';
- $('cast').disabled=active || remaining>0;
+ const active=run.activeSkill;
+ const canRelease=run.lead===0 && active?.id===0 && active.hp>0;
+ const remaining=Math.ceil(squadSkillCooldown(run.lead));
+ $('cast-name').textContent=canRelease?'벙커 해제':squadSkillDefs[run.lead].name;
+ $('cast-status').textContent=canRelease?`내구도 ${Math.ceil(active.hp)}/${active.maxHp}`:
+   active?'사용 중':remaining>0?remaining+'초':'스킬 발동';
+ $('cast').disabled=!canRelease && (!!active || remaining>0);
 }
 function showLoadout(){
  const panel=$('loadout');
@@ -209,7 +212,12 @@ $('cast').onclick=activateSquadSkill;
 addEventListener('keydown',e=>{if(['Tab','F5','F12'].includes(e.key))return;if(e.code==='Escape'){if(!e.repeat)back();return}if(mode==='home')return;if(/^Arrow|^Space$/.test(e.code))e.preventDefault();if(e.repeat)return;if(mode==='upgrade'){if(e.code==='Enter'){applyUpgrade();return}if(e.code==='ArrowRight')choose(Math.min(offers.length-1,selected+1));if(e.code==='ArrowLeft')choose(Math.max(0,selected-1))}
  if(e.code==='Space' && mode==='play'){activateSquadSkill();return}
  if(/^[1-3]$/.test(e.key)){const slot=Number(e.key)-1;if(mode==='upgrade')choose(slot);else if(mode==='play')switchLead(run.lineup[slot])}pressed.add(e.code)});
-addEventListener('keyup',e=>pressed.delete(e.code));document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});addEventListener('blur',pause);
+addEventListener('keyup',e=>{
+ // Space already casts on keydown. A focused HUD button must not click again on keyup.
+ if(e.code==='Space' && mode==='play')e.preventDefault();
+ pressed.delete(e.code);
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});addEventListener('blur',pause);
 $('party').addEventListener('pointerdown',e=>{const b=e.target.closest('.operator');if(b&&e.pointerType==='touch'){e.preventDefault();switchLead(+b.dataset.i)}});
 cv.onpointerdown=e=>{if(mode!=='play'||stick)return;cv.setPointerCapture(e.pointerId);stick={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0}};
 cv.onpointermove=e=>{if(stick?.id===e.pointerId){const r=Math.max(25,innerHeight*.091);stick.dx=(e.clientX-stick.x)/r;stick.dy=(e.clientY-stick.y)/r}};
