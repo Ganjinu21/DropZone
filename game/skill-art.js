@@ -94,7 +94,7 @@ function drawRifleSkill(m, s) {
   }else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
   ctx.translate(p.px-p.fx, p.py-p.fy);
   ctx.rotate(pitch);
-  const hands=art[m.weapon.key+'-skill'];
+  const hands=art[m.weapon.artKey+'-skill'];
   skillCell(hands||p.sheet,p.col,hands?0:1,p.w,p.h,0,0,p.px,p.py);
   ctx.restore();
 }
@@ -120,7 +120,7 @@ function drawSpinner(m, s) {
     }
     ctx.restore();
   }
-  const spin=art[m.weapon.key+'-skill'];
+  const spin=art[m.weapon.artKey+'-skill'];
   skillCell(spin||art.ravenSpin,i%8,Math.floor(i/8)+(spin?1:0),112,72,m.x,m.y,54,65);
 }
 

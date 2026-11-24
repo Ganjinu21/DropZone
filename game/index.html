@@ -53,9 +53,13 @@
             <div class="gear-art"><img id="item-icon" alt=""></div>
             <div class="gear-info" aria-live="polite" aria-atomic="true">
               <div class="gear-meta"><em id="item-tier" class="tier"></em><span id="item-context"></span></div>
-              <h4 id="item-title"></h4><p id="item-detail"></p><small id="item-compare"></small>
+              <h4 id="item-title"></h4><p id="item-detail"></p><p id="item-magazine"></p><small id="item-compare"></small>
             </div>
             <button type="button" id="item-close" aria-label="장비 상세 닫기">×</button>
+            <div id="enhancement" hidden>
+              <label>강화 단계 <select id="item-level"></select></label><span id="fusion-preview"></span>
+              <button type="button" id="item-fuse"></button>
+            </div>
             <button type="button" id="item-action"></button>
           </section>
         </section>
@@ -94,6 +98,7 @@
     </div>
     <aside id="encounter-alert" role="status" hidden><span></span><strong></strong></aside>
     <div class="xp" aria-label="분대 레벨과 경험치"><em id="lv"></em><div><i id="xpfill"></i></div></div>
+    <span id="ammo-status" aria-label="선두 대원 탄약"></span>
     <div id="party" role="group" aria-label="분대원 선택"></div>
     <button id="cast" type="button"><span id="cast-name"></span><small id="cast-status"></small></button>
   </section>
@@ -114,10 +119,13 @@
   <dialog id="crate-popup" class="armory-popup" aria-labelledby="crate-title">
     <div class="popup-bar"><div class="wallet"><i class="gem" aria-hidden="true"></i><span data-balance>0</span></div><button type="button" data-dismiss aria-label="닫기">×</button></div>
     <img class="crate-art" src="art/armory/crate.png" alt=""><h2 id="crate-title">특수 무기 소환</h2>
-    <p>C~S 등급 미보유 무기 1개와 남은 방어구 1개를 획득합니다.</p>
+    <label class="crate-field">보급 무기 <select id="crate-family"></select></label>
+    <p>C~A 무기 1개 · 미보유 방어구가 있으면 1개 추가</p>
+    <p id="crate-progress"></p>
     <p>일반 적 처치 +1 다이아 · 보스 처치 +5</p>
+    <button type="button" id="profile-mode" aria-pressed="false"></button>
     <div id="crate-result" role="status"></div>
-    <div class="popup-buttons"><button type="button" data-dismiss>닫기</button><button type="button" id="crate-open" aria-label="다이아 10개로 소환">10개로 소환</button></div>
+    <div class="popup-buttons"><button type="button" data-dismiss>닫기</button><button type="button" id="crate-open">구매 후 개봉</button></div>
   </dialog>
   <script src="images.js"></script>
   <script src="streets.js"></script>

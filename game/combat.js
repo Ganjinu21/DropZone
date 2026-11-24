@@ -105,7 +105,7 @@ function equippedProfile(item,lead=true){
   return loadouts[weaponFamilies.indexOf(item.family)];
 }
 function equipmentDamage(item,profile=equippedProfile(item),upgrade=0){
-  return Math.round(weaponDamage(profile,upgrade)*(1+item.power/100));
+  return Math.round(weaponDamage(profile,upgrade)*(100+item.power)/100);
 }
 function basicWeaponProfile(member,lead){
   return equippedProfile(member.weapon,lead);
@@ -114,11 +114,24 @@ function basicHitDamage(member,weapon){
   return equipmentDamage(member.weapon,weapon,run.up[weapon.damageUpgrade]??0);
 }
 
+// Reload deadlines follow simulated combat time, including time spent as a supporting member.
+function magazineReady(member,item){
+  if(member.ammoKey!==item.key || (member.reloadAt>0 && run.t>=member.reloadAt)){
+    member.ammoKey=item.key;member.ammo=item.capacity;member.reloadAt=0;
+  }
+  return member.ammo>0;
+}
+function spendRound(member,item){
+  member.ammo--;
+  if(member.ammo===0)member.reloadAt=run.t+item.reload;
+}
+
 function shoot(member) {
   if (member.hp<=0 || member.deployed===false) return;
   const skill=run.activeSkill;
   if (skill && (skill.id===0 || skill.id===member.id)) return;
   const lead=member.id===run.lead,family=member.weapon.family;
+  if(!magazineReady(member,member.weapon))return;
   const weapon=basicWeaponProfile(member,lead);
   const sniper=family==='sniper',dual=family==='smg';
   const targets=combatTargets(member,weapon.range,sniper);
@@ -128,12 +141,13 @@ function shoot(member) {
     return;
   }
   const target=targets[0].enemy, beat=member.burstIndex || 0;
+  const col=dual && (member.weapon.capacity-member.ammo)%2 ? 3 : 1;
+  spendRound(member,member.weapon);
   if (family==='rocket') {
     fireMortar(member,target,null);
     member.cool=weapon.delay*member.gear.interval;
     return;
   }
-  const col=dual && beat%2 ? 3 : 1;
   if (sniper) run.mark=target;
   combatAim(member,target.x,chestY(target),col,lead);
   const barrel=combatMuzzle(member,col,lead);

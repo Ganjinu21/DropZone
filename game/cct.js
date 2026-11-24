@@ -67,7 +67,7 @@ function updateRadioSupport(dt){
     if(ally.hp<=0){
       ally.respawn-=dt;
       if(ally.respawn<=0 && chief.hp>0)Object.assign(ally,{hp:ally.max,x:chief.x,y:chief.y,grace:1,cool:.5,
-        downFloor:null,reviveTime:0,floor:run.floor,post:null,patrolTime:0});
+        ammoKey:null,downFloor:null,reviveTime:0,floor:run.floor,post:null,patrolTime:0});
       continue;
     }
     if(ally.floor!==run.floor){ally.x=run.x;ally.y=run.y;ally.floor=run.floor;ally.post=null}
@@ -80,7 +80,8 @@ function updateRadioSupport(dt){
       ally.hp-=enemy.contactDamage||8;ally.grace=.75;
       if(ally.hp<=0){ally.hp=0;ally.downFloor=run.floor;ally.reviveTime=0;ally.respawn=6;continue}
     }
-    if(ally.cool<=0){
+    if(ally.cool<=0 && magazineReady(ally,chief.weapon)){
+      spendRound(ally,chief.weapon);
       const pose={...ally,id:4,weapon:chief.weapon};
       // Aim in the summon's unscaled coordinate space before mapping its muzzle to the floor.
       combatAim(pose,ally.x+(enemy.x-ally.x)/summonScale,ally.y+(chestY(enemy)-ally.y)/summonScale,1);

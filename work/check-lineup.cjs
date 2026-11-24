@@ -58,7 +58,7 @@ const launchSquad = require('./select-test-squad.cjs');
     await page.locator('#start:enabled').tap();
     await page.locator('#hud').waitFor();
     assert.deepEqual(await page.evaluate(()=>run.lineup),ids);
-    await page.evaluate(()=>localStorage.setItem('dropzone.squad.v1','[3,3,99]'));
+    await page.evaluate(()=>localStorage.setItem(squadStorageKey,'[3,3,99]'));
     await page.reload();
     await page.locator('#select-team:enabled').tap();
     await page.locator('#prep-screen').waitFor();

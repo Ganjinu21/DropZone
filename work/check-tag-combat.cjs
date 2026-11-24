@@ -93,6 +93,8 @@ const {chromium} = require('playwright');
           document.querySelector('#party [data-operator="'+id+'"]').click();
         };
         function volley(member,swapTo=null){
+          // Each audio case starts with a fresh magazine.
+          member.ammoKey=null;
           const enemy={type:0,x:1365,y:1004,hp:120,max:120,phase:0,hit:0,flip:-1,speed:0};
           run.enemies=[enemy];run.marks=[];run.effects=[];
           played.length=0;gunAudio.lastImpact=-1;

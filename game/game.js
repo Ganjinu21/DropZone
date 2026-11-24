@@ -18,6 +18,7 @@ function start(){
  const lineup=getSelectedSquad();
  if(lineup.length!==formationSlots.length){openPreparation();return}
  try{sound??=new (window.AudioContext||window.webkitAudioContext)();sound.resume().catch(()=>{});gunAudio.load(sound)}catch{}
+ savedEquipment=normalizedEquipment(savedEquipment);
  const pos=SURFACE.spawn;
  const squad=names.map((_,id)=>{
    const slot=lineup.indexOf(id), deployed=slot>=0;
@@ -155,6 +156,9 @@ function switchLead(i){if(mode!=='play'||run.activeSkill||run.swap>0||!run.squad
 function updateHud(){
  updateStageHud({stage:run.stage,stageName:stageRules().name,wave:run.wave,waves:stageRules().waves.length,remaining:run.remaining,bossPhase:run.bossPhase,bossName:stageRules().bossName,boss:run.boss,bigWave:run.bigWave});
  updateMapHud();$('time').textContent=clock(run.t);$('kills').textContent='처치 '+run.kills;$('lv').textContent='Lv. '+run.level;$('xpfill').style.width=(100*run.xp/run.need)+'%';
+ const leader=run.squad[run.lead];
+ magazineReady(leader,leader.weapon);
+ $('ammo-status').textContent=leader.reloadAt>run.t?'재장전 '+(leader.reloadAt-run.t).toFixed(1)+'초':'탄약 '+leader.ammo+' / '+leader.weapon.capacity;
  const party=$('party');
  if(!party.children.length)party.innerHTML=run.lineup.map(i=>'<button class="operator" data-i="'+i+'" data-operator="'+i+'"><img alt="" src="'+ART['face'+i]+'"><span><strong>'+names[i]+'</strong><small></small></span><span class="health"><i></i></span></button>').join('');
  party.classList.toggle('reforming',run.swap>0);party.style.setProperty('--swap-left',run.swap/swapTime);
@@ -162,7 +166,7 @@ function updateHud(){
    const i=Number(b.dataset.i),m=run.squad[i],lead=i===run.lead;
    b.classList.toggle('lead',lead);b.classList.toggle('hurt',m.hurt>.43);
    b.setAttribute('aria-pressed',String(lead));b.disabled=m.hp<=0 || (!!run.activeSkill && !lead);
-   b.querySelector('small').textContent=m.hp<=0?'기절':roles[i];
+   b.querySelector('small').textContent=m.hp<=0?'기절':m.reloadAt>run.t?'재장전':roles[i];
    b.querySelector('i').style.width=Math.max(0,100*m.hp/m.max)+'%';
  }
  const remaining=Math.ceil(squadSkillCooldown(run.lead)),active=!!run.activeSkill;
@@ -179,13 +183,13 @@ function showLoadout(){
      return level?label+' '+level:'';
    }).filter(Boolean).join(' · ');
    const hp=Math.max(0,Math.ceil(member.hp));
-   const weapon = member.weapon.label+(i===0?' · '+gearByKey.get(member.shieldItem).label:'');
+   const weapon = gradeLabel(member.weapon)+' '+member.weapon.label+(i===0?' · '+gearByKey.get(member.shieldItem).label:'');
    return `<div data-operator="${i}"><canvas aria-hidden="true"></canvas><strong>${names[i]}</strong><span>${weapon}</span><small>${enhancements || '기본 장비'}</small><span class="hp">HP ${hp}/${member.max}</span></div>`;
  }).join('');
  panel.querySelectorAll('canvas').forEach((canvas,slot)=>{
    const i=run.lineup[slot];
    const weapon=run.squad[i].weapon;
-   const icon=art[weapon.family==='smg'?weapon.key+'-pair':weapon.key];canvas.width=64;canvas.height=40;
+   const icon=art[weapon.family==='smg'?weapon.artKey+'-pair':weapon.artKey];canvas.width=64;canvas.height=40;
    const g=canvas.getContext('2d'),scale=Math.min(58/icon.width,32/icon.height);
    g.imageSmoothingEnabled=false;g.drawImage(icon,(64-icon.width*scale)/2,(40-icon.height*scale)/2,icon.width*scale,icon.height*scale);
  });

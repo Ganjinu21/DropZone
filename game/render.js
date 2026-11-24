@@ -79,7 +79,7 @@ function shoulderAt(m) {
 const fieldWidths={pistol:[16,17,18,19,21],carbine:[27,29,31,33,35],smg:[21,22,23,25,26],
   sniper:[49,52,54,57,60],rocket:[46,47,49,51,53],ar:[34,35,37,39,41]};
 function weaponMount(m,col,recoil=0){
-  const {family,tier,key}=m.weapon,far=family==='smg' && col===3;
+  const {family,tier,artKey:key}=m.weapon,far=family==='smg' && col===3;
   const image=art[far?key+'-far':key];
   const w=fieldWidths[family][tier],h=Math.round(w*image.height/image.width);
   const x=family==='sniper'?-12:family==='pistol'?7:family==='rocket'?-16:family==='ar'?-10:1;

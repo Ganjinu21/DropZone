@@ -1,8 +1,11 @@
 'use strict';
 
-const equipmentKey='dropzone.equipment.v2';
-const armoryKey='dropzone.armory.v1';
-const boxPrice=10;
+// This portrait development branch starts in the test profile. Normal progress keeps its original save keys.
+const developerPreference='dropzone.developer-mode';
+const developerMode=readLocal(developerPreference)!==false;
+const equipmentKey=developerMode?'dropzone.dev.equipment.v2':'dropzone.equipment.v2';
+const armoryKey=developerMode?'dropzone.dev.armory.v1':'dropzone.armory.v1';
+const boxPrice=100,firstBBox=3,firstABox=21,repeatABoxes=12;
 const equipmentSlots={weapon:'무기',gloves:'장갑',boots:'신발',helmet:'헬멧',top:'상의',pants:'하의',shield:'전술방패'};
 const weaponFamilies=['carbine','smg','sniper','rocket','ar'];
 const itemFamilies={pistol:'권총',carbine:'실드 카빈',smg:'듀얼 SMG',sniper:'저격소총',rocket:'전술 로켓포',ar:'돌격소총',
@@ -19,9 +22,9 @@ const rankedNames={
 };
 // Keep the original C, B, A and S save IDs. S+ has its own ID and drop policy.
 const rankedTiers=[
-  {rank:'C',variant:0,bonus:0}, {rank:'B',variant:1,bonus:20},
-  {rank:'A',variant:3,bonus:45}, {rank:'S',variant:5,bonus:75},
-  {rank:'S+',variant:6,bonus:100}
+  {rank:'C',variant:0,bonus:0}, {rank:'B',variant:1,bonus:60},
+  {rank:'A',variant:3,bonus:150}, {rank:'S',variant:5,bonus:450},
+  {rank:'S+',variant:6,bonus:1100}
 ];
 const shieldGuard=[0,5,9,14,18];
 const equipmentCatalog=Object.entries(itemFamilies).flatMap(([family,label])=>{
@@ -35,6 +38,33 @@ const equipmentCatalog=Object.entries(itemFamilies).flatMap(([family,label])=>{
   }));
 });
 const gearByKey=new Map(equipmentCatalog.map(i=>[i.key,i]));
+const weaponMagazines={
+  pistol:  {rounds:[10,12,14,16,18],seconds:[1.35,1.30,1.25,1.20,1.10]},
+  carbine: {rounds:[18,20,24,28,30],seconds:[1.90,1.80,1.70,1.60,1.50]},
+  smg:     {rounds:[24,28,32,40,48],seconds:[2.10,2.00,1.85,1.70,1.55]},
+  sniper:  {rounds:[4,5,5,6,7],seconds:[2.60,2.50,2.35,2.20,2.00]},
+  rocket:  {rounds:[1,1,2,2,3],seconds:[3.00,2.80,2.70,2.50,2.30]},
+  ar:      {rounds:[20,24,28,30,36],seconds:[1.85,1.75,1.65,1.55,1.45]}
+};
+const canEnhance=i=>i?.weapon && (i.rank==='A'||i.rank==='S');
+const levelKey=(base,level)=>level?base+'@'+level:base;
+const gradeLabel=i=>i.level?i.rank+'+'+i.level:i.rank;
+for(const item of equipmentCatalog.filter(i=>i.weapon)){
+  const magazine=weaponMagazines[item.family];
+  Object.assign(item,{artKey:item.key,level:0,capacity:magazine.rounds[item.tier],reload:magazine.seconds[item.tier]});
+  if(!canEnhance(item))continue;
+  for(let level=1;level<=5;level++){
+    const key=levelKey(item.key,level);
+    gearByKey.set(key,{...item,key,level,power:item.power+level*(item.rank==='A'?35:80)});
+  }
+}
+function fusionRecipe(item){
+  if(!canEnhance(item))return null;
+  const base=item.artKey;
+  const material=item.level===5?item.key:base;
+  const output=item.level===5?item.family+'-'+rankedTiers[item.tier+1].variant:levelKey(base,item.level+1);
+  return {material,output};
+}
 function canonicalGearKey(key){
   if(gearByKey.has(key) || typeof key!=='string')return key;
   const family=key.split('-')[0];
@@ -46,7 +76,6 @@ function canonicalGearKey(key){
 const starterKeys=['pistol-0',...Object.keys(equipmentSlots).filter(k=>k!=='weapon').map(k=>k+'-0')];
 const gearImage=family=>'art/prep/'+family+'.png';
 const itemImage=i=>i.asset?i.asset+'.png':gearImage(i.family);
-const crateEligible=i=>i.rank!=='S+';
 const defaultItem=slot=>slot==='weapon'?'pistol-0':slot+'-0';
 function gearSlots(id){return Object.keys(equipmentSlots).filter(slot=>slot!=='shield'||id===0)}
 function canEquip(id,slot,item){
@@ -54,30 +83,52 @@ function canEquip(id,slot,item){
   return slot==='weapon' ? item.family==='pistol'||item.family===weaponFamilies[id] : item.family===slot;
 }
 function readLocal(key){try{return JSON.parse(localStorage.getItem(key))}catch{return null}}
-const legacyGear=readLocal('dropzone.equipment.v1');
+const legacyGear=developerMode?null:readLocal('dropzone.equipment.v1');
+const safeCount=n=>Number.isSafeInteger(n)&&n>0?n:0;
 function restoredArmory(raw){
-  const owned=new Set(starterKeys);
-  if(raw && Array.isArray(raw.owned)){
-    for(const saved of raw.owned){const key=canonicalGearKey(saved);if(gearByKey.has(key))owned.add(key)}
+  const counts={};
+  if(raw?.counts && typeof raw.counts==='object'){
+    for(const [key,n] of Object.entries(raw.counts))if(gearByKey.has(key)&&safeCount(n))counts[key]=n;
+  }else if(Array.isArray(raw?.owned)){
+    for(const old of new Set(raw.owned)){
+      const key=canonicalGearKey(old);
+      if(gearByKey.has(key))counts[key]=(counts[key]||0)+1;
+    }
+  }else if(developerMode){
+    for(const i of equipmentCatalog.filter(canEnhance))counts[i.key]=12;
   }else if(Array.isArray(legacyGear)){
-    for(const [id,row] of legacyGear.entries()){
-      for(const [slot,saved] of Object.entries(row||{})){
-        const key=canonicalGearKey(saved);
-        if(canEquip(id,slot,gearByKey.get(key)) && !key.endsWith('-0'))owned.add(key);
-      }
+    for(const [id,row] of legacyGear.entries())for(const [slot,old] of Object.entries(row||{})){
+      const key=canonicalGearKey(old);
+      if(canEquip(id,slot,gearByKey.get(key)) && !key.endsWith('-0'))counts[key]=1;
     }
   }
-  return {diamonds:Number.isSafeInteger(raw?.diamonds)?Math.max(0,raw.diamonds):0,owned:[...owned]};
+  for(const key of starterKeys)counts[key]=Math.max(1,counts[key]||0);
+  return {diamonds:!raw && developerMode?3000:safeCount(raw?.diamonds),counts,
+    boxes:safeCount(raw?.boxes),sinceA:safeCount(raw?.sinceA)};
 }
-let armory=restoredArmory(readLocal(armoryKey)), sessionStorageOnly=false;
-const owns=key=>armory.owned.includes(key);
+let armory=restoredArmory(readLocal(armoryKey)),sessionStorageOnly=false;
+function owns(key){
+  const item=gearByKey.get(key);
+  return !!armory.counts[key] || !!(developerMode && item?.asset && !item.level);
+}
 function normalizedEquipment(data){
   return weaponFamilies.map((_,id)=>Object.fromEntries(gearSlots(id).map(slot=>{
-    const key=canonicalGearKey(data?.[id]?.[slot]);
-    return [slot,canEquip(id,slot,gearByKey.get(key))&&owns(key)?key:defaultItem(slot)];
+    const key=canonicalGearKey(data?.[id]?.[slot]),item=gearByKey.get(key);
+    if(canEquip(id,slot,item)){
+      if(owns(key))return [slot,key];
+      // Recover references to a consumed copy even if the app closed between the inventory and loadout saves.
+      if(canEnhance(item)){
+        let next=item;
+        while(canEnhance(next)){
+          next=gearByKey.get(fusionRecipe(next).output);
+          if(owns(next.key))return [slot,next.key];
+        }
+      }
+    }
+    return [slot,defaultItem(slot)];
   })));
 }
-let savedEquipment=normalizedEquipment(readLocal(equipmentKey)??legacyGear);
+let savedEquipment=normalizedEquipment(readLocal(equipmentKey)??(developerMode?readLocal('dropzone.equipment.v2'):legacyGear));
 function changeArmory(edit){
   const update=()=>{
     if(!sessionStorageOnly)armory=restoredArmory(readLocal(armoryKey)??armory);
@@ -93,15 +144,42 @@ function changeArmory(edit){
   });
 }
 function awardDiamonds(value){return changeArmory(state=>{state.diamonds+=value})}
-function openWeaponCrate(){
+function crateRank(state){
+  const draw=state.boxes+1;
+  if(draw<firstBBox)return 'C';
+  if(draw===firstBBox)return 'B';
+  if(draw<firstABox)return Math.random()<.30?'B':'C';
+  if(draw===firstABox || state.sinceA+1>=repeatABoxes)return 'A';
+  const roll=Math.random();
+  if(roll<.08)return 'A';
+  return roll<.38?'B':'C';
+}
+function openWeaponCrate(family){
   return changeArmory(state=>{
+    if(!Object.hasOwn(weaponMagazines,family))return {message:'보급할 무기 종류를 선택하세요.'};
     if(state.diamonds<boxPrice)return {message:'다이아가 부족합니다. 적을 처치해 모으세요.'};
-    const fresh=equipmentCatalog.filter(i=>crateEligible(i) && !state.owned.includes(i.key));
-    const weapons=fresh.filter(i=>i.weapon),armor=fresh.filter(i=>!i.weapon);
-    if(!weapons.length)return {message:'소환 가능한 무기를 모두 수집했습니다.'};
-    const choose=list=>list[Math.floor(Math.random()*list.length)];
-    const drops=[choose(weapons)];if(armor.length)drops.push(choose(armor));
-    state.diamonds-=boxPrice;state.owned.push(...drops.map(i=>i.key));return {drops};
+    const rank=crateRank(state);
+    const weapon=equipmentCatalog.find(i=>i.family===family && i.rank===rank);
+    const armor=equipmentCatalog.filter(i=>!i.weapon && i.rank!=='S+' && !state.counts[i.key]);
+    const drops=[weapon];
+    if(armor.length)drops.push(armor[Math.floor(Math.random()*armor.length)]);
+    state.diamonds-=boxPrice;state.boxes++;state.sinceA=rank==='A'?0:state.sinceA+1;
+    for(const i of drops)state.counts[i.key]=(state.counts[i.key]||0)+1;
+    return {drops};
+  });
+}
+function readyToFuse(state,item,recipe){
+  if(!recipe)return false;
+  const input=state.counts[item.key]||0,material=state.counts[recipe.material]||0;
+  return item.key===recipe.material?input>=2:input>=1 && material>=1;
+}
+function fuseWeapon(key){
+  return changeArmory(state=>{
+    const item=gearByKey.get(key),recipe=fusionRecipe(item);
+    if(!readyToFuse(state,item,recipe))return null;
+    state.counts[key]--;state.counts[recipe.material]--;
+    state.counts[recipe.output]=(state.counts[recipe.output]||0)+1;
+    return {item:gearByKey.get(recipe.output),consumed:[key,recipe.material].filter(k=>!state.counts[k])};
   });
 }
 function gearStats(id){
@@ -120,6 +198,10 @@ function itemOwner(item){
   return id<0?'모든 대원 공용':names[id]+' 전용';
 }
 addEventListener('storage',event=>{
-  if(event.key===armoryKey){armory=restoredArmory(readLocal(armoryKey));updateDiamondDisplay();if(!$('prep-screen').hidden)paintInventory()}
+  if(event.key===armoryKey){
+    armory=restoredArmory(readLocal(armoryKey));savedEquipment=normalizedEquipment(readLocal(equipmentKey)??savedEquipment);
+    updateDiamondDisplay();
+    if(!$('prep-screen').hidden){draftEquipment=normalizedEquipment(draftEquipment);paintPrep()}
+  }
   if(event.key===equipmentKey)savedEquipment=normalizedEquipment(readLocal(equipmentKey));
 });

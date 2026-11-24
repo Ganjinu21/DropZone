@@ -40,3 +40,5 @@ node_modules/
 
 !/work/check-armory.cjs
 !/work/check-field-combat.cjs
+
+!/work/check-weapon-progression.cjs
