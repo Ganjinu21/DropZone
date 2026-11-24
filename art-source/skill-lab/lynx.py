@@ -28,7 +28,7 @@ def rifle(action):
         p.line([(18,9),(15,11),(12,11)],fill="#cab18c",width=2)
     return im
 
-def pose(i):
+def pose(i,fitted=None):
     # Boots remain planted while the torso sinks and absorbs the recoil.
     lean=[0,0,1,-4,-2,0,0][i]
     sink=[0,2,3,4,4,3,2][i]
@@ -38,14 +38,21 @@ def pose(i):
     rearX=gx+(11 if i==5 else 15)
     rearY=gy+(14 if i==5 else 13)
     crew.arm(im,(29+lean,35+sink),(gx+35,gy+13),True,2)
-    im.alpha_composite(rifle(i==5),(gx,gy))
+    if fitted:
+        gun,grip,tip=fitted
+        origin=(gx+15-grip[0],gy+13-grip[1])
+        im.alpha_composite(gun,origin)
+        muzzle=(origin[0]+tip[0],origin[1]+tip[1])
+    else:
+        im.alpha_composite(rifle(i==5),(gx,gy))
+        muzzle=(gx+59,gy+8)
     crew.glove(im,gx+35,gy+13,True,2)
     crew.arm(im,(27+lean,36+sink),(rearX,rearY),False,2)
     crew.glove(im,rearX,rearY,False,2)
     if i in (1,2):
         d=ImageDraw.Draw(im);d.point((gx+30,gy+1),fill="#e9fff3")
         if i==2:d.line((gx+29,gy,gx+31,gy),fill="#a5f0eb")
-    return im,(gx+59,gy+8)
+    return im,muzzle
 
 def fx(row,col):
     im=Image.new('RGBA',(56,48));d=ImageDraw.Draw(im)

@@ -2,23 +2,12 @@
 
 const skillArt = Object.fromEntries(Object.entries({
   bunker: 'bunker', mechFold: 'bulk-fold', squadBoard: 'squad-board', bulkRounds: 'bulk-ballistics',
-  ravenAim: 'raven-aim', ravenSpin: 'raven-spin', ravenEcho: 'raven-echo', ravenRounds: 'raven-ballistics',
+  ravenAim: 'raven-aim', ravenEcho: 'raven-echo', ravenRounds: 'raven-ballistics',
   lynxAim: 'lynx-aim', lynxPierce: 'lynx-pierce', lynxBeam: 'lynx-beam',
   hammerFx: 'hammer-fx', hammerBlast: 'hammer-blast'
 }).map(([id, name]) => [id, 'art/skills/' + name + '.png']));
 
 const bunkerWidth = 112;
-const spinMuzzles = [
-  [[90,40],[18,40]], [[83,48],[16,32]], [[71,53],[20,24]], [[57,55],[29,17]],
-  [[42,54],[42,13]], [[29,50],[57,12]], [[20,43],[71,14]], [[16,35],[83,19]],
-  [[18,27],[90,27]], [[25,19],[92,35]], [[37,14],[88,43]], [[51,12],[79,50]],
-  [[66,13],[66,54]], [[79,17],[51,55]], [[88,24],[37,53]], [[92,32],[25,48]]
-];
-const ravenTips = [
-  [[81,38],[95,28]], [[75,33],[95,28]], [[79,36],[95,28]], [[81,38],[89,24]],
-  [[81,38],[93,26]], [[81,38],[95,28]], [[79,39],[92,30]], [[79,39],[92,30]]
-];
-const lynxTips = [[81,32],[82,34],[82,35],[76,36],[78,36],[80,35],[81,34]];
 const laserEnds = [.032,.072,.120,.178,.238,.313,.410];
 const blastEnds = [.036,.080,.137,.201,.275,.358,.444,.538,.641,.749,.865,.997];
 const frameAt = (age, ends) => ends.findIndex(end => age < end);
@@ -51,6 +40,11 @@ function skillAimPose(m, s) {
 
 function hammerFlip(m) { return m.flip < 0 ? -1 : 1; }
 
+function rifleSkillItem(m){
+  const family=m.id===1?'smg':'sniper';
+  return m.weapon.family===family?m.weapon:gearByKey.get(family+'-0');
+}
+
 // Each position comes from the corresponding frame's gun tip. Combat calls this
 // before it spawns the round; camera movement never changes an in-flight origin.
 function skillShotSocket(m, s, angle, hand = 0) {
@@ -66,12 +60,13 @@ function skillShotSocket(m, s, angle, hand = 0) {
     return {x:s.x+pose.facing*(pose.x+pose.reach*Math.cos(pose.pitch)),
       y:s.y+pose.y+pose.reach*Math.sin(pose.pitch)};
   }
+  const item=rifleSkillItem(m), fit=weaponSockets[item.family][item.tier];
   if (s.phase === 'spin') {
-    const tip = spinMuzzles[spinStep(s.angle)][hand];
+    const tip = fit.turn[spinStep(s.angle)][hand];
     return {x:m.x+tip[0]-54, y:m.y+crewTorsoY(m)+tip[1]-65};
   }
   const pose = skillAimPose(m, s), flip = Math.cos(angle) < 0 ? -1 : 1;
-  const tip = m.id === 1 ? ravenTips[hand ? 3 : 1][hand] : lynxTips[3];
+  const tip = m.id===1?fit.forward[hand]:fit.firingTip;
   const pitch = Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle)));
   const u = tip[0]-pose.px, v = tip[1]-pose.py;
   return {
@@ -91,10 +86,12 @@ function drawRifleSkill(m, s) {
   else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
   ctx.translate(p.px-p.fx, p.py-p.fy+crewTorsoY(m));
   ctx.rotate(pitch);
-  const hands=art[m.weapon.artKey+'-skill'];
-  skillCell(hands||p.sheet,p.col,hands?0:1,p.w,p.h,0,0,p.px,p.py);
+  const item=rifleSkillItem(m);
+  skillCell(art[item.artKey+'-skill'],p.col,0,p.w,p.h,0,0,p.px,p.py);
   const glove=fieldGear(m.loadout,'gloves');
-  if(glove)ctx.drawImage(glove,0,0,8,6);
+  if(glove)for(const [x,y] of skillGrips[item.family][p.col]){
+    ctx.drawImage(glove,x-p.px-4,y-p.py-2,8,5);
+  }
   ctx.restore();
 }
 
@@ -119,16 +116,16 @@ function drawSpinner(m, s) {
     }
     ctx.restore();
   }
-  const spin=m.weapon.family==='smg'?art[m.weapon.artKey+'-skill']:null;
+  const spin=art[rifleSkillItem(m).artKey+'-skill'];
   const glove=fieldGear(m.loadout,'gloves');
   if(!m.moving && !crewOutfitSheet(m) && !glove){
-    skillCell(spin||art.ravenSpin,i%8,Math.floor(i/8)+(spin?1:0),112,72,m.x,m.y,54,65);
+    skillCell(spin,i%8,1+Math.floor(i/8),112,72,m.x,m.y,54,65);
     return;
   }
-  const arms=spin||art['smg-0-skill'],row=Math.floor(i/8);
+  const row=Math.floor(i/8);
   const y=m.y+crewTorsoY(m), facing=Math.cos(s.angle)<0?-1:1;
   const hands=(near)=>{
-    skillCell(arms,i%8,(near?5:3)+row,112,72,m.x,y,54,65);
+    skillCell(spin,i%8,(near?5:3)+row,112,72,m.x,y,54,65);
     if(!glove)return;
     for(const direction of [i*TAU/16+.32,i*TAU/16+Math.PI-.32]){
       if((Math.sin(direction)>=-.10)!==near)continue;

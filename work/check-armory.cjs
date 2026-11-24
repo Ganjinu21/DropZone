@@ -18,6 +18,23 @@ const {chromium}=require('playwright');
     await screenshot('Start');
     // Verify all 25 item images, their shared loadout rules, and a saved five-piece S+ kit in combat.
     await page.locator('#select-team').tap();
+    // A rank change must reach both the detail panel and the specific operator's equipped slot.
+    for(const [id,family] of [[0,'pistol'],[0,'carbine'],[1,'smg'],[2,'sniper']]){
+      const operator=page.locator('[data-inspect="'+id+'"]');
+      if(await operator.getAttribute('aria-pressed')!=='true')await operator.tap();
+      const slot=page.locator('[data-slot="weapon"]');
+      await slot.tap();
+      for(const [variant,file] of [[0,'C'],[1,'B'],[3,'A'],[5,'S'],[6,'S-plus']]){
+        const key=family+'-'+variant;
+        await page.locator('[data-item="'+key+'"]').tap();
+        const detail=await page.locator('#item-icon').evaluate(async img=>{await img.decode();return img.src});
+        assert.ok(detail.endsWith('/catalog/'+family+'/'+file+'.png'),key+' detail art');
+        const equip=page.locator('#item-action');
+        if(await equip.isEnabled())await equip.tap();
+        assert.equal(await slot.locator('img').evaluate(img=>img.src),detail,key+' equipped art');
+      }
+    }
+    await page.locator('[data-inspect="0"]').tap();
     for(const family of ['helmet','gloves','top','pants','boots']){
       await page.locator('[data-slot="'+family+'"]').tap();
       const tiles=page.locator('[data-item]');
@@ -32,6 +49,7 @@ const {chromium}=require('playwright');
       weaponFamilies.every((_,id)=>canEquip(id,i.family,i)) && owns(i.key))));
     await page.locator('#prep-save').tap();
     await page.reload();await page.locator('#start:enabled').tap();
+    assert.deepEqual(await page.evaluate(()=>run.squad.slice(0,3).map(m=>m.weapon.key)),['carbine-6','smg-6','sniper-6']);
     const kit=await page.evaluate(()=>{
       const m=run.squad[0], w=m.weapon;
       magazineReady(m,w);m.ammo=1;spendRound(m,w);
@@ -52,6 +70,7 @@ const {chromium}=require('playwright');
     assert.deepEqual(await page.evaluate(()=>savedEquipment.map(i=>i.weapon)),Array(5).fill('pistol-0'));
     assert.deepEqual(await page.locator('[data-slot="weapon"]').evaluate(e=>[e.innerText,e.querySelector('img').src.split('/').pop()]),['C','C.png']);
     await page.locator('[data-slot="weapon"]').tap();
+    await page.locator('#gear-detail').waitFor();
     assert.equal(await page.locator('#item-title').textContent(),'시작 권총');
     assert.ok(await page.locator('#item-action').isDisabled());
     assert.equal(await page.locator('[data-item]').count(),10);

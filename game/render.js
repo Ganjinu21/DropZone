@@ -82,16 +82,22 @@ function shoulderAt(m) {
 }
 
 // Widths are in game pixels. The same native art stays sharp in the larger locker preview.
-const fieldWidths={pistol:[16,17,18,19,21],carbine:[27,29,31,33,35],smg:[21,22,23,25,26],
+const fieldWidths={pistol:[18,19,20,21,22],carbine:[29,30,32,34,36],smg:[23,24,25,26,28],
   sniper:[49,52,54,57,60],rocket:[46,47,49,51,53],ar:[34,35,37,39,41]};
 function weaponMount(m,col,recoil=0){
   const {family,tier,artKey:key}=m.weapon,far=family==='smg' && col===3;
   const image=art[far?key+'-far':key];
   const w=fieldWidths[family][tier],h=Math.round(w*image.height/image.width);
-  const x=family==='sniper'?-12:family==='pistol'?7:family==='rocket'?-16:family==='ar'?-10:1;
-  const bore={pistol:.20,carbine:.40,smg:.36,sniper:.38,rocket:.53,ar:.36}[family];
-  const y=family==='rocket'?-12:family==='sniper'?-Math.round(h*bore):family==='ar'?-11:-5;
-  return {image,w,h,x:x+(far?6:0)-recoil,y:y-(far?7:0),bore};
+  const fit=weaponSockets[far?'smgFar':family]?.[tier];
+  if(fit){
+    // Attach each trimmed sprite by its painted grip. The near and far hands
+    // keep distinct mounts when Raven alternates weapons.
+    const gripX=(m.id>=3?10:5)+(far?7:0)-recoil,gripY=2-(far?7:0);
+    return {image,w,h,x:gripX-Math.round(w*fit.grip[0]),y:gripY-Math.round(h*fit.grip[1]),
+      gripX,gripY,bore:fit.bore};
+  }
+  const rocket=family==='rocket';
+  return {image,w,h,x:(rocket?-16:-10)-recoil,y:rocket?-12:-11,bore: rocket ? .53 : .36};
 }
 function combatAim(m,tx,ty,col){
   const pivot=shoulderAt(m),dx=tx-pivot.x,dy=ty-pivot.y;
@@ -136,9 +142,9 @@ function drawMemberGear(g,m,age,moving=false){
         g.fillStyle='#ff5147';g.fillRect(end+8,beamY-1,2,2);
       }
     }else{
-      const gripX=mount.x+(m.weapon.family==='sniper'?17:3),gripY=mount.y+Math.round(mount.h*.65);
-      if(glove)g.drawImage(glove,gripX-5,gripY-2,9,6);
-      else{g.fillStyle='#393f37';g.fillRect(gripX-4,gripY,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY,3,2)}
+      const {gripX,gripY}=mount;
+      if(glove)g.drawImage(glove,gripX-4,gripY-3,9,6);
+      else{g.fillStyle='#393f37';g.fillRect(gripX-3,gripY-2,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY-2,3,2)}
     }
   }
   g.restore();

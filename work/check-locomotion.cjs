@@ -163,6 +163,46 @@ async function exerciseFormation(page) {
         check(body && gun,'CCT support body, weapon or draw scale');
       }
     });
+    // At actual field resolution each fired barrel must have painted pixels at the shot origin.
+    // This catches a transparent margin, disappearing thin barrel or mismatched far-hand sprite.
+    await page.evaluate(()=>{
+      const canvas=document.createElement('canvas'),g=canvas.getContext('2d',{willReadFrequently:true});
+      for(const family of ['pistol','carbine','smg','sniper']){
+        const models=new Set();
+        for(const item of equipmentCatalog.filter(i=>i.family===family)){
+          const id=Math.max(0,weaponFamilies.indexOf(family));
+          const member={...run.squad[id],weapon:item,x:0,y:0,flip:1,moving:false,aimPitch:0};
+          for(const col of family==='smg'?[1,3]:[1]){
+            const part=weaponMount(member,col,2);
+            canvas.width=part.w;canvas.height=part.h;
+            g.imageSmoothingEnabled=false;g.drawImage(part.image,0,0,part.w,part.h);
+            const rgba=g.getImageData(0,0,part.w,part.h).data;
+            const pivot=shoulderAt(member),hit=combatMuzzle(member,col,true,0);
+            const tx=hit.x-pivot.x-part.x,ty=hit.y-pivot.y-part.y;
+            let closest=Infinity;
+            for(let y=0;y<part.h;y++)for(let x=0;x<part.w;x++){
+              if(rgba[4*(y*part.w+x)+3]>=96)closest=Math.min(closest,Math.hypot(x+.5-tx,y+.5-ty));
+            }
+            if(closest>2)throw Error('Empty muzzle on '+item.key+' hand '+col+' ('+closest.toFixed(1)+' field px)');
+            if(col===1)models.add(canvas.toDataURL());
+          }
+          if(family==='smg'||family==='sniper'){
+            const weapon=gearByKey.get(levelKey(item.artKey,1))||item;
+            const draw=ctx.drawImage;
+            let firingFrame=false;
+            ctx.drawImage=function(img,...args){
+              if(img===art[item.artKey+'-skill'])firingFrame=true;
+              return draw.call(this,img,...args);
+            };
+            try{
+              drawRifleSkill({...member,weapon,moving:true,shotColumn:1},{angle:0,age:.5,lastFire:.5,phase:'fire'});
+            }finally{ctx.drawImage=draw}
+            if(!firingFrame)throw Error('Ranked firing frame missing for '+weapon.key);
+          }
+        }
+        if(models.size!==5)throw Error('Indistinguishable field ranks on '+family);
+      }
+    });
     // Both arm planes of the sixteen-direction turn must surround the live
     // dressed body, including at half a step where the muzzle moves vertically.
     const turns=await page.evaluate(()=>{
