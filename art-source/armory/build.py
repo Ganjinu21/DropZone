@@ -2,7 +2,9 @@
 import importlib.util
 from pathlib import Path
 from PIL import Image, ImageDraw
-from field_crew import stride_sheet, squad_icons
+from field_crew import squad_icons
+from locomotion import stride_sheet
+from leg_armor import build_worn_armor
 import specialists
 
 root = Path(__file__).resolve().parents[2]
@@ -63,6 +65,7 @@ for role in range(5):
 bodies.save(out/'bodies.png')
 hands.save(out/'specialist-hands.png')
 stride_sheet(out/'crew-stride.png')
+build_worn_armor(out)
 squad_icons(out)
 shield=cropped(units.SHIELD);shield.save(out/'shield.png')
 # Reinforced field supply crate at native icon resolution.

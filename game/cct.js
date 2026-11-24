@@ -5,7 +5,7 @@ const summonDamageRatio=.8;
 
 function cctRadioSprite(member){
   ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(summonScale,summonScale);
-  drawMemberGear(ctx,{...member,id:4,x:0,y:0,weapon:run.squad[4].weapon},member.shoot>0?0:Infinity,member.moving);
+  drawMemberGear(ctx,{...member,id:4,x:0,y:0,loadout:run.squad[4].loadout,weapon:run.squad[4].weapon},member.shoot>0?0:Infinity,member.moving);
   ctx.restore();
 }
 function callCobra(member){
@@ -54,9 +54,7 @@ function moveRadioAlly(ally,enemy,nav,dt){
     if(nav.clear(x,y,ally.post.x,ally.post.y,4))nav.slide(ally,dx*fraction,dy*fraction,4);
     else nav.chase(ally,run,dt);
   }
-  const travel=Math.hypot(ally.x-x,ally.y-y);
-  ally.moving=travel>dt*5;ally.gait+=travel;
-  if(ally.moving && Math.abs(ally.x-x)>dt*4)ally.flip=Math.sign(ally.x-x);
+  updateCrewStride(ally,ally.x-x,ally.y-y,dt,summonScale);
 }
 function updateRadioSupport(dt){
   const chief=run.squad[4];
@@ -67,7 +65,7 @@ function updateRadioSupport(dt){
     if(ally.hp<=0){
       ally.respawn-=dt;
       if(ally.respawn<=0 && chief.hp>0)Object.assign(ally,{hp:ally.max,x:chief.x,y:chief.y,grace:1,cool:.5,
-        ammoKey:null,downFloor:null,reviveTime:0,floor:run.floor,post:null,patrolTime:0});
+        ammoKey:null,gait:0,moving:false,shoot:0,downFloor:null,reviveTime:0,floor:run.floor,post:null,patrolTime:0});
       continue;
     }
     if(ally.floor!==run.floor){ally.x=run.x;ally.y=run.y;ally.floor=run.floor;ally.post=null}

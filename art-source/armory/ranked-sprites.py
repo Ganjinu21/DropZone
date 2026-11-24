@@ -50,7 +50,7 @@ def raven_sheet(rank):
         return canvas, tip
 
     raven.equipment = equipment
-    sheet = Image.new('RGBA',(112*8,72*3))
+    sheet = Image.new('RGBA',(112*8,72*7))
     body = raven.shifted_body
     raven.shifted_body = lambda *args: Image.new('RGBA',raven.CELL)
     for i in range(8):
@@ -60,6 +60,9 @@ def raven_sheet(rank):
     for i in range(16):
         pose, _ = raven.spin(i)
         sheet.paste(pose,(i%8*112,(1+i//8)*72))
+        rear,front,_=raven.spin_layers(i)
+        sheet.paste(rear,(i%8*112,(3+i//8)*72))
+        sheet.paste(front,(i%8*112,(5+i//8)*72))
     sheet.save(CATALOG / 'smg' / f'{rank}-skill.png', optimize=True)
 
 

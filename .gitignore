@@ -42,3 +42,4 @@ node_modules/
 !/work/check-field-combat.cjs
 
 !/work/check-weapon-progression.cjs
+!/work/check-locomotion.cjs

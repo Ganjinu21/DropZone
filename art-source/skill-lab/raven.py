@@ -175,25 +175,28 @@ def spin_body(theta):
     line("#d59e63",[(-5,40),(-1,40)])
     return im
 
-def spin(i):
+def spin_layers(i):
     theta=i*math.tau/16
-    body=spin_body(theta)
-    # A controlled wide-arm turn. The arms sweep almost opposite each other,
-    # with a small anatomical bend so that the barrels never intersect.
+    rear=Image.new("RGBA",CELL)
+    front=Image.new("RGBA",CELL)
     guns=[]
     for hand,direction in enumerate([theta+.32,theta+math.pi-.32]):
         ca,sa=math.cos(direction),math.sin(direction)
         wrist=point(54+ca*17,37+sa*11)
         shoulder=point(54+ca*4.6,36+sa*2)
         guns.append((sa,hand,direction,wrist,shoulder))
-    full=Image.new("RGBA",CELL); sockets=[None,None]
-    for foreground in (False,True):
-        if foreground:full.alpha_composite(body)
-        for sa,hand,direction,wrist,shoulder in sorted(guns):
-            if (sa>=-.10)!=foreground:continue
-            arm_layer(full,shoulder,(wrist[0],wrist[1]+2),hand==1)
-            sockets[hand]=gun(full,wrist,direction,hand==1)
-    return full,sockets
+    sockets=[None,None]
+    for sa,hand,direction,wrist,shoulder in sorted(guns):
+        plane=front if sa>=-.10 else rear
+        arm_layer(plane,shoulder,(wrist[0],wrist[1]+2),hand==1)
+        sockets[hand]=gun(plane,wrist,direction,hand==1)
+    return rear,front,sockets
+
+def spin(i):
+    rear,front,sockets=spin_layers(i)
+    rear.alpha_composite(spin_body(i*math.tau/16))
+    rear.alpha_composite(front)
+    return rear,sockets
 
 def build_echoes(poses):
     """Three inks preserve the face, scarf, gloves and SMG silhouettes in motion."""

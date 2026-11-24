@@ -68,7 +68,7 @@ function skillShotSocket(m, s, angle, hand = 0) {
   }
   if (s.phase === 'spin') {
     const tip = spinMuzzles[spinStep(s.angle)][hand];
-    return {x:m.x+tip[0]-54, y:m.y+tip[1]-65};
+    return {x:m.x+tip[0]-54, y:m.y+crewTorsoY(m)+tip[1]-65};
   }
   const pose = skillAimPose(m, s), flip = Math.cos(angle) < 0 ? -1 : 1;
   const tip = m.id === 1 ? ravenTips[hand ? 3 : 1][hand] : lynxTips[3];
@@ -76,7 +76,7 @@ function skillShotSocket(m, s, angle, hand = 0) {
   const u = tip[0]-pose.px, v = tip[1]-pose.py;
   return {
     x:m.x + flip*(pose.px-pose.fx + u*Math.cos(pitch)-v*Math.sin(pitch)),
-    y:m.y + pose.py-pose.fy + u*Math.sin(pitch)+v*Math.cos(pitch)
+    y:m.y + crewTorsoY(m) + pose.py-pose.fy + u*Math.sin(pitch)+v*Math.cos(pitch)
   };
 }
 
@@ -87,15 +87,14 @@ function drawRifleSkill(m, s) {
   ctx.save();
   ctx.translate(Math.round(m.x), Math.round(m.y));
   ctx.scale(flip, 1);
-  if(m.moving){
-    drawWalkingLegs(ctx,m);
-    const top=p.fy-19;
-    ctx.drawImage(p.sheet,p.col*p.w,0,p.w,top,-p.fx,-p.fy,p.w,top);
-  }else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
-  ctx.translate(p.px-p.fx, p.py-p.fy);
+  if(m.moving || crewOutfitSheet(m))drawCrewBody(ctx,m,m.moving);
+  else skillCell(p.sheet,p.col,0,p.w,p.h,0,0,p.fx,p.fy);
+  ctx.translate(p.px-p.fx, p.py-p.fy+crewTorsoY(m));
   ctx.rotate(pitch);
   const hands=art[m.weapon.artKey+'-skill'];
   skillCell(hands||p.sheet,p.col,hands?0:1,p.w,p.h,0,0,p.px,p.py);
+  const glove=fieldGear(m.loadout,'gloves');
+  if(glove)ctx.drawImage(glove,0,0,8,6);
   ctx.restore();
 }
 
@@ -120,8 +119,27 @@ function drawSpinner(m, s) {
     }
     ctx.restore();
   }
-  const spin=art[m.weapon.artKey+'-skill'];
-  skillCell(spin||art.ravenSpin,i%8,Math.floor(i/8)+(spin?1:0),112,72,m.x,m.y,54,65);
+  const spin=m.weapon.family==='smg'?art[m.weapon.artKey+'-skill']:null;
+  const glove=fieldGear(m.loadout,'gloves');
+  if(!m.moving && !crewOutfitSheet(m) && !glove){
+    skillCell(spin||art.ravenSpin,i%8,Math.floor(i/8)+(spin?1:0),112,72,m.x,m.y,54,65);
+    return;
+  }
+  const arms=spin||art['smg-0-skill'],row=Math.floor(i/8);
+  const y=m.y+crewTorsoY(m), facing=Math.cos(s.angle)<0?-1:1;
+  const hands=(near)=>{
+    skillCell(arms,i%8,(near?5:3)+row,112,72,m.x,y,54,65);
+    if(!glove)return;
+    for(const direction of [i*TAU/16+.32,i*TAU/16+Math.PI-.32]){
+      if((Math.sin(direction)>=-.10)!==near)continue;
+      ctx.save();ctx.translate(Math.round(m.x+Math.cos(direction)*17),Math.round(y-27+Math.sin(direction)*11));
+      ctx.scale(Math.cos(direction)<0?-1:1,1);ctx.drawImage(glove,-3,-2,6,5);ctx.restore();
+    }
+  };
+  hands(false);
+  ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));ctx.scale(facing,1);
+  drawCrewBody(ctx,m,m.moving);ctx.restore();
+  hands(true);
 }
 
 function hammerMortarPose(m,s){
@@ -141,8 +159,9 @@ function drawHammerSkill(m,s){
   ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(facing,1);
   const sink=Math.round(8*plant);
   // Keep the face and torso intact while the legs bend into the planted stance.
-  ctx.drawImage(art.crewBodies,3*192,82,192,46,-32,-19+sink,96,23-sink);
-  ctx.drawImage(art.crewBodies,3*192,0,192,82,-32,-60+sink,96,41);
+  const outfit=crewOutfitSheet(m),body=outfit||art.crewBodies,cell=outfit?0:3*192;
+  ctx.drawImage(body,cell,82,192,46,-32,-19+sink,96,23-sink);
+  ctx.drawImage(body,cell,0,192,82,-32,-60+sink,96,41);
   if(plant>.12){
     const open=12*plant;
     line(x,y+1,x-open,y+19*plant,'#263032',3);
@@ -165,15 +184,15 @@ function boardBunker(s, p) {
     const x = from.x+(s.x-from.x)*p, y = from.y+(s.y-from.y)*p;
     ctx.save();
     ctx.globalAlpha *= Math.min(1,(1-p)*3);
-    if (m.id < 3) skillCell(art.squadBoard,Math.min(3,Math.floor(p*4)),m.id,96,64,x,y,32,60);
-    else drawEquippedMember({...m,x,y});
+    if (m.id < 3 && !crewOutfitSheet(m) && !fieldGear(m.loadout,'gloves')) skillCell(art.squadBoard,Math.min(3,Math.floor(p*4)),m.id,96,64,x,y,32,60);
+    else drawEquippedMember({...m,x,y,moving:p<1,gait:m.gait+p*Math.hypot(s.x-from.x,s.y-from.y)});
     ctx.restore();
   }
   for(const [i,ally] of (run.radioTeam||[]).entries()){
     const from=s.radioFrom?.[i];
     if(ally.hp<=0 || !from)continue;
     ctx.save();ctx.globalAlpha*=Math.min(1,(1-p)*3);
-    cctRadioSprite({...ally,x:from.x+(s.x-from.x)*p,y:from.y+(s.y-from.y)*p,moving:true,gait:p*32});
+    cctRadioSprite({...ally,x:from.x+(s.x-from.x)*p,y:from.y+(s.y-from.y)*p,moving:p<1,gait:ally.gait+p*Math.hypot(s.x-from.x,s.y-from.y)/summonScale});
     ctx.restore();
   }
 }

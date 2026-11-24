@@ -24,7 +24,7 @@ function start(){
    const slot=lineup.indexOf(id), deployed=slot>=0;
    const [front,side]=formationSlots[slot] || [0,0];
    const gear=gearStats(id),max=memberHealth[id]+gear.health;
-   return {id,deployed,gear,weapon:gearByKey.get(savedEquipment[id].weapon),shieldItem:savedEquipment[id].shield,x:pos.x+front,y:pos.y+side,hp:deployed?max:0,max,
+   return {id,deployed,gear,loadout:savedEquipment[id],weapon:gearByKey.get(savedEquipment[id].weapon),shieldItem:savedEquipment[id].shield,x:pos.x+front,y:pos.y+side,hp:deployed?max:0,max,
      cool:.15+id*.15,shoot:0,flip:1,hurt:0,gait:0,moving:false,moveSpeed:0,aimAngle:0};
  });
  run={...pos,floor:'surface',floors:{surface:freshFloor(),metro:freshFloor()},stair:-1,depth:0,t:0,level:1,xp:0,need:5,kills:0,lead:lineup[0],lineup:[...lineup],swap:0,face:1,dx:1,dy:0,heading:0,enemies:[],crystals:[],effects:[],marks:[],cues:[],pickupCool:0,stage:1,bossPhase:false,boss:null,walk:0,camera:{...pos},up:Array(upgrades.length).fill(0),squad,shield:0,lastHud:-1};
@@ -254,6 +254,19 @@ function updateRescues(dt){
    tone(550,.15,.028,'sine',0,820);updateHud();
  }
 }
+// Distance is measured after collision resolution. A unit aiming into its
+// retreat plays the same planted-foot sequence backwards.
+const crewStrideLength=40;
+function updateCrewStride(m,dx,dy,dt,scale=1){
+ const distance=Math.hypot(dx,dy);
+ m.moveSpeed=dt>0?distance/dt:0;
+ m.moving=m.moveSpeed>5;
+ if(!m.moving)return;
+ if(m.shoot<=0 && Math.abs(dx)>dt*8)m.flip=Math.sign(dx);
+ const backing=dx*m.flip<0 && Math.abs(dx)>Math.abs(dy)*.5;
+ const advance=(backing?-distance:distance)/scale;
+ m.gait=((m.gait+advance)%crewStrideLength+crewStrideLength)%crewStrideLength;
+}
 function moveFormation(dt) {
  const nav=routes[run.floor];
  const order=[run.lead,...run.lineup.filter(id=>id!==run.lead && run.squad[id].hp>0)];
@@ -275,13 +288,9 @@ function moveFormation(dt) {
      if(nav.clear(m.x,m.y,tx,ty,4))nav.slide(m,stepX,stepY,4);
      else {m.speed=160;nav.chase(m,run,dt);}
    }
-   const traveled=Math.hypot(m.x-bx,m.y-by);
-   m.gait+=traveled;
-   m.moveSpeed=dt>0?traveled/dt:0;
-   m.moving=m.moveSpeed>7;
    m.cool-=dt;m.shoot-=dt;m.hurt-=dt;
+   updateCrewStride(m,m.x-bx,m.y-by,dt);
    if(m.cool<=0)shoot(m);
-   if(m.moving&&m.shoot<=0&&Math.abs(stepX)>dt*10)m.flip=Math.sign(stepX);
  }
 }
 function update(dt){

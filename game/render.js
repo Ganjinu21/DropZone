@@ -49,6 +49,10 @@ const tagArt = {
     if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     return [[i.key,itemImage(i)]];
   })),
+  ...Object.fromEntries(equipmentCatalog.filter(i=>armorStats[i.family] && i.tier>0).map(i=>{
+    const fitted=i.family==='pants'||i.family==='boots';
+    return [i.key,fitted?'art/armory/worn/'+i.family+'-'+(i.rank==='S+'?'S-plus':i.rank)+'.png':itemImage(i)];
+  })),
   crewStride:'art/armory/crew-stride.png',
   crewBodies:'art/armory/bodies.png',specialistHands:'art/armory/specialist-hands.png',
   combatUnits: 'combat-units.png',
@@ -64,15 +68,17 @@ function tagCell(atlas, col, row, x, y) {
   ctx.drawImage(atlas, col * 96, row * 64, 96, 64, x, y, 96, 64);
 }
 
-// Gameplay and rendering use the same shoulder, gait offset and weapon socket.
-function strideBob(m) {
-  const gait = (m.gait ?? 0) / 30 + m.id * .31;
-  const stride = Math.sin(gait * TAU);
-  return !reduceMotion.matches ? Math.round(Math.abs(stride) * 1.7) : 0;
+// Contact, compression, passing foot and lift repeat on the other side.
+const crewStepY=[0,1,0,-1,0,1,0,-1];
+function crewStrideFrame(m){
+  const step=Math.floor((m.gait||0)*8/crewStrideLength);
+  return (step%8+8)%8;
+}
+function crewTorsoY(m){
+  return m.moving && !reduceMotion.matches?crewStepY[crewStrideFrame(m)]:0;
 }
 function shoulderAt(m) {
-  const bob=m.moving?strideBob(m):0;
-  return { x: Math.round(m.x), y: Math.round(m.y) + shoulder.y - 60 - bob };
+  return {x:Math.round(m.x),y:Math.round(m.y)+shoulder.y-60+crewTorsoY(m)};
 }
 
 // Widths are in game pixels. The same native art stays sharp in the larger locker preview.
@@ -99,20 +105,24 @@ function combatMuzzle(m,col,lead,pitch=m.aimPitch??0){
   const u=part.x+part.w,v=part.y+part.h*part.bore;
   return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
 }
-function drawWalkingLegs(g,m){
-  const frame=Math.floor((m.gait||0)/5)%8;
-  g.drawImage(art.crewStride,frame*64,m.id*24,64,24,-32,-20,64,24);
+function drawCrewBody(g,m,moving){
+  const sheet=crewOutfitSheet(m),frame=crewStrideFrame(m);
+  const sprite=sheet || (moving?art.crewStride:art.crewBodies);
+  const x=sheet?(moving?frame+1:0)*192:(moving?frame:m.id)*192;
+  const y=!sheet && moving?m.id*128:0;
+  if(moving && reduceMotion.matches && crewStepY[frame]){
+    // Pin the torso while retaining the authored ground-contact position.
+    const hip=80, shift=crewStepY[frame]*2, split=hip+shift;
+    g.drawImage(sprite,x,y,192,split,-32,-60-shift/2,96,split/2);
+    g.drawImage(sprite,x,y+split,192,128-split,-32,-60+hip/2,96,(128-hip)/2);
+  }else g.drawImage(sprite,x,y,192,128,-32,-60,96,64);
 }
 function drawMemberGear(g,m,age,moving=false){
-  const id=m.id, pose=art.crewBodies;
-  const bob=moving?strideBob(m):0;
+  const id=m.id,dy=moving?crewTorsoY(m):0,glove=fieldGear(m.loadout,'gloves');
   g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
-  if(moving){
-    drawWalkingLegs(g,m);
-    g.drawImage(pose,id*192,0,192,82,-32,-60-bob,96,41);
-  }else g.drawImage(pose,id*192,0,192,128,-32,-60-bob,96,64);
-  if(id===0)g.drawImage(art[m.shieldItem||'shield-0'],-19,-39-bob,25,37);
-  g.save();g.translate(0,-28-bob);
+  drawCrewBody(g,m,moving);
+  if(id===0)g.drawImage(art[m.shieldItem||'shield-0'],-19,-39+dy,25,37);
+  g.save();g.translate(0,-28+dy);
   g.rotate((m.aimPitch||0)*clamp((.34-age)/.12,0,1));
   for(const col of (m.weapon.family==='smg'?[3,1]:[1])){
     const kick=age<.055 && (m.shotColumn||1)===col?2:0;
@@ -127,18 +137,25 @@ function drawMemberGear(g,m,age,moving=false){
       }
     }else{
       const gripX=mount.x+(m.weapon.family==='sniper'?17:3),gripY=mount.y+Math.round(mount.h*.65);
-      g.fillStyle='#393f37';g.fillRect(gripX-4,gripY,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY,3,2);
+      if(glove)g.drawImage(glove,gripX-5,gripY-2,9,6);
+      else{g.fillStyle='#393f37';g.fillRect(gripX-4,gripY,7,4);g.fillStyle='#a18a69';g.fillRect(gripX-1,gripY,3,2)}
     }
   }
   g.restore();
-  if(id>=3)g.drawImage(art.specialistHands,(id-3)*192,0,192,128,-32,-60-bob,96,64);
+  if(id>=3){
+    g.drawImage(art.specialistHands,(id-3)*192,0,192,128,-32,-60+dy,96,64);
+    if(glove){
+      g.drawImage(glove,6,-31+dy,9,7);
+      g.drawImage(glove,-6,-32+dy,10,8);
+    }
+  }
   g.restore();
 }
 function drawCrewPreview(canvas,id,row){
   const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
   const weapon=gearByKey.get(row.weapon);
   g.save();g.scale(canvas.width/84,canvas.height/64);
-  drawMemberGear(g,{id,weapon,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?29:38,y:60},Infinity);
+  drawMemberGear(g,{id,weapon,loadout:row,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?29:38,y:60},Infinity);
   g.restore();
 }
 function drawEquippedMember(m){
@@ -192,7 +209,7 @@ function drawDowned(m) {
   footShadow(m.x,m.y,14);
   ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));
   ctx.save();const scale=.72*(m.side?summonScale:1);ctx.scale(scale,scale);ctx.rotate(-Math.PI*.45);
-  drawMemberGear(ctx,{...m,id:m.id??4,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1},Infinity);
+  drawMemberGear(ctx,{...m,id:m.id??4,loadout:m.loadout||run.squad[4].loadout,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1},Infinity);
   ctx.restore();
   const progress=(m.reviveTime||0)/3;
   ctx.fillStyle='#152322';ctx.fillRect(-24,-32,48,15);

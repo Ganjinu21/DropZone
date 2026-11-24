@@ -13,8 +13,7 @@ const {chromium} = require('playwright');
     await page.goto(pathToFileURL(path.resolve(__dirname,'../game/index.html')).href);
     await page.locator('#start:enabled').tap();
     await page.locator('#hud').waitFor();
-    const strideBytes=require('node:fs').readFileSync(path.resolve(__dirname,'../game/art/armory/crew-stride.png'));
-    const field = await page.evaluate(async strideURL => {
+    const field = await page.evaluate(() => {
       const need=(condition,message)=>{if(!condition)throw Error(message)};
       const nav=routes.surface,bulk=run.squad[0],chief=run.squad[4],hammer=run.squad[3];
       Object.assign(run,{x:1257,y:1004,heading:0,enemies:[],remaining:999});
@@ -85,27 +84,13 @@ const {chromium} = require('playwright');
       const rank=run.up[firepower];getOffer(firepower);applyUpgrade();
       const shot=enemy(100,100);damageEnemy(shot,100);
       need(Math.abs(shot.max-shot.hp-(110+rank*10))<.001,'Firepower multiplier');
-      // Check the native lower body pixels independently of weapon, head bob and camera.
-      const canvas=document.createElement('canvas');canvas.width=96;canvas.height=64;
-      const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
-      const strideImage=new Image();strideImage.src=strideURL;await strideImage.decode();
-      const draw=g.drawImage.bind(g);
-      g.drawImage=(image,...parts)=>{if(image===art.crewStride)draw(strideImage,...parts)};
-      for(const m of run.squad){
-        const phases=new Set();
-        for(let i=0;i<8;i++){
-          g.clearRect(0,0,96,64);drawMemberGear(g,{...m,x:32,y:60,flip:1,gait:i*5},0,true);
-          phases.add(Array.from(g.getImageData(0,47,64,15).data).join(','));
-        }
-        need(phases.size===8,'Walking poses missing for '+m.id);
-      }
       for(let i=0;i<100;i++){
         openUpgrade();
         if(offers.includes(fieldKit) && offers.includes(firepower))break;
       }
       need(new Set(offers).size===3,'Duplicate upgrade choices');
       return {patrol:stops.map(a=>a.size),bunkerHP:health,revived:hammer.max*.3};
-    },'data:image/png;base64,'+strideBytes.toString('base64'));
+    });
     for(const width of [320,393,430]){
       await page.setViewportSize({width,height:852});
       const cards=await page.locator('#cards .card').evaluateAll(nodes=>nodes.map(n=>{
@@ -122,6 +107,6 @@ const {chromium} = require('playwright');
     await page.locator('.card').first().tap();await page.locator('#equip').tap();
     assert.equal(await page.locator('#hud').isVisible(),true);
     assert.deepEqual(errors,[]);
-    console.log('Field combat, rescue, all five walking sprites and three-column augment layout passed.',field);
+    console.log('Field combat, rescue and three-column augment layout passed.',field);
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
