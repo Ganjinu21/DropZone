@@ -43,7 +43,7 @@ function drawUnit(frame, row, x, y, flip, width = 64, height = 64) {
 const tagRoles = ['bulk', 'raven', 'lynx'];
 const shoulder = { x: 32, y: 32 };
 const tagArt = {
-  ...Object.fromEntries(equipmentCatalog.filter(i=>i.asset).flatMap(i=>{
+  ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon || i.family==='shield').flatMap(i=>{
     if(i.family==='shield')return [[i.key,i.asset+'-field.png']];
     if(i.family==='smg')return [[i.key,i.asset+'-near.png'],[i.key+'-far',i.asset+'-far.png'],[i.key+'-pair',itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];

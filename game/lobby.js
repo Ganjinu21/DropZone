@@ -26,7 +26,7 @@ function paintInventory(){
   const rank=$('gear-rank').value, sort=$('gear-sort').value;
   const equippedItem=gearByKey.get(draftEquipment[editId][editSlot]);
   const selectedItem=gearByKey.get(detailKey);
-  const list=equipmentCatalog.filter(i=>canEquip(editId,editSlot,i) && (i.asset || owns(i.key)) && (!rank || rank===i.rank)).map(i=>{
+  const list=equipmentCatalog.filter(i=>canEquip(editId,editSlot,i) && (!rank || rank===i.rank)).map(i=>{
     if(!canEnhance(i))return i;
     if(selectedItem?.artKey===i.key)return selectedItem;
     if(equippedItem.artKey===i.key)return equippedItem;
@@ -160,7 +160,7 @@ function updateDiamondDisplay(){
   $('profile-mode').disabled=crateBusy;
   $('profile-mode').setAttribute('aria-pressed',String(developerMode));
   $('profile-mode').setAttribute('aria-label',developerMode?'일반 진행으로 전환':'개발자 모드로 전환');
-  $('profile-mode').textContent=developerMode?'개발자 모드 · 전체 무기 해금':'일반 모드 · 개발자 모드로 전환';
+  $('profile-mode').textContent=developerMode?'개발자 모드 · 전체 장비 해금':'일반 모드 · 개발자 모드로 전환';
   const n=armory.boxes;
   const milestone=n<firstBBox?'첫 B 보장까지 '+(firstBBox-n):n<firstABox?'첫 A 보장까지 '+(firstABox-n):'다음 A 보장까지 '+(repeatABoxes-armory.sinceA);
   $('crate-progress').textContent='누적 '+n+'상자 · '+milestone+'상자';
@@ -178,7 +178,8 @@ function paintGearDetail(){
     ? '1발 피해  '+equipmentDamage(item)+' (선두) · '+equipmentDamage(item,sidearm)+' (후열)'
     : item.weapon?'1발 피해  '+equipmentDamage(item):gearEffect(editSlot,item);
   const perHand=item.family==='smg';
-  $('item-magazine').textContent=item.weapon?'탄창 '+(perHand?(item.capacity/2)+'발 × 2':item.capacity+'발')+' · 재장전 '+Number(item.reload.toFixed(2))+'초':'';
+  const reload=gearStats(editId,draftEquipment).reload;
+  $('item-magazine').textContent=item.weapon?'탄창 '+(perHand?(item.capacity/2)+'발 × 2':item.capacity+'발')+' · 재장전 '+Number((item.reload*reload).toFixed(2))+'초':'';
   $('item-compare').textContent=same?'현재 장착 중':'장착 중인 '+gradeLabel(current)+' '+current.label+' · '+gearEffect(editSlot,current);
   const recipe=fusionRecipe(item);
   $('enhancement').hidden=!recipe;
@@ -192,7 +193,7 @@ function paintGearDetail(){
     $('item-fuse').textContent=!ready?'재료 부족':item.level===5?'등급 승급':'합성 강화';
     $('item-fuse').disabled=fusionBusy || !ready;
   }
-  const source=!item.weapon && item.rank==='S+'?'유료 전용 · 미보유':(item.level || (item.weapon && item.tier>=3))?'합성으로 획득':'특수 무기 소환에서 획득';
+  const source=!item.weapon && item.rank==='S+'?(item.family==='shield'?'유료 전용 · 미보유':'개발자 모드에서 사용 가능'):(item.level || (item.weapon && item.tier>=3))?'합성으로 획득':'특수 무기 소환에서 획득';
   $('item-action').textContent=same?'장착 중':owned?'교체하기':source;
   $('item-action').disabled=!owned || same || fusionBusy;
 }

@@ -10,7 +10,13 @@ const equipmentSlots={weapon:'무기',gloves:'장갑',boots:'신발',helmet:'헬
 const weaponFamilies=['carbine','smg','sniper','rocket','ar'];
 const itemFamilies={pistol:'권총',carbine:'실드 카빈',smg:'듀얼 SMG',sniper:'저격소총',rocket:'전술 로켓포',ar:'돌격소총',
   shield:'전술방패',gloves:'전술 장갑',boots:'전투화',helmet:'전투모',top:'전술 조끼',pants:'전투 바지'};
-const patterns=[['보급','C',0],['기동','B',5],['개량','B',7],['경량','A',9],['강화','A',11],['정예','S',14]];
+const armorStats={
+  helmet:{effect:'최대 체력',values:[8,16,28,45,65],unit:'',sign:'+'},
+  gloves:{effect:'기본 공격 속도',values:[3,6,10,16,24],unit:'%',sign:'+'},
+  top:{effect:'받는 피해',values:[3,7,12,18,26],unit:'%',sign:'−'},
+  pants:{effect:'재장전 시간',values:[4,8,14,22,32],unit:'%',sign:'−'},
+  boots:{effect:'이동 속도',values:[3,6,10,15,22],unit:'%',sign:'+'}
+};
 const rankedNames={
   pistol:['시작 권총','기동 권총','전술 권총','정예 권총','펄스 권총'],
   carbine:['초병','순찰대','문지기','성문','해태'],
@@ -18,7 +24,12 @@ const rankedNames={
   sniper:['척후','망루','긴그림자','월식','백호'],
   rocket:['화통','철퇴','해머헤드','공성추','이무기'],
   ar:['콜사인','릴레이','비콘','나이트링크','흑매'],
-  shield:['초병 방패','순찰대 방패','문지기 방패','성문 방패','해태 방패']
+  shield:['초병 방패','순찰대 방패','문지기 방패','성문 방패','해태 방패'],
+  helmet:['관제 헬멧','수색 관제모','돌입 헬멧','야간 강습 헬멧','펄스 바이저'],
+  gloves:['정찰 사격 장갑','수색 장갑','돌입 너클 장갑','야간 강습 장갑','코어 건틀릿'],
+  top:['보급 견갑 조끼','수색 흉갑 조끼','돌입 플레이트 캐리어','야간 강습 흉갑','리액터 흉갑'],
+  pants:['보급 전투 바지','수색 카고 바지','돌입 전술 바지','야간 강습 바지','서보 전투 바지'],
+  boots:['보급 전투화','수색 기동화','돌입 전투화','야간 강습 전투화','자력 기동화']
 };
 // Keep the original C, B, A and S save IDs. S+ has its own ID and drop policy.
 const rankedTiers=[
@@ -27,16 +38,14 @@ const rankedTiers=[
   {rank:'S+',variant:6,bonus:1100}
 ];
 const shieldGuard=[0,5,9,14,18];
-const equipmentCatalog=Object.entries(itemFamilies).flatMap(([family,label])=>{
-  if(rankedNames[family])return rankedTiers.map(({rank,variant,bonus},tier)=>({
-    key:family+'-'+variant,family,label:rankedNames[family][tier],rank,tier,
-    power:family==='shield'?shieldGuard[tier]:bonus,weapon:family!=='shield',
-    asset:'art/armory/catalog/'+family+'/'+(rank==='S+'?'S-plus':rank)
-  }));
-  return patterns.map(([prefix,rank,power],variant)=>({
-    key:family+'-'+variant,family,label:prefix+' '+label,rank,tier:'CBAS'.indexOf(rank),power,weapon:false
-  }));
-});
+const equipmentCatalog=Object.keys(itemFamilies).flatMap(family=>
+  rankedTiers.map(({rank,variant,bonus},tier)=>{
+    const weapon=family==='pistol'||weaponFamilies.includes(family);
+    const power=weapon?bonus:family==='shield'?shieldGuard[tier]:armorStats[family].values[tier];
+    return {key:family+'-'+variant,family,label:rankedNames[family][tier],rank,tier,power,weapon,
+      asset:'art/armory/catalog/'+family+'/'+(rank==='S+'?'S-plus':rank)};
+  })
+);
 const gearByKey=new Map(equipmentCatalog.map(i=>[i.key,i]));
 const weaponMagazines={
   pistol:  {rounds:[10,12,14,16,18],seconds:[1.35,1.30,1.25,1.20,1.10]},
@@ -74,8 +83,7 @@ function canonicalGearKey(key){
   return key;
 }
 const starterKeys=['pistol-0',...Object.keys(equipmentSlots).filter(k=>k!=='weapon').map(k=>k+'-0')];
-const gearImage=family=>'art/prep/'+family+'.png';
-const itemImage=i=>i.asset?i.asset+'.png':gearImage(i.family);
+const itemImage=i=>i.asset+'.png';
 const defaultItem=slot=>slot==='weapon'?'pistol-0':slot+'-0';
 function gearSlots(id){return Object.keys(equipmentSlots).filter(slot=>slot!=='shield'||id===0)}
 function canEquip(id,slot,item){
@@ -88,7 +96,10 @@ const safeCount=n=>Number.isSafeInteger(n)&&n>0?n:0;
 function restoredArmory(raw){
   const counts={};
   if(raw?.counts && typeof raw.counts==='object'){
-    for(const [key,n] of Object.entries(raw.counts))if(gearByKey.has(key)&&safeCount(n))counts[key]=n;
+    for(const [old,n] of Object.entries(raw.counts)){
+      const key=canonicalGearKey(old);
+      if(gearByKey.has(key) && safeCount(n))counts[key]=Math.min(Number.MAX_SAFE_INTEGER,(counts[key]||0)+n);
+    }
   }else if(Array.isArray(raw?.owned)){
     for(const old of new Set(raw.owned)){
       const key=canonicalGearKey(old);
@@ -182,15 +193,16 @@ function fuseWeapon(key){
     return {item:gearByKey.get(recipe.output),consumed:[key,recipe.material].filter(k=>!state.counts[k])};
   });
 }
-function gearStats(id){
-  const row=savedEquipment[id], power=slot=>gearByKey.get(row[slot])?.power||0;
+function gearStats(id,loadout=savedEquipment){
+  const row=loadout[id], power=slot=>gearByKey.get(row[slot])?.power||0;
   return {interval:1/(1+power('gloves')/100),movement:1+power('boots')/100,
-    health:power('helmet')+power('pants'),protection:power('top')/100,guard:power('shield')/100};
+    health:power('helmet'),reload:1-power('pants')/100,protection:power('top')/100,guard:power('shield')/100};
 }
 function gearEffect(slot,item){
   if(item.weapon)return '기본 피해 '+equipmentDamage(item);
-  const effects={gloves:'공격 속도',boots:'이동 속도',helmet:'체력',top:'피해 감소',pants:'체력',shield:'전방 방어'};
-  return effects[slot]+' +'+item.power+(['helmet','pants'].includes(slot)?'':'%');
+  if(slot==='shield')return '전방 방어 +'+item.power+'%';
+  const stat=armorStats[item.family];
+  return stat.effect+' '+stat.sign+item.power+stat.unit;
 }
 function itemOwner(item){
   if(item.family==='shield')return '벌크 전용';

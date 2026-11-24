@@ -18,7 +18,7 @@ const {chromium}=require('playwright');
     await page.locator('#item-fuse').tap();
     await page.waitForFunction(()=>detailKey==='smg-3@1',null,{polling:50,timeout:4000});
     assert.equal(await page.locator('#item-detail').innerText(),'1발 피해 31');
-    assert.match(await page.locator('#item-magazine').innerText(),/16발 × 2.*1.85초/);
+    assert.match(await page.locator('#item-magazine').innerText(),/16발 × 2.*1\.78초/);
     await page.locator('#item-action').tap();
     if(process.env.PREVIEW_DIR)await page.screenshot({path:path.join(process.env.PREVIEW_DIR,'Weapon-Fusion.png')});
     await page.locator('#prep-save').tap();await page.reload();

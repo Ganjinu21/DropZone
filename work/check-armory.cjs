@@ -16,6 +16,32 @@ const {chromium}=require('playwright');
       await page.screenshot({path:path.join(process.env.PREVIEW_DIR,name+'.png')});
     };
     await screenshot('Start');
+    // Verify all 25 item images, their shared loadout rules, and a saved five-piece S+ kit in combat.
+    await page.locator('#select-team').tap();
+    for(const family of ['helmet','gloves','top','pants','boots']){
+      await page.locator('[data-slot="'+family+'"]').tap();
+      const tiles=page.locator('[data-item]');
+      assert.equal(await tiles.count(),5);
+      await tiles.locator('img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
+      await page.locator('[data-item="'+family+'-6"]').tap();
+      assert.match(await page.locator('#item-context').innerText(),/모든 대원 공용/);
+      await page.locator('#item-action').tap();
+      assert.match(await page.locator('[data-slot="'+family+'"]').innerText(),/S\+/);
+    }
+    assert.ok(await page.evaluate(()=>equipmentCatalog.filter(i=>armorStats[i.family]).every(i=>
+      weaponFamilies.every((_,id)=>canEquip(id,i.family,i)) && owns(i.key))));
+    await page.locator('#prep-save').tap();
+    await page.reload();await page.locator('#start:enabled').tap();
+    const kit=await page.evaluate(()=>{
+      const m=run.squad[0], w=m.weapon;
+      magazineReady(m,w);m.ammo=1;spendRound(m,w);
+      const hp=m.hp;
+      absorbContact({x:m.x-1,y:m.y,type:0},m,routes.surface,100);
+      return [m.max-memberHealth[0],Math.round(100/m.gear.interval),hp-m.hp,
+        Math.round(1000*(m.reloadAt-run.t)/w.reload),Math.round(100*m.gear.movement)];
+    });
+    assert.deepEqual(kit,[65,124,74,680,122]);
+    await page.locator('#pause').tap();await page.locator('#homebtn').tap();
     await page.locator('#shop').tap();
     assert.ok(await page.evaluate(()=>developerMode && equipmentCatalog.filter(i=>i.weapon).every(i=>owns(i.key))));
     assert.ok(await page.locator('#crate-open').isEnabled());
@@ -121,6 +147,8 @@ const {chromium}=require('playwright');
     await page.locator('[data-inspect="4"]').tap();
     assert.equal(await page.locator('#crew-name').textContent(),'CCT-공중통제사');
     await screenshot('CCT');
+    assert.deepEqual(await page.evaluate(()=>{const s=restoredArmory({counts:{'top-4':2,'top-3':3,'boots-2':2}});
+      return [s.counts['top-3'],s.counts['boots-1'],s.counts['top-4']??0]}),[5,2,0]);
     // Migrate the old duplicated B/A patterns without making them paid entitlements.
     await page.evaluate(()=>{
       localStorage.setItem(armoryKey,JSON.stringify({diamonds:500,owned:['smg-2','smg-4','smg-5','shield-4','boots-4']}));
@@ -128,7 +156,7 @@ const {chromium}=require('playwright');
     });
     await page.reload();await page.locator('#select-team:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[savedEquipment[1].weapon,savedEquipment[0].shield,
-      savedEquipment[1].boots,owns('smg-1'),owns('smg-6'),armory.diamonds]),['smg-3','shield-3','boots-4',true,false,500]);
+      savedEquipment[1].boots,owns('smg-1'),owns('smg-6'),armory.diamonds]),['smg-3','shield-3','boots-3',true,false,500]);
     await page.locator('[data-inspect="1"]').tap();
     await page.locator('#gear-rank').selectOption('S+');
     assert.equal(await page.locator('[data-item]').count(),2);

@@ -104,20 +104,20 @@ const selectTestSquad = require('./select-test-squad.cjs');
         const {boss,leader}=stage(2), hp=leader.hp, mark=boss.pattern.marks[0];
         advance(1.26);const safe=leader.hp===hp && mark.waveRadius>0;
         advance(.4);
-        summary.pulse={safeUntilRing:safe,damage:hp-leader.hp,hitOnce:mark.hit.size===1};
+        summary.pulse={safeUntilRing:safe,damage:Math.round((hp-leader.hp)*100)/100,hitOnce:mark.hit.size===1};
       }
       {
         const {boss,leader}=stage(3), first=boss.pattern.marks[0];
         leader.x=105;advance(.58);const second=boss.pattern.marks.find(m=>m.number===2);
         leader.x=150;advance(.58);const third=boss.pattern.marks.find(m=>m.number===3);
         const hp=leader.hp;advance(.96);
-        summary.barrage={locked:[first.x,second.x,third.x],damage:hp-leader.hp,pending:boss.pattern.pending};
+        summary.barrage={locked:[first.x,second.x,third.x],damage:Math.round((hp-leader.hp)*100)/100,pending:boss.pattern.pending};
       }
       return summary;
     });
     assert.deepEqual(patterns.charge,{locked:true,moved:true,dodged:true});
-    assert.deepEqual(patterns.pulse,{safeUntilRing:true,damage:24,hitOnce:true});
-    assert.deepEqual(patterns.barrage,{locked:[65,105,150],damage:19,pending:0});
+    assert.deepEqual(patterns.pulse,{safeUntilRing:true,damage:23.28,hitOnce:true});
+    assert.deepEqual(patterns.barrage,{locked:[65,105,150],damage:18.43,pending:0});
     assert.deepEqual(errors,[]);
     console.log('Big waves',waves,'three bosses',patterns);
   } finally {await browser.close()}

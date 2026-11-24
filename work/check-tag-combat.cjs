@@ -72,8 +72,8 @@ const {chromium} = require('playwright');
     assert.equal(results.heavyMarked,true);
     assert.deepEqual(results.pierced,[65,82,120]);
     assert.equal(results.thirdHit,82);
-    assert.deepEqual(results.supports,[[1,.76,100,120],[1,.106,109,120],[1,1.16,82,82]]);
-    assert.ok(Math.abs(results.front-3.6)<.001 && results.rear===8);
+    assert.deepEqual(results.supports,[[1,.76*(1/1.03),100,120],[1,.106*(1/1.03),109,120],[1,1.16*(1/1.03),82,82]]);
+    assert.ok(Math.abs(results.front-3.6*.97)<.001 && Math.abs(results.rear-8*.97)<.001);
     assert.equal(results.pointBlank,109);
     const audio=await page.evaluate(()=>{
       const played=[];

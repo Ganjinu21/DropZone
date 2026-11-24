@@ -123,7 +123,7 @@ function magazineReady(member,item){
 }
 function spendRound(member,item){
   member.ammo--;
-  if(member.ammo===0)member.reloadAt=run.t+item.reload;
+  if(member.ammo===0)member.reloadAt=run.t+item.reload*(member.gear?.reload??1);
 }
 
 function shoot(member) {
