@@ -78,8 +78,7 @@ function drawSiegeLauncher(m,s){
   const p=siegeRackPose(m,s),f=p.facing;
   ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(f,1);
   drawCrewBody(ctx,m,false,-.2);
-  const glove=fieldGear(m.loadout,'gloves');
-  ctx.save();ctx.translate(0,-28);drawCrewHand(ctx,3,false,4,3,glove);drawCrewHand(ctx,3,true,11,1,glove);ctx.restore();
+  ctx.save();ctx.translate(0,-28);drawCrewHand(ctx,3,false,4,3);drawCrewHand(ctx,3,true,11,1);ctx.restore();
   ctx.restore();
   ctx.save();ctx.translate(Math.round(p.x),Math.round(p.y));ctx.scale(f,1);
   for(const end of [-15,15]){

@@ -1,0 +1,82 @@
+html, body { touch-action: manipulation; }
+#world { touch-action: none; }
+#lobby-hub {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0,1fr) auto;
+}
+#lobby-pages {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  isolation: isolate;
+  touch-action: pan-y;
+}
+#lobby-pages > section {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+#lobby-pages > #main-menu { background: inherit; }
+#barracks-page > section {
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 10px;
+}
+#lobby-pages img { -webkit-user-drag: none; }
+#hub-nav {
+  display: flex;
+  justify-content: center;
+  padding: 0 max(7px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(7px,env(safe-area-inset-left));
+  background: #172422;
+  border-top: 1px solid #5b695a;
+  z-index: 1;
+}
+#hub-nav button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 1 0;
+  max-width: 180px;
+  min-height: 49px;
+  padding: 5px;
+  background: transparent;
+  color: #b2bfb1;
+  font-size: 13px;
+  border: 0;
+  border-top: 2px solid transparent;
+}
+#hub-nav button[aria-current="page"] {
+  color: #f3dfab;
+  background: #2d3830;
+  border-top-color: #c8ae77;
+}
+#hub-nav .hub-icon { width: 21px; height: 21px; display: inline-grid; place-items: center; object-fit: contain; image-rendering: pixelated; }
+#hub-nav .operations-icon { background: url(art/armory/ui-home.png) center / contain no-repeat; }
+#hub-nav .network-icon { font: 700 23px/1 system-ui,sans-serif; }
+#hub-nav #select-team::before { width: 21px; height: 21px; margin: 0; }
+#hub-nav button:focus-visible { outline: 2px solid #d6ba82; outline-offset: -4px; }
+#main-menu .lobby-controls nav { display: flex; justify-content: center; }
+#main-menu .lobby-controls nav #start { flex: 1; flex-direction: row; gap: 9px; min-height: 44px; height: clamp(44px,7dvh,60px); }
+#main-menu .lobby-controls nav #start::before { width: 18px; height: 18px; margin: 0; }
+#main-menu .lobby-controls { margin-bottom: auto; }
+#main-menu .mission-selector { min-width: 0; }
+#talent-reroll { font-size: clamp(10px,3vw,14px); min-height: 42px; padding: 5px 10px; }
+@media (max-width:520px) {
+  #hub-nav button { flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+}
+@media (orientation:portrait) and (max-height:650px) {
+  #main-menu #stage-preview-art { max-height: 31dvh; }
+  #hub-nav button { min-height: 44px; }
+}
+@media (orientation:landscape) and (max-height:580px) {
+  #hub-nav button { min-height: 38px; }
+  #main-menu #stage-preview-art { max-height: 31dvh; }
+}

@@ -10,7 +10,7 @@
 .prep-nav,.locker-filters {margin-left:auto;gap:6px}
 .prep-head button,.crew-caption button,.locker-filters select {font:inherit;color:#d4dfd7;border:1px solid #607273;background:#26373b}
 .prep-head button {min-height:clamp(30px,6.8vh,46px);padding:0 .9em;font-size:clamp(11px,2.7vh,16px)}
-#prep-back {width:clamp(32px,6.8vh,46px);padding:0;font:700 25px/1 sans-serif}
+#prep-back {width:clamp(32px,6.8vh,46px);padding:0}
 .dressing {min-height:0;display:grid;grid-template-columns:minmax(120px,1fr) minmax(225px,2.6fr) minmax(120px,1fr);gap:clamp(4px,1.5vw,22px)}
 .slot-column {display:grid;align-content:center;gap:clamp(3px,1vh,9px)}
 .gear-slot {width:100%;height:clamp(31px,8.6vh,58px);display:flex;gap:.45em;align-items:center;text-align:left;background:#1e2c31;color:var(--paper);border:1px solid #526164;padding:2px 6px}
@@ -209,7 +209,7 @@
 .gear-info h4{margin:4px 0;font-size:clamp(15px,4vw,22px);color:#fff1cd;line-height:1.2}
 .gear-info p{color:#ede4c7;font-size:12px}
 .gear-info small{display:block;margin-top:4px;color:#b2c0b4;font-size:10px}
-#item-close{position:absolute;right:0;top:0;width:32px;height:32px;background:transparent;color:#d3dbc9;font:22px/1 sans-serif}
+#item-close{position:absolute;right:0;top:0;width:32px;height:32px;background:transparent;color:#d3dbc9;font-size:22px;line-height:1}
 #item-action{grid-column:1/-1;height:36px;background:#c3ab79;color:#161e20;border:1px solid #e1c99a;font-size:12px}
 #item-action:disabled{background:#263733;color:#c3d0c4;border-color:#4c6158}
 #item-action:disabled:before{display:none}

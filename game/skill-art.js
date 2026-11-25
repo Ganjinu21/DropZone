@@ -107,10 +107,6 @@ function drawRifleSkill(m, s) {
     ctx.fillStyle='#b1d9d2';ctx.fillRect(x,y-1,2,3);
     if(s.age>.22){ctx.fillStyle='#f4e4bd';ctx.fillRect(x,y,3,1)}
   }
-  const glove=fieldGear(m.loadout,'gloves');
-  if(glove)for(const [x,y] of skillGrips[item.family][p.col]){
-    ctx.drawImage(glove,x-p.px-4,y-p.py-2,8,5);
-  }
   ctx.restore();
 }
 
@@ -134,22 +130,12 @@ function drawSpinner(m, s) {
 function drawSpinPose(m, angle) {
   const i=spinStep(angle);
   const spin=art[rifleSkillItem(m).artKey+'-skill'];
-  const glove=fieldGear(m.loadout,'gloves');
   const row=Math.floor(i/8);
   const y=m.y+crewTorsoY(m), facing=Math.cos(angle)<0?-1:1;
-  const hands=(near)=>{
-    skillCell(spin,i%8,(near?3:1)+row,112,72,m.x,y,54,65);
-    if(!glove)return;
-    for(const direction of [i*TAU/16+.32,i*TAU/16+Math.PI-.32]){
-      if((Math.sin(direction)>=-.10)!==near)continue;
-      ctx.save();ctx.translate(Math.round(m.x+Math.cos(direction)*17),Math.round(y-27+Math.sin(direction)*11));
-      ctx.scale(Math.cos(direction)<0?-1:1,1);ctx.drawImage(glove,-3,-2,6,5);ctx.restore();
-    }
-  };
-  hands(false);
+  skillCell(spin,i%8,1+row,112,72,m.x,y,54,65);
   ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));ctx.scale(facing,1);
   drawCrewBody(ctx,m,m.moving);ctx.restore();
-  hands(true);
+  skillCell(spin,i%8,3+row,112,72,m.x,y,54,65);
 }
 
 function hammerMortarPose(m,s){
@@ -170,7 +156,7 @@ function drawHammerSkill(m,s){
   ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(facing,1);
   const sink=Math.round(8*plant);
   // Keep the face and torso intact while the legs bend into the planted stance.
-  const outfit=crewOutfitSheet(m),body=outfit||art.crewBodies,cell=outfit?0:3*192;
+  const body=art.crewBodies,cell=m.id*192;
   ctx.drawImage(body,cell,82,192,46,-32,-19+sink,96,23-sink);
   ctx.drawImage(body,cell,0,192,82,-32,-60+sink,96,41);
   if(plant>.12){
@@ -186,9 +172,8 @@ function drawHammerSkill(m,s){
   }
   ctx.translate(x,y);ctx.rotate(pitch);
   ctx.drawImage(image,reach-w,-Math.round(h*bore),w,h);
-  const glove=fieldGear(m.loadout,'gloves');
-  drawCrewHand(ctx,m.id,true,7,3,glove);
-  drawCrewHand(ctx,m.id,false,-2,3,glove);
+  drawCrewHand(ctx,m.id,true,7,3);
+  drawCrewHand(ctx,m.id,false,-2,3);
   ctx.restore();
   const contact=(s.age-.60)/.24;
   if(contact>=0 && contact<1)skillFlash(art.hammerFx,1,Math.floor(contact*8),64,64,32,32,s.x+facing*17,s.y,0,.8);
@@ -363,6 +348,12 @@ function drawSkillFX(e) {
         skillCell(art.hammerBlast,col,row+1,124,108,e.x,e.y,62,84);
       }
       break;
+    }
+    case 'exhaust': {
+      const size=Math.round(3+6*t),x=Math.round(e.x-size/2),y=Math.round(e.y-size/2-4*t);
+      ctx.save();ctx.globalAlpha*=.78*(1-t);
+      ctx.fillStyle='#242629';ctx.fillRect(x+1,y,size-1,size);ctx.fillRect(x,y+1,size+2,size-2);
+      ctx.fillStyle='#424244';ctx.fillRect(x+1,y,Math.max(2,size-3),2);ctx.restore();break;
     }
     case 'shellArc': drawShellFlight(e); break;
     case 'smgFire': {

@@ -6,6 +6,7 @@ const assaultVest={vest:[29,37,55,44],cloth:[30,42,43,36,55,40,64,45,79,44,86,56
 const radioVest={vest:[34,39,48,43],cloth:[34,45,45,39,54,42,59,48,75,47,82,52,80,60,75,67,81,73,79,80,62,84,38,81,39,74,53,70,49,63,43,65,40,71,34,64]};
 const crewFits=[assaultVest,assaultVest,radioVest,assaultVest,radioVest];
 const portraitRoles=['bulk','raven','lynx','hammer','cct'];
+function fieldPortrait(id){return 'art/armory/portraits/'+portraitRoles[id]+'-field.png'}
 function wornPortrait(id,row){
   const rank=gearByKey.get(row?.helmet)?.rank??'C';
   return rank==='C'?ART['face'+id]:'art/armory/portraits/'+portraitRoles[id]+'-'+(rank==='S+'?'S-plus':rank)+'.png';

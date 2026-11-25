@@ -129,8 +129,14 @@ function combatMuzzle(m,col,lead,pitch=m.aimPitch??0,recoil=2){
   const u=part.x+part.w,v=part.y+part.h*part.bore;
   return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
 }
-function drawCrewBody(g,m,moving,pitch=0){
-  const sheet=crewOutfitSheet(m),frame=crewStrideFrame(m);
+function drawCrewBody(g,m,moving,pitch=0,sheet=null){
+  const frame=crewStrideFrame(m);
+  if(m.id===1 && !sheet){
+    g.save();g.imageSmoothingEnabled=true;
+    g.translate(0,-24);g.rotate(pitch*.095);
+    g.drawImage(art.ravenMotion,(moving?frame+1:0)*224,0,224,256,-33,-43,61,70);
+    g.restore();return;
+  }
   const sprite=sheet || (moving?art.crewStride:art.crewBodies);
   const x=sheet?(moving?frame+1:0)*192:(moving?frame:m.id)*192;
   const y=!sheet && moving?m.id*128:0;
@@ -160,10 +166,9 @@ function drawCrewHand(g,id,forward,x,y,glove){
 
 // Everything is drawn in the facing-local frame. The left hand stays around the
 // inside rail of the shield while the right forearm follows the pistol's pitch.
-function drawBulkGuard(g,m,offset,bob,glove,moving){
+function drawBulkGuard(g,m,offset,bob,glove,moving,shield){
   const sway=moving && !reduceMotion.matches?[0,1,1,0,0,-1,-1,0][crewStrideFrame(m)]:0;
   g.save();g.translate(sway+offset.x,-28+bob+offset.y);
-  const shield=art[m.shieldItem||'shield-0'];
   g.drawImage(shield,-6,-11,22,34);
   // Rear edge of the diagonal plate, the two strap lugs and their raised grip.
   g.fillStyle='#29282c';g.fillRect(-7,-3,5,2);g.fillRect(-7,9,5,2);g.fillRect(-8,-2,3,12);
@@ -178,15 +183,17 @@ const carryPitch=[0,.027,.018,0,-.018,-.027,-.018,0];
 function firingKick(age){
   return age<.055?2:age<.105?1:0;
 }
-function drawMemberGear(g,m,age,moving=false){
-  const id=m.id,dy=moving?crewTorsoY(m):0,glove=fieldGear(m.loadout,'gloves');
+function drawMemberGear(g,m,age,moving=false,previewLoadout=null){
+  const id=m.id,dy=moving?crewTorsoY(m):0;
+  const glove=previewLoadout && fieldGear(previewLoadout,'gloves');
   const family=m.weapon.family;
   g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
   const rest=moving && !reduceMotion.matches?carryPitch[crewStrideFrame(m)]:0;
   const aim=m.aimTarget?.hp>0?1:clamp((.34-age)/.12,0,1);
   const pitch=(m.aimPitch||0)*aim,offset=torsoOffset(-28,torsoSlope(pitch));
-  drawCrewBody(g,m,moving,pitch);
-  if(id===0)drawBulkGuard(g,m,offset,dy,glove,moving);
+  const outfit=previewLoadout && crewOutfitSheet({id,loadout:previewLoadout});
+  drawCrewBody(g,m,moving,pitch,outfit);
+  if(id===0)drawBulkGuard(g,m,offset,dy,glove,moving,art[previewLoadout?.shield||'shield-0']);
   g.save();g.translate(offset.x,-28+dy+offset.y);
   g.rotate(pitch+rest*(1-aim));
   for(const col of (family==='smg'?[3,1]:[1])){
@@ -199,7 +206,7 @@ function drawMemberGear(g,m,age,moving=false){
       g.fillStyle='#ff5147';g.fillRect(end+8,beamY-1,2,2);
     }
     if(family==='smg'){
-      drawCrewHand(g,id,col===3,mount.gripX,mount.gripY,glove);
+      if(previewLoadout || id!==1)drawCrewHand(g,id,col===3,mount.gripX,mount.gripY,glove);
     }else{
       const [rear,forward]=fieldHands[family];
       if(id!==0)drawCrewHand(g,id,true,forward[0]-kick,forward[1],glove);
@@ -213,7 +220,7 @@ function drawCrewPreview(canvas,id,row){
   const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
   const weapon=gearByKey.get(row.weapon);
   g.save();g.scale(canvas.width/84,canvas.height/64);
-  drawMemberGear(g,{id,weapon,loadout:row,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?29:38,y:60},Infinity);
+  drawMemberGear(g,{id,weapon,flip:1,x:weapon.family==='sniper'?29:38,y:60},Infinity,false,row);
   g.restore();
 }
 function drawEquippedMember(m){
@@ -267,7 +274,7 @@ function drawDowned(m) {
   footShadow(m.x,m.y,14);
   ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));
   ctx.save();const scale=.72*(m.side?summonScale:1);ctx.scale(scale,scale);ctx.rotate(-Math.PI*.45);
-  drawMemberGear(ctx,{...m,id:m.id??4,loadout:m.loadout||run.squad[4].loadout,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1,aimPitch:0,aimTarget:null},Infinity);
+  drawMemberGear(ctx,{...m,id:m.id??4,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1,aimPitch:0,aimTarget:null},Infinity);
   ctx.restore();
   const progress=(m.reviveTime||0)/3;
   ctx.fillStyle='#152322';ctx.fillRect(-24,-32,48,15);
@@ -304,7 +311,7 @@ function drawBossSprite(stage, frame, x, y, flip, hit, height = 88) {
 }
 
 function drawInfectedBoss(e) {
-  const stage = e.stage || e.pattern?.stage || run.stage;
+  const stage = stages[(e.stage || e.pattern?.stage || run.stage)-1].bossClass;
   const marks = e.pattern?.marks || [];
   const cfg = bossPatterns[stage - 1];
   const active = marks.find(mark => !mark.done);
@@ -373,6 +380,15 @@ function drawTracer(mark) {
   const dx = mark.tx - mark.x, dy = mark.ty - mark.y;
   const x = mark.x + dx * t, y = mark.y + dy * t;
   const angle = mark.angle ?? Math.atan2(dy, dx);
+  if(mark.family==='rocket'){
+    ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.rotate(angle);
+    ctx.fillStyle='#392e28';ctx.fillRect(-7,-2,14,5);
+    ctx.fillStyle='#87937b';ctx.fillRect(-5,-2,10,3);
+    ctx.fillStyle='#d9ce9b';ctx.fillRect(5,-1,4,2);
+    ctx.fillStyle='#524f46';ctx.fillRect(-7,-4,3,8);
+    ctx.fillStyle='#e77e45';ctx.fillRect(-13,-2,6,4);
+    ctx.fillStyle='#fff2b3';ctx.fillRect(-10,-1,4,2);ctx.restore();return;
+  }
   if (drawSkillRound(mark,x,y,angle)) return;
   if (mark.lead && mark.id<3 && mark.family!=='pistol') {
     drawTagEffect(tagRoles[mark.id] + '_bullet', mark.age, x, y, angle);
@@ -432,7 +448,7 @@ function drawDown(cue, t) {
     const p = t / .70;
     ctx.globalAlpha = opacity * (1 - p) * .83;
     const flip = cue.flip || (dx > 0 ? -1 : 1);
-    if (cue.bossStage) drawBossSprite(cue.bossStage, 3, cue.x + dx*p*6, cue.y, flip, false, 88-p*47);
+    if (cue.bossStage) drawBossSprite(stages[cue.bossStage-1].bossClass, 3, cue.x + dx*p*6, cue.y, flip, false, 88-p*47);
     else drawUnit(2, 3 + id, cue.x + dx * p * 6, cue.y, flip, 64 + p * 4, 64 - p * 35);
   }
   ctx.globalAlpha = opacity * (1 - t) * .65;
@@ -550,15 +566,20 @@ function render() {
   const cy = Math.round(clamp(run.camera.y - viewH / 2, 0, Math.max(0, map.bounds.h - viewH)));
   const visible = (x, y, padding = 80) => x >= cx - padding && x <= cx + viewW + padding &&
     y >= cy - padding && y <= cy + viewH + padding;
-  ctx.setTransform(1, 0, 0, 1, -cx, -cy);
+  ctx.setTransform(renderScale, 0, 0, renderScale, -cx*renderScale, -cy*renderScale);
   ctx.fillStyle='#172027';
   ctx.fillRect(cx,cy,viewW,viewH);
   ctx.save();
-  const view={x:cx,y:cy,w:viewW,h:viewH};
+  ctx.scale(sceneryScale,sceneryScale);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='medium';
+  const view={x:cx/sceneryScale,y:cy/sceneryScale,w:viewW/sceneryScale,h:viewH/sceneryScale};
   const depth=run.depth??0, undergroundAlpha=depth*depth*(3-2*depth);
+  const scenery=[];
   if(depth<1){
-    SURFACE.draw(ctx,view);
-    drawMapAmbience(ctx,'surface',view,run.t,reduceMotion.matches);
+    Battlefield.draw(ctx,view,run.stage,scenery,1-undergroundAlpha);
+    Battlefield.light(ctx,view);
+    drawAftermath(ctx,run.stage,view,run.t,reduceMotion.matches);
   }
   if(depth>0){
     ctx.globalAlpha=undergroundAlpha;
@@ -594,6 +615,7 @@ function render() {
   }
   for(const m of [...run.squad,...(run.radioTeam||[])])if(m.hp<=0 && m.downFloor===run.floor)actors.push({o:m,draw:drawDowned});
   if(!deployedBunker())for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:cctRadioSprite});
+  actors.push(...scenery);
   actors.sort((a, b) => a.o.y - b.o.y);
   for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}
   ctx.globalAlpha=1;
@@ -612,7 +634,7 @@ function render() {
   }
   ctx.globalAlpha = 1;
   drawCobraSupport();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   drawScreenShade();
   drawStick();
 }
@@ -637,21 +659,37 @@ function flashTint(image) {
   return canvas;
 }
 
-Promise.all(Object.entries({ ...ART, ...tagArt, ...skillArt, ...awakenedArt }).map(([id, url]) =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => { art[id] = img; resolve(); };
-    img.onerror = () => reject(new Error('이미지 ' + id + (url.startsWith('data:') ? '' : ' (' + url + ')')));
-    img.src = url;
-  }))).then(() => {
+async function loadGame() {
+  const assets = Object.entries({ ...ART, ...tagArt, ...skillArt, ...awakenedArt });
+  const meter = $('loading-progress');
+  meter.max = assets.length + 1;
+  meter.value = 0;
+  try {
+    await Promise.all(assets.map(([id, url]) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        art[id] = img;
+        meter.value++;
+        resolve();
+      };
+      img.onerror = () => reject(new Error('이미지 ' + id + (url.startsWith('data:') ? '' : ' (' + url + ')')));
+      img.src = url;
+    })));
     art.tagRigHit = flashTint(art.tagRig);
     art.infectedBossHit = flashTint(art.infectedBosses);
     art.tagEquipHit = flashTint(art.tagEquip);
     makeMap();
-    $('home').style.backgroundImage = 'linear-gradient(90deg,rgba(9,19,26,.86),rgba(12,21,27,.42) 45%,transparent 70%),url(' + ART.lobby + ')';
     setLobbyReady();
+    meter.value = meter.max;
+    $('loading-screen').hidden = true;
+    $('home').hidden = false;
     requestAnimationFrame(tick);
-  }).catch(error => {
+  } catch (error) {
     console.error('DropZone startup', error.stack || error.message);
-    $('start').textContent = '시작 실패 · ' + error.message;
-  });
+    $('loading-status').textContent = '게임을 불러오지 못했습니다.';
+    meter.hidden = true;
+    $('loading-retry').hidden = false;
+    $('loading-retry').onclick = () => location.reload();
+  }
+}
+loadGame();

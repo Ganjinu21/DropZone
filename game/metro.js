@@ -27,7 +27,7 @@ const METRO = (() => {
   fixture('mop',492,537,27,28);
   fixture('mop',1620,356,27,28,1);
   fixture('fallenMachine',1848,876,76,42);
-  function paint(g) {
+  function paint(g, visibleProps=props) {
     g.imageSmoothingEnabled=false;
     let seed=9141;
     function rand() { seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }
@@ -286,7 +286,7 @@ const METRO = (() => {
       r(x+1,y+5,20,12,'#443f39');r(x+2,y+2,17,12,'#856957');
       r(x+6,y,7,3,'#434c46');r(x+5,y+2,2,11,'#baa682');r(x+14,y+2,2,11,'#baa682');
     }
-    for(const item of props){
+    for(const item of visibleProps){
       const {type,x,y,w,h,style}=item;
       r(x+4,y+h-3,w,9,'#273a3677');
       if(type==='gate'){

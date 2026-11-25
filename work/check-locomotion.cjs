@@ -87,7 +87,7 @@ async function exerciseFormation(page) {
           for(const slot of parts){
             const upgraded={...m.loadout,[slot]:slot+'-6'};
             render({...m,loadout:upgraded});
-            check(canvas.toDataURL()!==normal,'missing moving '+slot+' on '+id+' phase '+i);
+            check(canvas.toDataURL()===normal,'equipped '+slot+' changed field uniform on '+id+' phase '+i);
           }
           const right=footSilhouette(m,1),left=footSilhouette(m,-1),w=mirrorCanvas.width;
           let visible=0,lowest=-1;
@@ -110,7 +110,7 @@ async function exerciseFormation(page) {
               tip=this.getTransform().transformPoint({x:x+w,y:y+h*p.bore});
               if(id===0)bulkLayers.push({part:'pistol',x:tip.x});
             }
-            if(image===art['shield-3']){
+            if(image===art['shield-0']){
               shield=true;
               const [x,y]=args.slice(-4);
               const edge=this.getTransform().transformPoint({x,y:y+15});
@@ -212,10 +212,9 @@ async function exerciseFormation(page) {
         const draw=ctx.drawImage,chief=run.squad[4];
         let body=false,gun=false;
         ctx.drawImage=function(image,...args){
-          const outfit=crewOutfitSheet(chief);
-          if(image===(outfit||art.crewStride)){
+          if(image===art.crewStride){
             const [sx,sy,w]=args;
-            body=(outfit?sy===0 && sx/w===crewStrideFrame(support)+1:sy===4*128 && sx/w===crewStrideFrame(support))
+            body=sy===4*128 && sx/w===crewStrideFrame(support)
               && Math.abs(Math.abs(this.getTransform().a)-summonScale)<1e-5;
           }
           if(image===art[chief.weapon.artKey])gun=true;
@@ -266,11 +265,11 @@ async function exerciseFormation(page) {
       }
     });
     // Both arm planes of the sixteen-direction turn must surround the live
-    // dressed body, including at half a step where the muzzle moves vertically.
+    // field body, including at half a step where the muzzle moves vertically.
     const turns=await page.evaluate(()=>{
       const m={...run.squad[1],loadout:{...savedEquipment[1],helmet:'helmet-6'},
         moving:true,gait:5,weapon:gearByKey.get('smg-6')};
-      const body=crewOutfitSheet(m),arms=art['smg-6-skill'];
+      const body=art.crewStride,arms=art['smg-6-skill'];
       const draw=ctx.drawImage,seen=[];
       ctx.drawImage=function(image,...args){
         if(image===body)seen.push('body');
@@ -292,7 +291,7 @@ async function exerciseFormation(page) {
       assert.equal(planes,[1+(i>>3),'body',3+(i>>3)].join(','));
       assert.equal(dy,1);
     });
-    // The worn helmet and vest must stay exposed on both specialist rigs,
+    // The barracks preview must still show the worn helmet and vest on both specialist rigs,
     // including when the weapon, helmet and vest have different ranks.
     await page.evaluate(()=>{
       const variants=rankedTiers.map(tier=>tier.variant);

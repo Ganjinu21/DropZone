@@ -7,11 +7,13 @@ const squadSkillDefs = [
   {name:'박격포 포격', awakenedName:'다연장 공성포', duration:3.65, cooldown:13},
   {name:'코브라 공중지원',awakenedName:'A-10 공중지원',duration:7,cooldown:28}
 ];
-function weaponSkillForm(item){
-  if(item?.rank==='S+')return 2;
-  return item?.rank==='A' || item?.rank==='S'?1:0;
+const skillRoutes=['bulk','raven','lynx','rocket','cct'];
+function trainedSkillForm(item,id,talents){
+  if(!talents[skillRoutes[id]+'Skill'])return 0;
+  return item?.rank==='S+' || (id===0 && talents.bulkCap)?2:1;
 }
-function skillForm(id){return weaponSkillForm(run.squad[id].weapon)}
+function skillForm(id){return trainedSkillForm(run.squad[id].weapon,id,run.talents)}
+function skillCooldownDuration(seconds){return seconds*(1-run.talents.cooldownReduction)}
 function skillDisplayName(id,form){return form===2?squadSkillDefs[id].awakenedName:squadSkillDefs[id].name}
 
 // Packaged as data so local desktop previews and the offline Android WebView
@@ -76,7 +78,7 @@ function activateSquadSkill() {
   if(skill.awakened && id===2)skill.nextShot=1;
   if(skill.awakened && id===3)skill.nextShot=.60;
   if(id===0 && skill.awakened){
-    skill.hp=skill.maxHp=mechStats.hp;
+    skill.hp=skill.maxHp=Math.round(mechStats.hp*(run.talents.bulkCap?1.25:1));
     skill.duration=mechStats.duration;skill.nextShot=mechStats.spinUp;
   }else if (id===0) {
     initializeRadioTeam();
@@ -88,12 +90,13 @@ function activateSquadSkill() {
     }
   }
   if (id===3) skill.plantFacing=member.flip||1;
+  if (id===1 && run.talents.ravenCap)skill.duration+=1;
   run.activeSkill=skill;
   if(id===1 && skill.awakened){
     const pending=ravenPendingCharges();
-    pending.push((pending.at(-1)??run.t)+def.cooldown);
+    pending.push((pending.at(-1)??run.t)+skillCooldownDuration(def.cooldown));
     member.burstRecharges=pending;
-  }else if (id!==0) member.skillReadyAt=run.t+def.cooldown;
+  }else if (id!==0) member.skillReadyAt=run.t+skillCooldownDuration(def.cooldown);
   member.burstIndex=0;
   if (squadSkillLocked()) run.squad.forEach(m=>{m.moving=false; m.moveSpeed=0});
   if (id===0 || id===2) skillAudio.play(id,'lock');
@@ -108,7 +111,7 @@ function cancelSquadSkill() {
   const member=run.squad[skill.id];
   if (skill.id===0) {
     const def=squadSkillDefs[0];
-    member.skillReadyAt=run.t+(skill.awakened?mechStats.cooldown:skill.hp>0?def.recallCooldown:def.cooldown);
+    member.skillReadyAt=run.t+skillCooldownDuration(skill.awakened?mechStats.cooldown:skill.hp>0?def.recallCooldown:def.cooldown);
   }
   member.cool=Math.max(.19,member.cool);
   member.shoot=0; member.burstIndex=0;
@@ -120,7 +123,7 @@ function hitBunker(enemy,nav,damage,isContact){
   const fort=run.activeSkill;
   if(isContact && (enemy.nextBunkerHit||0)>run.t)return;
   if(isContact)enemy.nextBunkerHit=run.t+.8;
-  fort.hp=Math.max(0,fort.hp-damage);
+  fort.hp=Math.max(0,fort.hp-damage*(1-run.talents.reduction));
   if(fort.hp>0)return;
   cancelSquadSkill();
   const protectedCrew=fort.awakened?[run.squad[0]]:run.squad;
@@ -217,20 +220,16 @@ function fireRailBeam(member,skill) {
 }
 
 function fireMortar(member,target,skill,salvoIndex=0) {
-  const large=!!skill;
-  const siege=!!skill?.awakened;
-  const angle=Math.atan2(target.y-member.y,target.x-member.x);
+  const siege=skill.awakened,angle=Math.atan2(target.y-member.y,target.x-member.x);
   member.flip=Math.cos(angle)<0?-1:1;
-  member.lastShot=run.t; member.shoot=.27; member.aimAngle=angle;
-  if (skill) skill.angle=angle;
-  if(!large)combatAim(member,target.x,chestY(target),1);
-  const barrel=large?skillShotSocket(member,skill,angle,salvoIndex):combatMuzzle(member,1,member.id===run.lead);
+  member.lastShot=run.t;member.shoot=.27;member.aimAngle=skill.angle=angle;
+  const barrel=skillShotSocket(member,skill,angle,salvoIndex);
   const travel=Math.hypot(target.x-member.x,target.y-member.y);
-  const duration=siege?clamp(.18+travel/1100,.24,.65):clamp((large?.48:.30)+travel/1000,.32,.86);
-  run.effects.push({skillFx:'shellArc',id:3,lead:true,large,awakened:siege,salvoIndex,angle,age:0,duration,
-    x:barrel.x,y:barrel.y,tx:target.x,ty:target.y,
-    damage:Math.round((equipmentDamage(member.weapon,loadouts[3])+(large?18:0))*weaponRunMultiplier(member.id)),radius:siege?72:large?60:37});
-  skillAudio.play(3,large?'thump':'lob',large?.54:.45);
+  const duration=siege?clamp(.18+travel/1100,.24,.65):clamp(.48+travel/1000,.32,.86);
+  const power=(equipmentDamage(member.weapon,loadouts[3])+18)*weaponRunMultiplier(member.id);
+  run.effects.push({skillFx:'shellArc',id:3,lead:true,large:true,awakened:siege,salvoIndex,angle,age:0,duration,
+    x:barrel.x,y:barrel.y,tx:target.x,ty:target.y,damage:Math.round(power*(run.talents.rocketCap?1.25:1)),radius:siege?72:60});
+  skillAudio.play(3,'thump',.54);
 }
 
 function detonateMortar(shell,state,floor) {
@@ -239,8 +238,8 @@ function detonateMortar(shell,state,floor) {
     lead:true,awakened:shell.awakened,angle:shell.angle,age:0,duration:shell.large?1.02:.79});
   for (const enemy of state.enemies) {
     if (enemy.hp<=0) continue;
-    const dx=enemy.x-shell.tx, dy=enemy.y-shell.ty;
-    if (Math.hypot(dx,dy)>shell.radius || !routes[floor].clear(shell.tx,shell.ty,enemy.x,enemy.y,0)) continue;
+    const dx=enemy.x-shell.tx, dy=enemy.y-(shell.groundY??shell.ty);
+    if (Math.hypot(dx,dy)>shell.radius || !routes[floor].clear(shell.tx,shell.groundY??shell.ty,enemy.x,enemy.y,0)) continue;
     damageEnemy(enemy,shell.damage,Math.atan2(dy,dx),state,shell.id);
   }
   if (state===run) skillAudio.play(3,shell.large?'burst':'grenade',shell.large?.49:.42);

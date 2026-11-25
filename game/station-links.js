@@ -2,24 +2,34 @@
 
 // Station artwork is registered under the street in world coordinates. Each passage
 // starts at the same physical XY stair as its entrance; only elevation changes.
-const underground = (() => {
-  const offset={x:240,y:725}, bounds=SURFACE.bounds, exits=SURFACE.exits;
+function makeUnderground(exits,bounds=SURFACE.bounds) {
+  const offset={x:240,y:725};
   const worldBox=b=>({x:b.x+offset.x,y:b.y+offset.y,w:b.w,h:b.h});
   const rooms=METRO.rooms.map(worldBox);
-  const bends=[
-    [[656,839],[656,920]], [[738,338],[738,920]], [], [],
-    [[1930,839],[1930,920]], [[2420,331],[2420,1110],[2170,1110]],
-    [[1600,1452],[1600,1225]], [[2305,1688],[2305,1570],[2160,1570]]
-  ];
   const passages=[], segments=[];
   function passage(a,b) {
-    const margin=34;
+    const margin=52;
     return {x:Math.min(a.x,b.x)-margin,y:Math.min(a.y,b.y)-margin,
       w:Math.abs(a.x-b.x)+2*margin,h:Math.abs(a.y-b.y)+2*margin};
   }
-  for(const [i,e] of exits.entries()){
-    const lip=TransitKit.stairPoint(e,TransitKit.stairLength+18);
-    const path=[e,lip,...bends[i].map(([x,y])=>({x,y}))];
+  const hall={x:718,y:1144};
+  for(const e of exits){
+    // Turn at the open lower landing before joining the ticket hall. Routing
+    // back along a staircase would put its closed upper wall across the link.
+    const lip=TransitKit.stairPoint(e,TransitKit.stairLength+30);
+    const vertical=e.facing==='N'||e.facing==='S';
+    const corner=vertical?{x:hall.x,y:lip.y}:{x:lip.x,y:hall.y};
+    const path=[e,lip,corner,hall];
+    if(vertical && Math.abs(lip.x-hall.x)<108){
+      const x=lip.x+140;path.splice(2,1,{x,y:lip.y},{x,y:hall.y});
+    }else if(!vertical && Math.abs(lip.y-hall.y)<108){
+      const y=lip.y+140;path.splice(2,1,{x:lip.x,y},{x:hall.x,y});
+    }
+    if(exits.length===8 && e.number===2){
+      // Gwanghwamun's two west-facing landings share a bank. Pass west
+      // of the first stairwell before turning south into the ticket hall.
+      path.splice(2,path.length-3,{x:630,y:lip.y},{x:630,y:hall.y});
+    }
     for(let j=1;j<path.length;j++){
       passages.push(passage(path[j-1],path[j]));
       segments.push([path[j-1],path[j]]);
@@ -28,7 +38,12 @@ const underground = (() => {
   // Derive wall collision from the very same open rectangles used to paint the floor.
   let solids=[bounds];
   for(const open of [...rooms,...passages])solids=solids.flatMap(w=>TransitKit.subtractRect(w,open));
-  solids.push(...METRO.props.map(worldBox),...exits.flatMap(e=>TransitKit.stairRails(e,true)));
+  // Furniture must leave the shared passages and their stair landings usable.
+  const props=METRO.props.filter(item=>{
+    const box=worldBox(item);
+    return !passages.some(p=>box.x<p.x+p.w&&box.x+box.w>p.x&&box.y<p.y+p.h&&box.y+box.h>p.y);
+  });
+  solids.push(...props.map(worldBox),...exits.flatMap(e=>TransitKit.stairRails(e,true)));
 
   // Trace only exposed walls of the passage union. Shared edges at elbows,
   // intersections and doors into the ticket hall stay completely open.
@@ -98,13 +113,14 @@ const underground = (() => {
     g.fillStyle='#f1d891';g.font='bold 10px Arcade, sans-serif';g.textAlign='center';
     g.fillText(String(e.number),p.x,p.y+3);
   }
+  const density=1.25;
   let sheet;
   function bake(){
-    const c=document.createElement('canvas');c.width=bounds.w;c.height=bounds.h;
-    const g=c.getContext('2d',{alpha:false});g.imageSmoothingEnabled=false;
+    const c=document.createElement('canvas');c.width=Math.ceil(bounds.w*density);c.height=Math.ceil(bounds.h*density);
+    const g=c.getContext('2d',{alpha:false});g.scale(density,density);g.imageSmoothingEnabled=true;
     g.fillStyle='#202b2e';g.fillRect(0,0,c.width,c.height);
     g.save();g.translate(offset.x,offset.y);
-    METRO.paint(g);g.restore();
+    METRO.paint(g,props);g.restore();
     // Draw passages only in the unoccupied ceiling space; the historic halls,
     // shops and platform retain their original tiles and furniture.
     g.save();g.beginPath();
@@ -134,7 +150,8 @@ const underground = (() => {
   }
   function prepare(){sheet??=bake()}
   function draw(g,v){
-    g.drawImage(sheet,v.x,v.y,v.w,v.h,v.x,v.y,v.w,v.h);
+    prepare();g.drawImage(sheet,v.x*density,v.y*density,v.w*density,v.h*density,v.x,v.y,v.w,v.h);
   }
   return {bounds,exits,solids,offset,draw,prepare};
-})();
+}
+let underground;

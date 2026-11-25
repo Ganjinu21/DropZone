@@ -5,13 +5,13 @@ const summonDamageRatio=.8;
 
 function cctRadioSprite(member){
   ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(summonScale,summonScale);
-  drawMemberGear(ctx,{...member,id:4,x:0,y:0,loadout:run.squad[4].loadout,weapon:run.squad[4].weapon},run.t-(member.lastShot??-Infinity),member.moving);
+  drawMemberGear(ctx,{...member,id:4,x:0,y:0,weapon:run.squad[4].weapon},run.t-(member.lastShot??-Infinity),member.moving);
   ctx.restore();
 }
 function callCobra(member){
   const awakened=skillForm(4)===2;
-  run.cobra={awakened,age:0,duration:awakened?11:squadSkillDefs[4].duration,shot:.5,flip:1,x:member.x,y:member.y-76};
-  member.skillReadyAt=run.t+squadSkillDefs[4].cooldown;
+  run.cobra={awakened,age:0,duration:(awakened?11:squadSkillDefs[4].duration)+(run.talents.cctCap?3:0),shot:.5,flip:1,x:member.x,y:member.y-76};
+  member.skillReadyAt=run.t+skillCooldownDuration(squadSkillDefs[4].cooldown);
   updateHud();return true;
 }
 function fireSupport(source,enemy,damage,awakened=false){
@@ -22,9 +22,9 @@ function fireSupport(source,enemy,damage,awakened=false){
 function initializeRadioTeam(){
   const chief=run.squad[4];
   if(!chief?.deployed || run.radioTeam)return;
-  const max=Math.round(30*(1+.3*run.up[vitality]));
+  const baseMax=Math.round(30*(1+run.talents.hpBonus)),max=Math.round(baseMax*(1+.3*run.up[vitality]));
   run.radioTeam=[-1,1].map(side=>({
-    side,x:chief.x,y:chief.y,hp:max,max,baseMax:30,gear:chief.gear,gait:0,flip:1,shoot:0,cool:1,
+    side,x:chief.x,y:chief.y,hp:max,max,baseMax,gear:chief.gear,gait:0,flip:1,shoot:0,cool:1,
     grace:1,floor:run.floor,patrolTime:0,moving:false
   }));
 }
@@ -80,7 +80,7 @@ function updateRadioSupport(dt){
     ally.shoot-=dt;ally.cool-=dt;ally.grace-=dt;
     if(!enemy)continue;
     if(ally.grace<=0 && dist(enemy,ally)<18){
-      if(!evadeHit(ally))ally.hp-=enemy.contactDamage||8;
+      if(!evadeHit(ally))ally.hp-=(enemy.contactDamage||8)*(1-run.talents.reduction);
       ally.grace=.75;
       if(ally.hp<=0){ally.hp=0;ally.downFloor=run.floor;ally.reviveTime=0;ally.respawn=6;continue}
     }
@@ -95,7 +95,7 @@ function updateRadioSupport(dt){
       const source={x:x+barrel.x*summonScale,y:y+barrel.y*summonScale};
       const damage=basicHitDamage(chief,basicWeaponProfile(chief,chief.id===run.lead));
       fireSupport(source,enemy,damage*summonDamageRatio);
-      ally.shoot=.16;ally.lastShot=run.t;ally.cool=1.25;
+      ally.shoot=.16;ally.lastShot=run.t;ally.cool=1.25/(1+run.talents.fireRateBonus);
     }
   }
   const craft=run.cobra;

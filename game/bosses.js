@@ -19,7 +19,7 @@ function tickBossAttack(dt, nav) {
     boss.pattern={floor:run.floor,stage:run.stage,cool:1.2,marks:[],pending:0,nextShell:0};
     boss.charging=false;
   }
-  const pattern=boss.pattern, cfg=bossPatterns[run.stage-1];
+  const pattern=boss.pattern, cfg=bossPatterns[stageRules().bossClass-1];
   if (!cfg) return;
   const leader=run.squad[run.lead];
   if (!leader || leader.hp<=0) return;
@@ -107,7 +107,7 @@ function tickBossAttack(dt, nav) {
 function drawBossWarnings(ctx) {
   const boss=run.boss, pattern=boss?.pattern;
   if (!pattern || boss.hp<=0 || pattern.floor!==run.floor || pattern.stage!==run.stage || !run.enemies.includes(boss)) return;
-  const cfg=bossPatterns[pattern.stage-1];
+  const cfg=bossPatterns[stages[pattern.stage-1].bossClass-1];
   ctx.save();
   for (const mark of pattern.marks) {
     const progress=clamp(mark.age/cfg.windup,0,1);

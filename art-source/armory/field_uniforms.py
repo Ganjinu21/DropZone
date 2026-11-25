@@ -5,7 +5,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 from locomotion import CELL, stride_sheet
 import specialists
-from field_headgear import publish_base_and_helmets
+from field_headgear import PATCH, publish_base_and_helmets
 
 ROLES = ('bulk', 'raven', 'lynx', 'hammer', 'cct')
 EDGE = '#211c20'
@@ -265,12 +265,34 @@ def separate_arms(dressed, template):
     return body,arms
 
 
+def cct_field_helmet(body):
+    """Remove the detachable four-lens assembly while retaining the radio, mask and fabric helmet."""
+    pen=ImageDraw.Draw(body)
+    pen.polygon([(67,0),(101,0),(101,28),(86,28),(81,25),(70,25),(67,21)],fill=(0,0,0,0))
+    pen.polygon([(63,14),(68,12),(75,12),(81,14),(85,17),(87,21),(88,24),
+                 (84,26),(78,24),(71,24),(66,26),(63,24)],fill='#312820')
+    pen.polygon([(63,15),(68,14),(75,14),(80,16),(84,19),(85,21),
+                 (79,21),(73,20),(67,22),(63,23)],fill='#ae8757')
+    pen.polygon([(64,15),(69,14),(75,14),(78,16),(72,16),(68,18),(64,18)],fill='#d6af79')
+    pen.polygon([(76,16),(80,17),(82,19),(76,18),(73,19),(71,18)],fill='#c29d6a')
+    seam(pen,[(72,22),(78,22),(84,23),(86,24)],'#6c523a')
+    pen.rectangle((50,23,61,29),fill='#57492f')
+    for y,row in enumerate(PATCH,24):
+        for x,pixel in enumerate(row,51):
+            if pixel=='#': pen.point((x,y),fill='#e3cb94')
+
+
 def publish(out):
     out=Path(out)
     bodies=Image.new('RGBA',(len(ROLES)*CELL[0],CELL[1]))
     arms=Image.new('RGBA',bodies.size)
-    starters=publish_base_and_helmets(out,[uniform(role) for role in ROLES])
-    for i,(role,dressed) in enumerate(zip(ROLES,starters)):
+    uniforms=[uniform(role) for role in ROLES]
+    publish_base_and_helmets(out,uniforms)
+    for i,(role,dressed) in enumerate(zip(ROLES,uniforms)):
+        if role=='cct':
+            cct_field_helmet(dressed)
+        portrait=dressed.crop((27,0,103,76)).resize((112,112),Image.Resampling.NEAREST)
+        portrait.save(out/'portraits'/(role+'-field.png'),optimize=True)
         body,hands=separate_arms(dressed,'cct' if role in ('cct','lynx') else 'hammer')
         bodies.paste(body,(i*CELL[0],0))
         arms.paste(hands,(i*CELL[0],0))
