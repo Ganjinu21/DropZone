@@ -34,6 +34,7 @@ const {chromium} = require('playwright');
         roster() { return run.squad.filter(member => member.deployed).map(member => member.id); },
         equipBase() {
           const member=run.squad[run.lead];
+          run.talents[skillRoutes[member.id]+'Skill']=true;
           member.weapon=gearByKey.get(weaponFamilies[run.lead]+'-3');
           member.loadout={...member.loadout,weapon:member.weapon.key};
           updateHud();
@@ -150,7 +151,7 @@ const {chromium} = require('playwright');
       }
     }
     await page.evaluate(() => { skillUI.setup(); shoot(run.squad[3]); });
-    assert.deepEqual(await page.evaluate(() => skillUI.sounds),['lob']);
+    assert.deepEqual(await page.evaluate(() => skillUI.sounds),['rocket-launch']);
     await party.nth(1).tap();
     const impact = await page.evaluate(() => {
       skillUI.sounds.length=0;
@@ -172,7 +173,7 @@ const {chromium} = require('playwright');
     await page.keyboard.press('Space');
     assert.equal(await page.evaluate(() => run.activeSkill?.id),2);
     const crossing = await page.evaluate(() => {
-      Object.assign(run,TransitKit.stairPoint(SURFACE.exits[0],TransitKit.stairLength*.61));
+      Object.assign(run,TransitKit.stairPoint(cityMaps.surface.exits[0],TransitKit.stairLength*.61));
       update(1/60);
       return {floor:run.floor,cast:run.activeSkill,cooldown:squadSkillCooldown(2)};
     });

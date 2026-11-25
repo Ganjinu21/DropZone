@@ -48,7 +48,7 @@ const gameDirectory=path.join(__dirname,'../game');
           for(const slot of gearSlots)row[slot]=slot+'-'+variant;
           const op={id,loadout:row},sheet=crewOutfitSheet(op);
           const capBox=[22,0,90,42];
-          check((lensPixels(sheet,capBox)>3)===(tier===4),'field optics '+id+' '+rank);
+          check((lensPixels(sheet,capBox)>3)===(tier===4),'locker optics '+id+' '+rank);
           for(let frame=0;frame<8;frame++){
             const box=[192*(frame+1)+22,0,90,44];
             check((lensPixels(sheet,box)>3)===(tier===4),'walking optics '+id+' '+rank+' frame '+frame);
@@ -110,26 +110,28 @@ const gameDirectory=path.join(__dirname,'../game');
     await page.locator('#prep-save').click();
     await page.locator('#start').click();
     await page.locator('#hud').waitFor();
-    assert.match(await page.locator('#party [data-i="4"] img').getAttribute('src'),/cct-S-plus\.png$/);
+    const radioPortrait=await page.evaluate(()=>fieldPortrait(4));
+    assert.equal(await page.locator('#party [data-i="4"] img').getAttribute('src'),radioPortrait);
     const support=await page.evaluate(()=>{
       initializeRadioTeam();
-      const chief=run.squad[4],variants=[];
+      const chief=run.squad[4],frames=[];
       for(const {variant} of rankedTiers){
         chief.loadout={...chief.loadout,helmet:'helmet-'+variant};
-        const sheet=crewOutfitSheet(chief);
-        let count=0;
-        const draw=ctx.drawImage;ctx.drawImage=function(image,...args){
-          if(image===sheet)count++;
-          return draw.call(this,image,...args);
-        };
-        try{for(const ally of run.radioTeam)cctRadioSprite(ally)}finally{ctx.drawImage=draw}
-        variants.push(count>=2);
+        ctx.save();ctx.setTransform(1,0,0,1,0,0);
+        ctx.fillStyle='#35433d';ctx.fillRect(0,0,140,90);
+        for(const [index,ally] of run.radioTeam.entries()){
+          cctRadioSprite({...ally,x:35+index*65,y:62,flip:index?-1:1});
+        }
+        const frame=document.createElement('canvas');frame.width=140;frame.height=90;
+        frame.getContext('2d').drawImage(cv,0,0,140,90,0,0,140,90);
+        ctx.restore();
+        frames.push(frame.toDataURL());
       }
       openUpgrade([8,0,6]);
-      return variants;
+      return {allies:run.radioTeam.length,unique:new Set(frames).size};
     });
-    assert.deepEqual(support,[true,true,true,true,true]);
-    assert.match(await page.locator('#cards [data-operator="4"] .who img').getAttribute('src'),/cct-S-plus\.png$/);
+    assert.deepEqual(support,{allies:2,unique:1});
+    assert.equal(await page.locator('#cards [data-operator="4"] .who img').getAttribute('src'),radioPortrait);
     assert.deepEqual(errors,[]);
     if(process.env.PREVIEW_DIR){
       fs.mkdirSync(process.env.PREVIEW_DIR,{recursive:true});
@@ -137,6 +139,6 @@ const gameDirectory=path.join(__dirname,'../game');
         fs.writeFileSync(path.join(process.env.PREVIEW_DIR,file),Buffer.from(rows[key],'base64'));
       }
     }
-    console.log('All 25 items render distinctly on all five operators. Only S+ has optics on native heads, eight walking frames and portraits. Live roster, HUD, augment and CCT support rigs passed.');
+    console.log('All 25 locker items and five worn portraits follow equipped ranks. Combat HUD and augments use class portraits, and both CCT support sprites retain the same field appearance across all five helmet ranks.');
   }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

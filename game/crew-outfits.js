@@ -7,6 +7,7 @@ const radioVest={vest:[34,39,48,43],cloth:[34,45,45,39,54,42,59,48,75,47,82,52,8
 const ravenVest={vest:[49,28,30,32],cloth:[60,29,66,33,72,36,77,43,72,49,66,56,55,56,52,52,58,48,55,43,57,37]};
 const crewFits=[assaultVest,ravenVest,radioVest,assaultVest,radioVest];
 const portraitRoles=['bulk','raven','lynx','hammer','cct'];
+function fieldPortrait(id){return wornPortrait(id,run?.squad[id]?.loadout)}
 function wornPortrait(id,row){
   const rank=gearByKey.get(row?.helmet)?.rank??'C';
   if(id===1)return 'art/armory/raven-cels/portrait-'+rank.replace('+','-plus')+'.png';

@@ -69,6 +69,8 @@
     savedSquad = [id,...names.map((_,i)=>i).filter(i=>i!==id).slice(0,2)];
     start();
     const lead = run.squad[id];
+    // Preview the selected operator's skill without changing the saved talent tree.
+    run.talents[skillRoutes[id]+'Skill']=true;
     const weapon = equipmentCatalog.find(item=>item.family===weaponFamilies[id] && item.rank===settings.rank);
     const loadout = savedEquipment.map((row,index)=>index===id ? {...row,weapon:weapon.key} : row);
     Object.assign(lead,{weapon,loadout:loadout[id],gear:gearStats(id,loadout)});
@@ -162,6 +164,6 @@
       if (mode==='play') original.update(1/60);
       render();
     },
-    status:()=>({mode, paused, time:run.t, effects:run.effects.length, enemies:run.enemies.length})
+    status:()=>({mode, paused, time:run.t, effects:run.effects.length, rounds:run.marks.length, enemies:run.enemies.length})
   };
 })();

@@ -1,23 +1,35 @@
 'use strict';
 
-// Each wave has a steady trickle and one concentrated attack from a shared bearing.
+// Campaign order follows the Seoul location atlas. Boss classes reuse the three animated rigs.
 const stages = [
-  {name:'을지로 봉쇄선', bossName:'철갑 돌격대장', bossHp:420, bossSpeed:47, bossContact:14,
-   hpScale:1, speedBonus:0, damageScale:1, cap:48, waves:[
-     {seconds:24, interval:1.35, rush:10, runners:.12, heavies:0},
-     {seconds:26, interval:1.16, rush:14, runners:.22, heavies:.04},
-     {seconds:28, interval:1.05, rush:18, runners:.25, heavies:.08}]},
-  {name:'환승로 범람', bossName:'공진 파쇄기', bossHp:480, bossSpeed:38, bossContact:16,
-   hpScale:1.12, speedBonus:5, damageScale:1.1, cap:84, waves:[
-     {seconds:26, interval:.64, rush:20, runners:.35, heavies:.04},
-     {seconds:28, interval:.55, rush:26, runners:.4, heavies:.06},
-     {seconds:30, interval:.48, rush:32, runners:.43, heavies:.09}]},
-  {name:'종점 포격지대', bossName:'종점 포격지휘관', bossHp:1200, bossSpeed:34, bossContact:19,
-   hpScale:1.3, speedBonus:3, damageScale:1.2, cap:56, waves:[
-     {seconds:24, interval:1, rush:12, runners:.15, heavies:.12},
-     {seconds:26, interval:.88, rush:15, runners:.18, heavies:.15},
-     {seconds:28, interval:.78, rush:18, runners:.2, heavies:.18}]}
-];
+  ['을지로3가 인쇄골목','철갑 돌격대장',1], ['종로 보신각','공진 파쇄기',2],
+  ['청계천 광통교','수로 포격수',3], ['종로5가 광장시장','시장 돌격대장',1],
+  ['성수대교 봉쇄선','교량 파쇄기',2], ['남산 서울타워','전망대 포격수',3],
+  ['강남대로 사거리','광장 돌격대장',1], ['반포대교 고립구간','교두보 파쇄기',2],
+  ['잠실야구장','구장 포격수',3], ['광화문광장','광화문 포격지휘관',3]
+].map(([name,bossName,bossClass],i)=>{
+  const finale=i===9;
+  return {name,bossName,bossClass,bossHp:finale?1650:280+i*90,bossSpeed:34+i,
+    bossContact:11+i,hpScale:.88+i*.055,speedBonus:i*.65,damageScale:.82+i*.035,
+    cap:64+4*i,waves:Array.from({length:3},(_,w)=>({
+      seconds:115,interval:.88-i*.014-w*.035,rush:16+i+w*3,
+      runners:.14+i*.012+w*.03,heavies:.018+i*.004+w*.010
+    }))};
+});
+function rollSeoulLight(){
+  const roll=Math.random();
+  return roll<.50?'overcast':roll<.92?'sunset':'day';
+}
+let selectedStartStage=1, sessionClearMask=0;
+function highestPlayableStage(){
+  if(developerMode)return stages.length;
+  let cleared=sessionClearMask;
+  for(const mask of Object.values(armory.bossClaims))cleared|=mask;
+  let number=1;
+  while(number<stages.length && (cleared & (1<<(number-1))))number++;
+  return number;
+}
+
 function stageRules() { return stages[run.stage-1]; }
 function waveRules() { return stageRules().waves[run.wave-1]; }
 function beginWave(number) {
@@ -29,25 +41,6 @@ function beginWave(number) {
 }
 function announceEncounter(kind,title,detail,seconds) {
   run.encounterAlert={kind,title,detail,until:run.t+seconds};
-}
-function advanceStage() {
-  if(run.stage===stages.length){end(true);return;}
-  if(!deployedBunker())cancelSquadSkill();
-  // Remove stragglers and rounds from both floors. Earned XP and equipment carry over.
-  for(const state of [run,run.floors.surface,run.floors.metro]){
-    state.enemies.length=0;
-    state.marks.length=0;
-    for(let i=state.effects.length-1;i>=0;i--) {
-      if(state.effects[i].skillFx==='shellArc') state.effects.splice(i,1);
-    }
-  }
-  run.stage++;
-  run.boss=null;
-  run.bossPhase=false;
-  run.mark=null;
-  beginWave(1);
-  announceEncounter('stage',stageRules().name,'스테이지 '+run.stage+' 진입',2);
-  updateHud();
 }
 function beginBossFight() {
   // Escort survivors on both floors stay in stage 2. Retreating zombies
@@ -66,7 +59,7 @@ function beginBossFight() {
 }
 function updateEncounter(dt) {
   if(run.bossPhase){
-    if(run.boss && run.boss.hp<=0){advanceStage();return;}
+    if(run.boss && run.boss.hp<=0){end(true);return;}
     if(!run.boss){
       run.bossArrival=Math.max(0,(run.bossArrival || 0)-dt);
       if(run.bossArrival>0)return;
@@ -80,11 +73,11 @@ function updateEncounter(dt) {
   if(!run.bigWave && run.remaining<=8){
     run.bigWave=true;
     run.rushLeft=rules.rush;
-    run.rushAngle=Math.random()*TAU;
+    run.rushAngle=run.floor==='surface'&&seoulLayouts[run.stage-1].axis?(run.wave%2?Math.PI*.5:Math.PI*1.5):Math.random()*TAU;
     run.rushTimer=0;
     const bearings=['동','남동','남','남서','서','북서','북','북동'];
     const direction=bearings[Math.round(run.rushAngle*8/TAU)%8];
-    announceEncounter('rush','빅웨이브 '+run.wave+'/3',direction+'쪽에서 감염체 '+rules.rush+'마리 접근',2);
+    announceEncounter('rush','빅웨이브 '+run.wave+'/'+stageRules().waves.length,direction+'쪽에서 감염체 '+rules.rush+'마리 접근',2);
     tone(196,.18,.035,'triangle',0,130);
     updateHud();
   }

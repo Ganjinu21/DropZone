@@ -2,11 +2,30 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
 const {chromium}=require('playwright');
+const rules=require('../game/supply-rules.js');
+const earlyRates=[[60,40],[59,40],[56,43],[53,45],[50,48],[47,50],[44,53],[41,55],[38,58],[35,60],[34,56],[33,52],[32,48],[30,44]];
+
+for(const [index,threshold] of rules.thresholds.entries()){
+  const level=index+1;
+  assert.equal(rules.progress(threshold).level,level);
+  if(threshold)assert.equal(rules.progress(threshold-1).level,level-1);
+  const samples={C:0,B:0,A:0,S:0};
+  for(let ticket=0;ticket<10000;ticket++)samples[rules.rankForRoll(level,(ticket+.5)/10000)]++;
+  assert.deepEqual(samples,rules.odds(level));
+  assert.equal(Object.values(samples).reduce((sum,n)=>sum+n,0),10000);
+  const [expectedC,expectedB]=earlyRates[index]??[20,40];
+  assert.equal(samples.C,expectedC*100);
+  assert.equal(samples.B,expectedB*100);
+  assert.equal(samples.A,10000-samples.C-samples.B-samples.S);
+  assert.equal(samples.S,[1,2,4,8,12,20][level-15]??0);
+}
+assert.equal(rules.progress(740).nextLevelAt,null);
 
 (async()=>{
   const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||undefined});
   try{
-    const page=await browser.newPage({viewport:{width:393,height:852},hasTouch:true,isMobile:true});
+    const context=await browser.newContext({viewport:{width:393,height:852},hasTouch:true,isMobile:true});
+    const page=await context.newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.addInitScript(()=>{window.requestAnimationFrame=()=>0});
@@ -62,7 +81,7 @@ const {chromium}=require('playwright');
       }
       return checks;
     });
-    assert.equal(enhancedHits,50);
+    assert.equal(enhancedHits,75); // Five families, three enhanceable ranks, five levels each.
     const tagged=await page.evaluate(()=>{
       const m=run.squad[1],w=gearByKey.get('smg-3@1');
       m.weapon=w;run.lead=1;magazineReady(m,w);m.ammo=1;
@@ -77,31 +96,78 @@ const {chromium}=require('playwright');
     await page.locator('#shop').tap();await page.locator('#profile-mode').tap();
     await page.locator('#shop:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[developerMode,armory.diamonds,owns('smg-3@1')]),[false,0,false]);
-    const draws=await page.evaluate(async()=>{
-      await awardDiamonds(40*boxPrice);
-      const results=[],original=Math.random;Math.random=()=>.99;
+    await page.evaluate(async()=>{
+      await awardDiamonds(60*boxPrice);
+      const original=Math.random;Math.random=()=>0;
       try{
-        let repeatedGear;
-        for(let i=0;i<40;i++){
-          const {drops}=await openWeaponCrate();
-          if(drops.length!==2 || !drops[0].weapon || drops[1].weapon)throw Error('Expected weapon and gear');
-          repeatedGear??=drops[1].key;
-          if(drops[1].key!==repeatedGear)throw Error('Owned equipment removed from drop pool');
-          results.push(drops[0].rank);
+        const shieldsBefore=armory.counts['shield-0'],pistolsBefore=armory.counts['pistol-0'];
+        for(const [kind,total] of [['weapon',40],['gear',20]]){
+          for(let n=1;n<=total;n++){
+            // Include a random A immediately before the fixed guarantee.
+            let pickRank=kind==='weapon' && n===39;
+            Math.random=()=>{if(pickRank){pickRank=false;return .9999}return 0};
+            const {drops,guaranteed,level}=await openSupplyCrate(kind);
+            if(drops.length!==1 || drops[0].weapon!==(kind==='weapon'))throw Error('Wrong supply pool');
+            if(guaranteed!==(n%20===0) || drops[0].rank!==(guaranteed||n===39?'A':'C'))throw Error('Wrong guarantee');
+            if(level!==(n<=20?1:2))throw Error('Level applied to the wrong opening');
+          }
+          if(kind==='weapon' && crateProgress('gear').count!==0)throw Error('Shared box progress');
         }
-        if(armory.counts[repeatedGear]!==40)throw Error('Duplicate equipment was discarded');
-        const before=armory.boxes;
-        const last=await Promise.all([openWeaponCrate(),openWeaponCrate()]);
-        if(last.some(r=>r.drops)||armory.boxes!==before||armory.diamonds!==0)throw Error('Unpaid box');
+        if(armory.counts['pistol-0']!==pistolsBefore+37 || armory.counts['shield-0']!==shieldsBefore+19){
+          throw Error('Duplicate rewards were discarded');
+        }
+        const before=JSON.stringify(armory);
+        const last=await Promise.all([openSupplyCrate('weapon'),openSupplyCrate('gear')]);
+        if(last.some(r=>r.drops) || JSON.stringify(armory)!==before)throw Error('Unpaid box');
         await awardDiamonds(boxPrice);
-        const parallel=await Promise.all([openWeaponCrate(),openWeaponCrate()]);
+        const parallel=await Promise.all([openSupplyCrate('weapon'),openSupplyCrate('gear')]);
         if(parallel.filter(r=>r.drops).length!==1 || armory.diamonds!==0)throw Error('Duplicate purchase');
+        const kept=JSON.stringify(armory);
+        // Seed an old combined save and verify both its earlier guarantee and the fixed twentieth draws.
+        try{
+          localStorage.setItem(armoryKey,JSON.stringify({boxes:21,sinceA:19,diamonds:40*boxPrice,counts:{'pistol-3':7}}));
+          for(const kind of ['weapon','gear']){
+            const first=await openSupplyCrate(kind);
+            if(!first.guaranteed || first.level!==2 || first.drops[0].rank!=='A')throw Error('Lost legacy guarantee');
+            for(let n=23;n<=40;n++){
+              const draw=await openSupplyCrate(kind);
+              if(draw.guaranteed!==(n===40))throw Error('Legacy guarantee displaced fixed draw');
+            }
+          }
+          if(armory.counts['pistol-3']!==9 || armory.diamonds!==2*boxPrice)throw Error('Legacy inventory or currency changed');
+          await changeArmory(s=>{s.supplyCounts.weapon=418;s.diamonds=3*boxPrice});
+          Math.random=()=>.99999;
+          const draws=[];
+          for(let i=0;i<3;i++){const {drops,level}=await openSupplyCrate('weapon');draws.push([drops[0].rank,level])}
+          if(JSON.stringify(draws)!==JSON.stringify([['A',14],['A',14],['S',15]]))throw Error('S unlock boundary');
+          await changeArmory(s=>{s.supplyCounts={weapon:739,gear:739};s.diamonds=4*boxPrice});
+          for(const kind of ['weapon','gear']){
+            const fixed=await openSupplyCrate(kind),next=await openSupplyCrate(kind);
+            if(fixed.level!==20 || !fixed.guaranteed || fixed.drops[0].rank!=='A' ||
+               next.guaranteed || next.drops[0].rank!=='S')throw Error('Level 20 fixed A override in '+kind);
+          }
+        }finally{localStorage.setItem(armoryKey,kept);await changeArmory(()=>{})}
       }finally{Math.random=original}
-      return results;
     });
-    assert.deepEqual(draws.slice(0,3),['C','C','B']);
-    assert.deepEqual(draws.flatMap((rank,i)=>rank==='A'?[i+1]:[]),[20,40]);
-    assert.ok(draws.every(rank=>['C','B','A'].includes(rank)));
+
+    // Two tabs share the balance and use the same Web Lock for both kinds.
+    const other=await page.context().newPage();
+    try{
+      await other.goto(page.url());
+      await other.waitForFunction(()=>typeof openSupplyCrate==='function');
+      const before=await page.evaluate(async()=>{
+        await awardDiamonds(boxPrice);
+        return armory.supplyCounts.weapon+armory.supplyCounts.gear;
+      });
+      const attempts=await Promise.all([
+        page.evaluate(()=>openSupplyCrate('weapon')),other.evaluate(()=>openSupplyCrate('gear'))
+      ]);
+      assert.equal(attempts.filter(r=>r.drops).length,1);
+      assert.deepEqual(await page.evaluate(()=>{
+        const saved=readLocal(armoryKey);
+        return [saved.diamonds,saved.supplyCounts.weapon+saved.supplyCounts.gear];
+      }),[0,before+1]);
+    }finally{await other.close()}
 
     const result=await page.evaluate(async()=>{
       const base='ar-3',makeS='ar-5',apex='ar-6';
@@ -128,6 +194,6 @@ const {chromium}=require('playwright');
     await page.locator('#profile-mode').tap();await page.locator('#select-team:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[developerMode,armory.diamonds,armory.counts['smg-3@1'],savedEquipment[1].weapon]),[true,3000,1,'smg-3@1']);
     assert.deepEqual(errors,[]);
-    console.log('25 magazines, alternating hands, saved upgraded loadout, isolated profiles, random gear, 20th-box guarantees, concurrent spending and 144 A → S+ verified.');
+    console.log('25 magazines, saved loadouts, profiles, all 20 loot tables, independent crates, save migration, exact A guarantees, concurrent spending and 144 A → S+ verified.');
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -5,7 +5,7 @@ const developerPreference='dropzone.developer-mode';
 const developerMode=readLocal(developerPreference)!==false;
 const equipmentKey=developerMode?'dropzone.dev.equipment.v2':'dropzone.equipment.v2';
 const armoryKey=developerMode?'dropzone.dev.armory.v1':'dropzone.armory.v1';
-const boxPrice=100,firstBBox=3,aBoxInterval=20;
+const boxPrice=SupplyRules.price;
 const equipmentSlots={weapon:'무기',gloves:'장갑',boots:'신발',helmet:'헬멧',top:'상의',pants:'하의',shield:'전술방패'};
 const weaponFamilies=['pistol','smg','sniper','rocket','ar'];
 const itemFamilies={pistol:'권총',smg:'듀얼 SMG',sniper:'저격소총',rocket:'전술 로켓포',ar:'돌격소총',
@@ -53,7 +53,7 @@ const weaponMagazines={
   rocket:  {rounds:[1,1,2,2,3],seconds:[3.00,2.80,2.70,2.50,2.30]},
   ar:      {rounds:[20,24,28,30,36],seconds:[1.85,1.75,1.65,1.55,1.45]}
 };
-const canEnhance=i=>i?.weapon && (i.rank==='A'||i.rank==='S');
+const canEnhance=i=>i?.weapon && (['B','A','S'].includes(i.rank));
 const levelKey=(base,level)=>level?base+'@'+level:base;
 const gradeLabel=i=>i.level?i.rank+'+'+i.level:i.rank;
 for(const item of equipmentCatalog.filter(i=>i.weapon)){
@@ -62,7 +62,7 @@ for(const item of equipmentCatalog.filter(i=>i.weapon)){
   if(!canEnhance(item))continue;
   for(let level=1;level<=5;level++){
     const key=levelKey(item.key,level);
-    gearByKey.set(key,{...item,key,level,power:item.power+level*(item.rank==='A'?35:80)});
+    gearByKey.set(key,{...item,key,level,power:item.power+level*(item.rank==='B'?15:item.rank==='A'?35:80)});
   }
 }
 function fusionRecipe(item){
@@ -88,6 +88,32 @@ function canEquip(id,slot,item){
 function readLocal(key){try{return JSON.parse(localStorage.getItem(key))}catch{return null}}
 const legacyGear=developerMode?null:readLocal('dropzone.equipment.v1');
 const safeCount=n=>Number.isSafeInteger(n)&&n>0?n:0;
+function restoredSupply(raw){
+  const oldCount=safeCount(raw?.boxes);
+  const oldRemaining=Math.max(1,SupplyRules.interval-safeCount(raw?.sinceA));
+  const supplyCounts={},legacyGuaranteedAt={};
+  for(const kind of ['weapon','gear']){
+    const migrated=Object.hasOwn(raw?.supplyCounts??{},kind);
+    const count=migrated?safeCount(raw.supplyCounts[kind]):oldCount;
+    supplyCounts[kind]=count;
+    // A combined box used to award both items. Honor an earlier pending pity once per pool.
+    const due=migrated?safeCount(raw.legacyGuaranteedAt?.[kind]):oldCount+oldRemaining;
+    if(Number.isSafeInteger(due) && due>count && due-count<SupplyRules.progress(count).remainingToA){
+      legacyGuaranteedAt[kind]=due;
+    }
+  }
+  return {supplyCounts,legacyGuaranteedAt};
+}
+function restoredBossClaims(raw){
+  const claims={};
+  // One bit per stage. Receipts survive checkpoint retries and concurrent launches.
+  if(raw && typeof raw==='object'){
+    for(const [key,mask] of Object.entries(raw)){
+      if(key.startsWith('run:') && key.length>4 && key.length<=164 && Number.isInteger(mask) && mask>0 && mask<2**stages.length)claims[key]=mask;
+    }
+  }
+  return claims;
+}
 function restoredArmory(raw){
   const counts={};
   if(raw?.counts && typeof raw.counts==='object'){
@@ -109,8 +135,9 @@ function restoredArmory(raw){
     }
   }
   for(const key of starterKeys)counts[key]=Math.max(1,counts[key]||0);
-  return {diamonds:!raw && developerMode?3000:safeCount(raw?.diamonds),counts,
-    boxes:safeCount(raw?.boxes),sinceA:safeCount(raw?.sinceA)};
+  const bossTokens=developerMode && !Object.hasOwn(raw??{},'bossTokens')?8:safeCount(raw?.bossTokens);
+  return {diamonds:!raw && developerMode?3000:safeCount(raw?.diamonds),counts,...restoredSupply(raw),
+    bossTokens,talentRanks:TalentTree.restoreRanks(raw?.talentRanks),bossClaims:restoredBossClaims(raw?.bossClaims)};
 }
 let armory=restoredArmory(readLocal(armoryKey)),sessionStorageOnly=false;
 function owns(key){
@@ -156,32 +183,58 @@ function changeArmory(edit){
     throw error;
   });
 }
-function awardDiamonds(value){return changeArmory(state=>{state.diamonds+=value})}
-function drawsToGuaranteedA(state){
-  // Also honor the carried-over streak in profiles saved just before the old 21st-box guarantee.
-  return Math.max(1,Math.min(aBoxInterval-state.boxes%aBoxInterval,aBoxInterval-state.sinceA));
+function awardDiamonds(value){
+  return changeArmory(state=>{state.diamonds=Math.min(Number.MAX_SAFE_INTEGER,state.diamonds+safeCount(value))});
 }
-function crateRank(state){
-  const draw=state.boxes+1;
-  if(drawsToGuaranteedA(state)===1)return 'A';
-  if(draw<firstBBox)return 'C';
-  if(draw===firstBBox)return 'B';
-  if(draw<aBoxInterval)return Math.random()<.30?'B':'C';
-  const roll=Math.random();
-  if(roll<.08)return 'A';
-  return roll<.38?'B':'C';
+async function purchaseTalent(id,expectedRank){
+  const result=await changeArmory(state=>{
+    const status=TalentTree.status(id,state);
+    if(!status.canBuy)return {ok:false,message:status.reason};
+    if(status.rank!==expectedRank)return {ok:false,message:'연구 단계가 변경되었습니다.'};
+    state[status.currency]-=status.cost;
+    state.talentRanks[id]=status.rank+1;
+    return {ok:true,message:TalentTree.byId.get(id).name+' '+(status.rank+1)+'단계 연구 완료'};
+  });
+  dispatchEvent(new Event('talents-changed'));
+  return result;
 }
-const crateGear=equipmentCatalog.filter(item=>!item.weapon && item.rank!=='S+');
-function randomItem(items){return items[Math.floor(Math.random()*items.length)]}
-function openWeaponCrate(){
+async function claimBossToken(runId,stage){
+  if(typeof runId!=='string' || !runId.length || runId.length>160 ||
+     !Number.isInteger(stage) || stage<1 || stage>stages.length)return {awarded:false};
+  const result=await changeArmory(state=>{
+    const key='run:'+runId,bit=1<<(stage-1),previous=state.bossClaims[key]||0;
+    if(previous&bit)return {awarded:false};
+    state.bossClaims[key]=previous|bit;
+    state.bossTokens=Math.min(Number.MAX_SAFE_INTEGER,state.bossTokens+1);
+    state.diamonds=Math.min(Number.MAX_SAFE_INTEGER,state.diamonds+5);
+    return {awarded:true};
+  });
+  if(result.awarded)dispatchEvent(new Event('talents-changed'));
+  return result;
+}
+function crateProgress(kind,state=armory){
+  const info=SupplyRules.progress(state.supplyCounts[kind]);
+  const early=state.legacyGuaranteedAt?.[kind];
+  if(early>info.count)info.remainingToA=Math.min(info.remainingToA,early-info.count);
+  return info;
+}
+function openSupplyCrate(kind){
   return changeArmory(state=>{
+    if(kind!=='weapon' && kind!=='gear')return {message:'보급상자 종류를 확인해 주세요.'};
     if(state.diamonds<boxPrice)return {message:'다이아가 부족합니다. 적을 처치해 모으세요.'};
-    const rank=crateRank(state);
-    const weapon=randomItem(equipmentCatalog.filter(item=>item.weapon && item.rank===rank));
-    const drops=[weapon,randomItem(crateGear)];
-    state.diamonds-=boxPrice;state.boxes++;state.sinceA=rank==='A'?0:state.sinceA+1;
-    for(const i of drops)state.counts[i.key]=(state.counts[i.key]||0)+1;
-    return {drops};
+    const {count,level,remainingToA}=crateProgress(kind,state);
+    if(count===Number.MAX_SAFE_INTEGER)return {message:'보급상자 개봉 횟수가 한도에 도달했습니다.'};
+    const guaranteed=remainingToA===1;
+    const rank=guaranteed?'A':SupplyRules.rankForRoll(level,Math.random());
+    const pool=equipmentCatalog.filter(item=>item.weapon===(kind==='weapon') && item.rank===rank);
+    const item=pool[Math.floor(Math.random()*pool.length)];
+    const owned=state.counts[item.key]||0;
+    if(owned===Number.MAX_SAFE_INTEGER)return {message:'해당 아이템의 보유 수량이 한도에 도달했습니다.'};
+    state.diamonds-=boxPrice;
+    state.supplyCounts[kind]=count+1;
+    state.counts[item.key]=owned+1;
+    if(guaranteed)delete state.legacyGuaranteedAt[kind];
+    return {drops:[item],guaranteed,level};
   });
 }
 function readyToFuse(state,item,recipe){
@@ -218,6 +271,8 @@ addEventListener('storage',event=>{
   if(event.key===armoryKey){
     armory=restoredArmory(readLocal(armoryKey));savedEquipment=normalizedEquipment(readLocal(equipmentKey)??savedEquipment);
     updateDiamondDisplay();
+    dispatchEvent(new Event('talents-changed'));
+    if(mode==='home' && lobbyReady)refreshContinueMenu();
     if(!$('prep-screen').hidden){draftEquipment=normalizedEquipment(draftEquipment);paintPrep()}
   }
   if(event.key===equipmentKey)savedEquipment=normalizedEquipment(readLocal(equipmentKey));

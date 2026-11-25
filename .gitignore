@@ -49,3 +49,5 @@ node_modules/
 !/work/check-continue.cjs
 !/work/check-checkpoint-migration.cjs
 !/work/check-awakened-support.cjs
+!/work/test-combat-lab.cjs
+!/work/preview-operator-cels.cjs

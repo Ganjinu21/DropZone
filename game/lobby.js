@@ -3,7 +3,7 @@
 const squadStorageKey=developerMode?'dropzone.dev.squad.v1':'dropzone.squad.v1';
 const squadLimit=formationSlots.length;
 let detailKey=null;
-let savedSquad=[],draftSquad=[],pickerSquad=[],draftEquipment,editId=0,editSlot='weapon',menuReturnTarget;
+let savedSquad=[],draftSquad=[],pickerSquad=[],draftEquipment,editId=0,editSlot='weapon';
 function validSquad(ids) {
   return Array.isArray(ids) && ids.length===squadLimit && new Set(ids).size===squadLimit &&
     ids.every(id=>Number.isInteger(id) && id>=0 && id<names.length);
@@ -13,8 +13,35 @@ try {
   if(validSquad(ids))savedSquad=ids;
 } catch {}
 function getSelectedSquad(){return validSquad(savedSquad)?savedSquad.slice():[0,1,2]}
+let lobbyReady=false;
+function chooseStartStage(number) {
+  if (!Number.isInteger(number) || number < 1 || number > stages.length) return;
+  selectedStartStage = number;
+  Battlefield.prepare(number);
+  $('mission-location').textContent=stages[number-1].name;
+  const rules = stages[number - 1];
+  $('stage-preview-art').src = 'art/stages/stage-' + number + '.webp';
+  $('stage-preview-name').textContent = rules.name;
+  $('stage-brief').textContent = (seoulLayouts[number-1].axis?'특별 작전 · ':'')+'약 6분 · 웨이브 ' + rules.waves.length + ' · 보스 ' + rules.bossName;
+  $('stage-label').textContent = '스테이지 ' + number;
+  $('stage-label').setAttribute('aria-label', '스테이지 ' + number + ', ' + rules.name);
+  $('stage-prev').disabled = number === 1;
+  $('stage-next').disabled = number === stages.length;
+  if(lobbyReady)refreshContinueMenu();
+}
+
+$('stage-prev').onclick = () => chooseStartStage(selectedStartStage - 1);
+$('stage-next').onclick = () => chooseStartStage(selectedStartStage + 1);
+document.querySelector('.stage-switch').addEventListener('keydown', event => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  chooseStartStage(selectedStartStage + (event.key === 'ArrowLeft' ? -1 : 1));
+  $('stage-label').focus({preventScroll: true});
+});
+
 function setLobbyReady(){
-  readBattleCheckpoint();refreshContinueMenu();$('start').disabled=false;$('select-team').disabled=false;$('shop').disabled=false;updateDiamondDisplay();
+  lobbyReady=true;chooseStartStage(developerMode?1:highestPlayableStage());
+  readBattleCheckpoint();refreshContinueMenu();$('select-team').disabled=false;$('shop').disabled=false;updateDiamondDisplay();
 }
 const prepRoles=roles;
 const crewLabel=id=>id===4?'CCT-공중통제사':names[id]+' - '+roles[id];
@@ -69,25 +96,36 @@ function paintPrep(){
   paintInventory();
 }
 function openPreparation(){
-  if(mode!=='home' || $('start').disabled)return;
-  menuReturnTarget=document.activeElement===$('select-team')?$('select-team'):$('start');
-  draftSquad=validSquad(savedSquad)?savedSquad.slice():[0,1,2];
-  draftEquipment=normalizedEquipment(savedEquipment);detailKey=null;editId=draftSquad[0];editSlot='weapon';
-  $('gear-rank').value='';$('main-menu').hidden=true;$('roster-screen').hidden=true;$('prep-screen').hidden=false;
-  paintPrep();$('prep-back').focus({preventScroll:true});
+  if(mode!=='home' || !lobbyReady)return;
+  showLobbyPage(lobbyPages.indexOf($('barracks-page')), {focus:true});
+}
+function renderBarracksPage(){
+  if(!draftEquipment){
+    draftSquad=getSelectedSquad();draftEquipment=normalizedEquipment(savedEquipment);
+    detailKey=null;editId=draftSquad[0];editSlot='weapon';
+    $('gear-rank').value='';$('roster-screen').hidden=true;$('prep-screen').hidden=false;
+  }
+  if($('roster-screen').hidden)paintPrep();
+  else updateSquadSelection();
 }
 function resetLobbyView(){
-  $('prep-screen').hidden=true;$('roster-screen').hidden=true;$('main-menu').hidden=false;
+  draftEquipment=null;detailKey=null;
+  $('prep-screen').hidden=true;$('roster-screen').hidden=true;
+  showLobbyPage(homePageIndex, {immediate:true});
 }
 function closeSquadSelection(){
+  for(const dialog of [$('supply-rates-dialog'),$('diamond-confirm')]){
+    if(dialog.open){dialog.close();return true}
+  }
   if($('replace-run').open){$('replace-run').close();return true}
-  if($('crate-popup').open){$('crate-popup').close();return true}
+  if(lobbyPageIndex>homePageIndex){showLobbyPage(lobbyPageIndex-1,{focus:true});return true}
+  if(lobbyPages[lobbyPageIndex]!==$('barracks-page'))return false;
   if(!$('roster-screen').hidden){
     $('roster-screen').hidden=true;$('prep-screen').hidden=false;paintPrep();$('change-crew').focus();return true;
   }
   if($('prep-screen').hidden)return false;
   if(detailKey){closeGearDetail();return true}
-  resetLobbyView();menuReturnTarget?.focus({preventScroll:true});return true;
+  resetLobbyView();$('select-team').focus({preventScroll:true});return true;
 }
 function savePreparation(){
   if(mode!=='home' || !validSquad(draftSquad))return;
@@ -99,12 +137,13 @@ function savePreparation(){
   resetLobbyView();$('start').focus({preventScroll:true});
 }
 function updateSquadSelection(){
+  const talents=TalentTree.effects(armory.talentRanks);
   for(const card of $('operator-grid').querySelectorAll('[data-pick]')){
     const id=Number(card.dataset.pick),slot=pickerSquad.indexOf(id);
     const portrait=card.querySelector('.pick-portrait img');
     const equipped=wornPortrait(id,draftEquipment[id]);
     if(portrait.getAttribute('src')!==equipped)portrait.src=equipped;
-    const form=weaponSkillForm(gearByKey.get(draftEquipment[id].weapon));
+    const form=trainedSkillForm(gearByKey.get(draftEquipment[id].weapon),id,talents);
     const skill=form?skillDisplayName(id,form):'특수 스킬 잠금';
     card.querySelector('.pick-info > span').textContent=skill;
     const role=slot<0?'대기':slot===0?'선두':(slot+1)+'번';
@@ -151,37 +190,27 @@ $('prep-screen').onclick=e=>{
 $('gear-rank').onchange=$('gear-sort').onchange=paintInventory;
 $('make-leader').onclick=()=>{draftSquad=[editId,...draftSquad.filter(id=>id!==editId)];paintPrep()};
 $('start').onclick=()=>{if(savedBattle)$('replace-run').showModal();else start()};
-$('select-team').onclick=openPreparation;$('change-crew').onclick=openSquadSelection;
+$('change-crew').onclick=openSquadSelection;
 $('roster-back').onclick=closeSquadSelection;
 $('prep-back').onclick=()=>{detailKey=null;closeSquadSelection()};
 $('save-team').onclick=applyPicker;
 $('prep-save').onclick=savePreparation;
 
-function updateDiamondDisplay(){
-  for(const el of document.querySelectorAll('[data-balance]'))el.textContent=armory.diamonds;
-  $('crate-open').textContent='다이아 '+boxPrice+'개로 개봉';
-  $('crate-open').disabled=crateBusy || armory.diamonds<boxPrice;
-  $('profile-mode').disabled=crateBusy;
-  $('profile-mode').setAttribute('aria-pressed',String(developerMode));
-  $('profile-mode').setAttribute('aria-label',developerMode?'일반 진행으로 전환':'개발자 모드로 전환');
-  $('profile-mode').textContent=developerMode?'개발자 모드 · 전체 장비 해금':'일반 모드 · 개발자 모드로 전환';
-  const n=armory.boxes;
-  $('crate-progress').textContent='누적 '+n+'회 · A등급 무기 확정까지 '+drawsToGuaranteedA(armory)+'회';
-}
-let crateBusy=false,fusionBusy=false;
+let fusionBusy=false;
 function paintGearDetail(){
   const item=gearByKey.get(detailKey);
   $('gear-detail').hidden=!item;
   if(!item)return;
   const current=gearByKey.get(draftEquipment[editId][editSlot]),owned=owns(item.key),same=item===current;
-  const form=item.weapon?weaponSkillForm(item):0;
-  const ability=item.weapon?(form?' · '+(form===2?'각성 스킬 ':'특수 스킬 ')+skillDisplayName(editId,form):' · A등급부터 특수 스킬 해금'):'';
+  const talents=TalentTree.effects(armory.talentRanks);
+  const form=item.weapon?trainedSkillForm(item,editId,talents):0;
+  const ability=item.weapon?(form?' · '+(form===2?'각성 스킬 ':'특수 스킬 ')+skillDisplayName(editId,form):' · 스킬트리에서 해금'):'';
   $('item-context').textContent=itemFamilies[item.family]+' · '+itemOwner(item)+ability;
   $('item-tier').className='tier tier-'+item.rank;$('item-tier').textContent=gradeLabel(item);
   $('item-icon').src=itemImage(item);$('item-title').textContent=item.label;
-  $('item-detail').textContent=item.weapon?'1발 피해 '+equipmentDamage(item):gearEffect(editSlot,item);
+  $('item-detail').textContent=item.weapon?'1발 피해 '+equipmentDamage(item):gearEffect(editSlot,item)+' · 전투에는 능력치만 적용';
   const perHand=item.family==='smg';
-  const reload=gearStats(editId,draftEquipment).reload;
+  const reload=gearStats(editId,draftEquipment).reload/(1+talents.reloadBonus);
   $('item-magazine').textContent=item.weapon?'탄창 '+(perHand?(item.capacity/2)+'발 × 2':item.capacity+'발')+' · 재장전 '+Number((item.reload*reload).toFixed(2))+'초':'';
   $('item-compare').textContent=same?'현재 장착 중':'장착 중인 '+gradeLabel(current)+' '+current.label+' · '+gearEffect(editSlot,current);
   const recipe=fusionRecipe(item);
@@ -196,7 +225,14 @@ function paintGearDetail(){
     $('item-fuse').textContent=!ready?'재료 부족':item.level===5?'등급 승급':'합성 강화';
     $('item-fuse').disabled=fusionBusy || !ready;
   }
-  const source=!item.weapon && item.rank==='S+'?(item.family==='shield'?'유료 전용 · 미보유':'개발자 모드에서 사용 가능'):(item.level || (item.weapon && item.tier>=3))?'합성으로 획득':'무기·장비 보급 상자에서 획득';
+  let source = item.weapon ? '무기 보급상자에서 획득' : '장비 보급상자에서 획득';
+  if (item.level || (item.weapon && item.rank === 'S+')) {
+    source = '합성으로 획득';
+  } else if (item.rank === 'S') {
+    source = item.weapon ? '무기 보급상자 Lv.15부터 · 합성 가능' : '장비 보급상자 Lv.15부터';
+  } else if (item.rank === 'S+') {
+    source = item.family === 'shield' ? '유료 전용 · 미보유' : '개발자 모드에서 사용 가능';
+  }
   $('item-action').textContent=same?'장착 중':owned?'교체하기':source;
   $('item-action').disabled=!owned || same || fusionBusy;
 }
@@ -229,7 +265,7 @@ $('item-fuse').onclick=async()=>{
     if(!stored || JSON.stringify(stored)!==JSON.stringify(savedEquipment)){
       try{localStorage.setItem(equipmentKey,JSON.stringify(savedEquipment))}catch{}
     }
-    draftEquipment=normalizedEquipment(follow(draftEquipment));
+    if(draftEquipment)draftEquipment=normalizedEquipment(follow(draftEquipment));
     if(detailKey===input){
       detailKey=result.item.key;
       if($('gear-rank').value && $('gear-rank').value!==result.item.rank)$('gear-rank').value=result.item.rank;
@@ -238,24 +274,6 @@ $('item-fuse').onclick=async()=>{
     fusionBusy=false;if(!$('prep-screen').hidden)paintPrep();
   }
 };
-$('profile-mode').onclick=()=>{
-  if(crateBusy)return;
-  try{localStorage.setItem(developerPreference,JSON.stringify(!developerMode));location.reload()}
-  catch{$('crate-result').textContent='프로필을 저장할 수 없습니다.'}
-};
 for(const dialog of document.querySelectorAll('.armory-popup')){
   dialog.addEventListener('click',e=>{if(e.target.closest('[data-dismiss]')||e.target===dialog && (e.offsetX<0||e.offsetY<0||e.offsetX>dialog.clientWidth||e.offsetY>dialog.clientHeight))dialog.close()});
 }
-$('shop').onclick=()=>{
-  $('crate-result').textContent=armory.diamonds<boxPrice?'필요한 다이아 '+(boxPrice-armory.diamonds)+'개':'';
-  updateDiamondDisplay();$('crate-popup').showModal();
-};
-$('crate-open').onclick=async()=>{
-  if(crateBusy)return;
-  crateBusy=true;updateDiamondDisplay();
-  try {
-    const result=await openWeaponCrate();
-    if(result.drops)$('crate-result').innerHTML=result.drops.map(i=>'<div><img alt="" src="'+itemImage(i)+'"><span><b>'+i.rank+' · '+i.label+'</b><small>'+itemOwner(i)+' · 보유 '+armory.counts[i.key]+'개</small></span></div>').join('');
-    else $('crate-result').textContent=result.message;
-  }finally{crateBusy=false;updateDiamondDisplay()}
-};

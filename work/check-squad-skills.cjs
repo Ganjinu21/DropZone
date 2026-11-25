@@ -22,6 +22,7 @@ const {chromium} = require('playwright');
       const foes=(...cells)=>cells.map(([x,y])=>({x,y,type:0,hp:500,max:500,speed:0,phase:0,hit:0,flip:1}));
       const startAt=(id,enemies,variant=3)=>{
         cancelSquadSkill();
+        run.talents[skillRoutes[id]+'Skill']=true;
         if (run.lead!==id) setLeader(id);
         run.x=1280; run.y=1004;
         for (const m of run.squad) Object.assign(m,{x:run.x,y:run.y,cool:9,hurt:0,flip:1,moving:false});
@@ -44,7 +45,8 @@ const {chromium} = require('playwright');
       window.skillFixture={foes,startAt,simulate};
       const result={};
       result.forms=['-0','-1','-3','-3@5','-5','-5@5','-6'].map(suffix=>
-        weaponSkillForm(gearByKey.get('smg'+suffix)));
+        trainedSkillForm(gearByKey.get('smg'+suffix),1,{ravenSkill:true}));
+      result.locked=trainedSkillForm(gearByKey.get('smg-6'),1,{});
       // Capture the actual flight vector of each directional shot, including empty sectors.
       startAt(0,foes([1370,1004]));
       activateSquadSkill();
@@ -133,8 +135,8 @@ const {chromium} = require('playwright');
       const targets=foes([1380,1004],[1387,1013]);
       startAt(3,targets);
       shoot(run.squad[3]);
-      const shell=run.effects.find(e=>e.skillFx==='shellArc');
-      simulate(.15);
+      const shell=run.marks.find(e=>e.family==='rocket');
+      simulate(.01);
       result.hammer={before:targets[0].hp,travel:shell.duration};
       simulate(.75);
       result.hammer.impact=targets.map(e=>500-e.hp);
@@ -164,20 +166,18 @@ const {chromium} = require('playwright');
       // but cannot hurt the newly active floor or play its originating operator's audio there.
       startAt(3,foes([1380,1004]));
       shoot(run.squad[3]);
-      const old={effects:run.effects,marks:[],enemies:run.enemies,crystals:[],cues:[]};
-      const oldShell=old.effects[0];
-      oldShell.age=oldShell.duration-.01;
-      run.enemies=foes([1380,1004]);run.effects=[];setLeader(1);
+      const old={effects:run.effects,marks:run.marks,enemies:run.enemies,crystals:[],cues:[]};
+      run.enemies=foes([1380,1004]);run.effects=[];run.marks=[];setLeader(1);
       const names=[];
       const play=skillAudio.play;
       skillAudio.play=function(...args){names.push(args);return play.apply(this,args)};
-      try {advanceRounds(.02,old,'surface')} finally {skillAudio.play=play}
+      try {advanceRounds(1,old,'surface')} finally {skillAudio.play=play}
       result.oldFloor={oldHp:old.enemies[0].hp,newHp:run.enemies[0].hp,sounds:names.length};
       mode='qa';
       return result;
     }));
     console.log(JSON.stringify(result));
-    assert.deepEqual(result.forms,[0,0,1,1,1,1,2]);
+    assert.deepEqual(result.forms,[1,1,1,1,1,1,2]);assert.equal(result.locked,0);
     assert.deepEqual(result.charges,{casts:[true,true,true],blocked:true,deadlines:[10,20,30],firstRefill:true});
     assert.deepEqual(result.focus,{charged:true,beams:1,centered:true,damage:7308,decoy:500});
     assert.ok(result.siege.rockets===12 && result.siege.apertures===4 && result.siege.sites>=3 && result.siege.hurt);

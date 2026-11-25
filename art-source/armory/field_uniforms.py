@@ -5,7 +5,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 from locomotion import CELL, stride_sheet
 import specialists
-from field_headgear import publish_base_and_helmets
+from field_headgear import PATCH, publish_base_and_helmets
 
 ROLES = ('bulk', 'raven', 'lynx', 'hammer', 'cct')
 EDGE = '#211c20'
@@ -297,6 +297,8 @@ def publish(out):
     operators[1].paste(raven,(25,6))
     starters=publish_base_and_helmets(out,operators)
     for i,(role,dressed) in enumerate(zip(ROLES,starters)):
+        portrait=dressed.crop((27,0,103,76)).resize((112,112),Image.Resampling.NEAREST)
+        portrait.save(out/'portraits'/(role+'-field.png'),optimize=True)
         body,hands=separate_arms(dressed,'cct' if role in ('cct','lynx') else 'hammer')
         if role=='raven':
             body=dressed.copy()

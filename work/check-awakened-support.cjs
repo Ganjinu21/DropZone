@@ -18,6 +18,7 @@ const launchSquad=require('./select-test-squad.cjs');
     });
     await page.goto(pathToFileURL(path.resolve(__dirname,'../game/index.html')).href);
     await launchSquad(page,[4,0,1]);
+    await page.evaluate(()=>{Object.assign(run.talents,{cctSkill:true,bulkSkill:true,ravenSkill:true});updateHud()});
     assert.equal(await page.locator('#cast-name').innerText(),'A-10 공중지원');
     await page.locator('#cast').tap();
     assert.ok(await page.evaluate(()=>run.cobra.awakened && run.cobra.duration===11 && !run.activeSkill));

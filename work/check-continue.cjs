@@ -53,6 +53,7 @@ function combatSnapshot() {
 
     await page.evaluate(() => {
       Object.assign(run,{t:73.25,level:8,xp:6,need:20,kills:45,stage:2,magnetUntil:75.75});
+      Object.assign(run.talents,{bulkSkill:true,cctSkill:true,rocketSkill:true});
       beginWave(3);beginBossFight();updateEncounter(1.2);
       const boss=run.boss, chief=run.squad[4], bulk=run.squad[0];
       for(const member of [bulk,chief]){

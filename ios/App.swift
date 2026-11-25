@@ -24,6 +24,7 @@ final class GameController: UIViewController {
     override func loadView() {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        config.preferences.isTextInteractionEnabled = false
         let game = WKWebView(frame: .zero, configuration: config)
         game.isOpaque = false
         game.backgroundColor = UIColor(red: 0.07, green: 0.11, blue: 0.14, alpha: 1)

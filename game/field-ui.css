@@ -1,0 +1,296 @@
+/* Shared stamped controls and panel tones for the field HUD, armory and supply shop. */
+:root {
+  --field-base: #1a2527;
+  --field-panel: #263331;
+  --field-ink: #10191b;
+  --field-text: #ebe8d7;
+  --field-muted: #afbcaf;
+  --field-brass: #a28e63;
+  --field-brass-ink: #17211e;
+  --field-edge: #758273;
+  --field-selected: #d6ba82;
+  --field-selected-bg: #353c31;
+  --field-focus: #ebcc8c;
+  --field-disabled-bg: #35413d;
+  --field-disabled-text: #b7c2b4;
+}
+[data-field-control] {
+  --button-face: var(--field-panel);
+  --button-top: #46564a;
+  --button-foot: #1d2927;
+  --button-line: var(--field-edge);
+  --button-ink: var(--field-text);
+}
+[data-field-control="primary"] {
+  --button-face: var(--field-brass);
+  --button-top: #bba477;
+  --button-foot: #81714e;
+  --button-line: #c8b17e;
+  --button-ink: var(--field-brass-ink);
+}
+:is(#home,#hud,#dialog,#upgrade,#replace-run) [data-field-control],
+#main-menu .lobby-controls [data-field-control] {
+  color: var(--button-ink);
+  background: linear-gradient(var(--button-top) 0 1px,var(--button-face) 1px calc(100% - 2px),var(--button-foot) calc(100% - 2px));
+  border: 1px solid var(--button-line);
+  box-shadow: 1px 2px var(--field-ink);
+}
+:is(#home,#hud,#dialog,#upgrade,#replace-run) [data-field-control]:disabled,
+#main-menu .lobby-controls [data-field-control]:disabled {
+  --button-face: var(--field-disabled-bg);
+  --button-foot: var(--field-disabled-bg);
+  --button-top: #414f45;
+  --button-line: #59665b;
+  --button-ink: var(--field-disabled-text);
+  opacity: 1;
+  box-shadow: none;
+}
+:is(#home,#hud,#dialog,#upgrade,#replace-run) [data-field-control]:active:enabled,
+#main-menu .lobby-controls [data-field-control]:active:enabled {
+  background: var(--button-face);
+  box-shadow: inset 1px 2px var(--button-foot);
+  transform: translateY(1px);
+  filter: none;
+}
+:is(#home,#hud,#dialog,#upgrade,#replace-run) :is(button,select):focus-visible {
+  outline: 2px solid var(--field-focus);
+  outline-offset: -3px;
+}
+:is(#home,#dialog,#upgrade,#replace-run) [data-field-control="primary"]:focus-visible {
+  outline-color: #28332c;
+  outline-offset: -4px;
+}
+#main-menu .wallet, #home kbd, #upgrade header small {
+  background: var(--field-base);
+  color: var(--field-text);
+  border-color: #607163;
+}
+#main-menu #game-title span { color: #d7b678; }
+#continue-run { border-left-width: 3px; }
+#replace-run { background: var(--field-panel); border-color: var(--field-edge); color: var(--field-text); }
+#replace-run h2, #home .prep-head h2, #roster-screen h2 { color: var(--field-text); }
+#replace-run p, #summary, #buildstat { color: #c4cec1; }
+
+/* The barracks and its crew picker share the field UI's embedded Galmuri faces. */
+:is(#prep-screen,#roster-screen) :is(button,select,option) { font-family: inherit; }
+:is(#prep-title,#roster-title) {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.25;
+  word-break: keep-all;
+}
+#prep-screen :is(#crew-name,#locker-title), #roster-screen .pick-info strong {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+#prep-screen :is(.prep-nav button,.locker-filters label,.locker-filters select,#item-action),
+#roster-screen :is(#roster-help,#squad-line,.roster-footer button) {
+  font-size: 12px;
+  line-height: 1.5;
+}
+#prep-screen :is(.figure small,.gear-meta,.gear-info small,#locker-owner),
+#roster-screen :is(.pick-mark,.pick-info small,.pick-info > span) {
+  font-size: 11px;
+  line-height: 1.4;
+}
+#prep-screen .gear-info p { line-height: 1.5; }
+@media (min-width: 650px) {
+  :is(#prep-title,#roster-title) { font-size: 26px; }
+}
+
+#prep-screen .gear-slot, #prep-screen .gear-tile,
+#operator-grid .pick-operator, #cards .card, #party .operator {
+  background: var(--field-panel);
+  border-color: #677767;
+  color: var(--field-text);
+  box-shadow: 0 2px var(--field-ink);
+}
+#prep-screen .gear-tile[data-owned="false"] { background: var(--field-base); border-color: #515f54; }
+#prep-screen :is(.gear-slot,.gear-tile)[aria-pressed="true"],
+#operator-grid .pick-operator[aria-pressed="true"],
+#cards .card.active, #party .operator.lead {
+  background: var(--field-selected-bg);
+  border-color: var(--field-selected);
+  box-shadow: inset 0 2px var(--field-selected), 0 2px var(--field-ink);
+}
+#operator-grid .pick-operator[aria-pressed="true"] .pick-mark {
+  color: var(--field-brass-ink); background: var(--field-selected); border-color: #d7c59d;
+}
+#prep-screen .figure[aria-pressed="true"] small,
+#cards .card.active strong, #party .lead small { color: #e4c58e; }
+#prep-screen .figure[aria-pressed="true"] small { border-color: var(--field-selected); }
+#home .gear-info h4 { color: var(--field-text); }
+#gear-detail { background: var(--field-panel); border-color: #8c896d; }
+#gear-detail #item-close { border-top: 0; border-right: 0; }
+#operator-grid .pick-operator:disabled, #party .operator:disabled {
+  background: var(--field-disabled-bg); border-color: #526155; box-shadow: none;
+  color: var(--field-disabled-text); opacity: 1; filter: none;
+}
+#party .operator:disabled img { filter: grayscale(.75) brightness(.8); }
+#party .operator.hurt { border-color: #f6a08a; }
+#prep-screen :is(.gear-slot,.gear-tile):active:enabled,
+#operator-grid .pick-operator:active:enabled, #cards .card:active:enabled, #party .operator:active:enabled {
+  transform: translateY(1px); box-shadow: inset 0 2px var(--field-ink);
+}
+#hud .top, #hud .xp, #hud #stage-panel, #hud #sector, #hud #ammo-status,
+#cards .who { background: var(--field-base); }
+#hud #pause i { border-color: var(--field-text); }
+#hud #cast:enabled { border-left: 4px solid var(--field-selected); }
+#hud #cast:enabled #cast-name { color: #e4c58e; }
+#hud #cast-status { color: #c7d0c3; }
+#hud #cast:disabled::before { opacity: .58; }
+#cards .card .item { background-color: #24322e; }
+#cards .card.active .item { background-color: var(--field-selected-bg); }
+#cards .num b { color: #dfc597; }
+#dialog #loadout > div { background: var(--field-panel); }
+#roster-screen { background: linear-gradient(110deg,#202d2c,#1d2929 50%,#192427); }
+#upgrade, #dialog { background: linear-gradient(115deg,#122022ed,#162223df 60%,#142021ed); }
+@media(orientation:portrait) {
+  #hud #pause { min-width: 44px; min-height: 44px; }
+  #hud #stage-panel, #hud #sector { top: calc(var(--safe-top) + 49px); }
+}
+@media(orientation:portrait) {
+  #dialog .report footer button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    gap: 5px;
+    padding-inline: clamp(5px,2vw,12px);
+    min-width: 0;
+  }
+  #dialog .report footer button::before { margin: 0; }
+}
+@media(orientation:portrait) and (max-height:690px) {
+  #prep-screen { align-items: start; }
+  #prep-screen .prep-shell { height: auto; min-height: 100%; grid-template-rows: auto minmax(205px,1fr) auto; }
+  #prep-screen #gear-inventory { flex-shrink: 0; min-height: 50px; }
+  #prep-screen .gear-info { padding-right: 27px; }
+}
+
+/* The illustrated title belongs to startup. The briefing uses a quiet plotting grid. */
+#home {
+  background-color: #1b2b2a;
+  background-image: linear-gradient(to right, rgba(213,222,194,.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(213,222,194,.035) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 44%, #293a34, #1b2b2a 68%, #172525);
+  background-size: 36px 36px, 36px 36px, cover;
+  background-position: center;
+}
+#home::before { content: none; }
+#loading-screen {
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  isolation: isolate;
+  background: #14222a;
+  color: #f8edd6;
+}
+#loading-art, #loading-screen::before {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#loading-art {
+  z-index: -2;
+  object-fit: cover;
+  object-position: 66% 50%;
+}
+#loading-screen::before {
+  content: "";
+  z-index: -1;
+  background: linear-gradient(to top, #0b141bf5, #101a22a6 21%, transparent 57%);
+}
+.loading-panel {
+  padding: 24px max(8vw,env(safe-area-inset-right)) max(7vh,calc(env(safe-area-inset-bottom) + 20px)) max(8vw,env(safe-area-inset-left));
+}
+#loading-title {
+  margin: 0 0 22px;
+  font-size: clamp(36px,min(12vw,10vh),83px);
+  letter-spacing: -.055em;
+  line-height: .94;
+}
+#loading-title span { color: #dec18b; }
+#loading-status { margin: 0 0 8px; font-size: 13px; }
+#loading-progress {
+  display: block;
+  width: min(265px,100%);
+  height: 7px;
+  appearance: none;
+  border: 1px solid #72796a;
+  background: #1c2726;
+  color: #d7b57c;
+}
+#loading-progress::-webkit-progress-bar { background: #1c2726; }
+#loading-progress::-webkit-progress-value { background: #d7b57c; }
+#loading-progress::-moz-progress-bar { background: #d7b57c; }
+#loading-retry { padding: 8px 14px; min-height: 44px; border: 1px solid #c8b17e; background: #a28e63; color: #17211e; }
+@media (orientation: portrait) {
+  #loading-art, #loading-screen::before { height: min(100%,144vw); }
+  #loading-art { object-position: 73% 50%; }
+  #loading-screen::before { background: linear-gradient(to bottom, transparent 62%, #14222a66 78%, #14222a 100%); }
+}
+#main-menu {
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+#main-menu .home-mast, #main-menu .mission-selector, #main-menu .lobby-controls { width: min(100%,440px); flex: none; }
+#main-menu .home-mast { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+#main-menu .title-block { margin: 0; padding: 0; }
+#main-menu .title-block .location { padding-top: 4px; font-size: 10px; }
+#main-menu #game-title { font-size: clamp(29px,5.4dvh,47px); margin: 7px 0 0; line-height: .92; }
+#main-menu .home-mast .wallet { align-self: flex-start; gap: 6px; padding: 6px 9px; border: 1px solid var(--field-edge); }
+.mission-selector { margin: auto 0 0; }
+#stage-preview { margin: 0; position: relative; overflow: hidden; border: 1px solid #84907a; background: var(--field-base); box-shadow: 2px 3px var(--field-ink); }
+#stage-preview-art { display: block; width: 100%; aspect-ratio: 8/5; object-fit: cover; image-rendering: auto; }
+#stage-preview figcaption {
+  display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; column-gap: 6px; row-gap: 1px;
+  background: #21302c; border-top: 1px solid #6d7c6b; padding: 7px 9px; color: var(--field-text);
+}
+#stage-preview-name { margin: 0; font-size: clamp(15px,4.4vw,19px); line-height: 1.4; }
+#stage-brief { color: #c7cec0; font-size: 10px; line-height: 1.4; }
+.stage-switch { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; }
+.stage-switch button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; }
+.stage-switch i { display: block; width: 0; height: 0; border-block: 7px solid transparent; }
+#stage-prev i { border-right: 10px solid currentColor; }
+#stage-next i { border-left: 10px solid currentColor; }
+#stage-label {
+  display: grid; place-items: center; min-width: 130px; min-height: 44px; padding: 4px 8px;
+  background: var(--field-base); border: 1px solid #687763; color: var(--field-text); font-weight: 700; font-size: 17px;
+}
+#stage-label:focus-visible { outline: 2px solid var(--field-focus); outline-offset: -3px; }
+#main-menu .lobby-controls { margin: 0 0 auto; padding: 0; }
+#main-menu .lobby-controls nav { display: grid; gap: 6px; grid-template-columns: minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr); }
+#main-menu .lobby-controls nav button { min-width: 0; justify-content: center; }
+#main-menu .lobby-controls nav #select-team { grid-area: 1/1; }
+#main-menu .lobby-controls nav #start { grid-area: 1/2; height: 65px; }
+#main-menu .lobby-controls nav #shop { grid-area: 1/3; }
+#main-menu #continue-run { min-height: 44px; margin-top: 1px; }
+
+@media(orientation:portrait) and (max-height:650px) {
+  #main-menu { padding-block: max(9px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-bottom)); gap: 6px; }
+  #main-menu #game-title { font-size: 29px; margin-top: 3px; }
+  #main-menu .lobby-controls nav button { height: 51px; }
+  #main-menu .lobby-controls nav #start { height: 54px; }
+  #main-menu .lobby-controls { gap: 6px; }
+  #main-menu .lobby-controls .controlhint { padding: 0; }
+}
+@media(orientation:landscape) {
+  #main-menu { display: grid; grid-template-columns: minmax(140px,1fr) minmax(260px,460px); grid-template-rows: 1fr auto;
+    align-content: center; align-items: end; column-gap: 5vw; padding-block: var(--safe-top) var(--safe-bottom); }
+  #main-menu .home-mast { grid-area: 1/1/3/2; height: 100%; flex-flow: column-reverse; justify-content: space-around; align-items: flex-start; }
+  #main-menu .mission-selector { grid-area: 1/2; width: min(100%,76dvh); margin: auto auto 0; }
+  #main-menu .lobby-controls { grid-area: 2/2; width: min(100%,76dvh); margin: 0 auto auto; gap: 4px; }
+  #main-menu #stage-preview-art { max-height: 44dvh; }
+  #main-menu .lobby-controls nav button, #main-menu .lobby-controls nav #start { height: 44px; min-height: 44px; font-size: 13px; }
+  #main-menu .lobby-controls nav img { width: 25px; height: 22px; }
+}

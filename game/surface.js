@@ -364,7 +364,7 @@ const SURFACE = (() => {
     g.lineTo(x+w-3,y+h-3);g.closePath();g.fill();
     if(!b.shared.S)ink(g,x+1,y+h,w-2,3,'#26303245');
   }
-  function renderChunk(g,view){
+  function renderChunk(g,view,stage){
     g.imageSmoothingEnabled=false;
     fillMaterial(g,view,bounds,0,40);
     for(let n=0;n<blocks.length;n++){
@@ -373,9 +373,9 @@ const SURFACE = (() => {
       kerb(g,block,n);
     }
     for(const c of courts)fillMaterial(g,view,c,c.row,40);
-    roads(g);drawStreetWear(g,view);details(g);
+    roads(g);drawStreetWear(g,view);drawDistrictGround(g,stage);details(g);
     for(const b of buildings)if(visible(b,view,30))shadow(g,b);
-    for(const b of buildings)if(visible(b,view,12))CityKit.draw(g,b);
+
     for(const [variant,x,y] of trees){
       const frame=rect(x-32,y-38,64,64);
       if(visible(frame,view))g.drawImage(art.groundKit,variant*64,160,64,64,frame.x,frame.y,64,64);
@@ -383,7 +383,9 @@ const SURFACE = (() => {
     for(const e of exits)if(visible(rect(e.x-120,e.y-120,240,240),view))TransitKit.drawEntrance(g,e);
     for(const p of fixtures)if(visible(p.frame,view,6))StreetFixtures.draw(g,p.id,p.x,p.y,p.scale);
   }
-  function draw(g,v){
+  let cachedStage=-1;
+  function draw(g,v,stage=0){
+    if(cachedStage!==stage){cache.clear();cachedStage=stage;}
     const minX=Math.max(0,Math.floor(v.x/chunkSize)),maxX=Math.min(Math.ceil(bounds.w/chunkSize)-1,Math.floor((v.x+v.w)/chunkSize));
     const minY=Math.max(0,Math.floor(v.y/chunkSize)),maxY=Math.min(Math.ceil(bounds.h/chunkSize)-1,Math.floor((v.y+v.h)/chunkSize));
     ink(g,v.x,v.y,v.w,v.h,'#353a3b');
@@ -393,7 +395,7 @@ const SURFACE = (() => {
       if(!c){
         c=document.createElement('canvas');c.width=Math.min(chunkSize,bounds.w-x);c.height=Math.min(chunkSize,bounds.h-y);
         const local=c.getContext('2d',{alpha:false});local.translate(-x,-y);
-        renderChunk(local,rect(x,y,c.width,c.height));
+        renderChunk(local,rect(x,y,c.width,c.height),stage);
       }
       cache.delete(key);cache.set(key,c);g.drawImage(c,x,y);
     }
@@ -405,5 +407,5 @@ const SURFACE = (() => {
     footprints=footprints.flatMap(b=>TransitKit.subtractRect(b,cut));
     footprints.push(...TransitKit.stairRails(e,false));
   }
-  return {bounds,spawn,exits,solids:footprints,draw};
+  return {bounds,spawn,exits,buildings,solids:footprints,draw};
 })();

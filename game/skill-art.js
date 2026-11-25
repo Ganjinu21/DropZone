@@ -418,6 +418,12 @@ function drawSkillFX(e) {
       }
       break;
     }
+    case 'exhaust': {
+      const size=Math.round(3+6*t),x=Math.round(e.x-size/2),y=Math.round(e.y-size/2-4*t);
+      ctx.save();ctx.globalAlpha*=.78*(1-t);
+      ctx.fillStyle='#242629';ctx.fillRect(x+1,y,size-1,size);ctx.fillRect(x,y+1,size+2,size-2);
+      ctx.fillStyle='#424244';ctx.fillRect(x+1,y,Math.max(2,size-3),2);ctx.restore();break;
+    }
     case 'shellArc': drawShellFlight(e); break;
     case 'smgFire': {
       ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.angle);

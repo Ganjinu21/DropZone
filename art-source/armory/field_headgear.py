@@ -58,7 +58,6 @@ def publish_base_and_helmets(out,bodies):
     """Export replacement strips and portraits from the exact same native head pixels."""
     portraits=out/'portraits';portraits.mkdir(exist_ok=True)
     worn=out/'worn';worn.mkdir(exist_ok=True)
-    starters=[]
     for rank in RANKS:
         band=Image.new('RGBA',(192*len(ROLES),48))
         for i,(role,body) in enumerate(zip(ROLES,bodies)):
@@ -69,8 +68,6 @@ def publish_base_and_helmets(out,bodies):
             portrait=dressed.crop((27,0,103,76)).resize((112,112),Image.Resampling.NEAREST)
             if rank=='C':
                 portrait.save(out/(role+'-portrait.png'),optimize=True)
-                starters.append(dressed)
             else:
                 portrait.save(portraits/(role+'-'+rank+'.png'),optimize=True)
         band.save(worn/('helmet-'+rank+'.png'),optimize=True)
-    return starters

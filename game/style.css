@@ -95,3 +95,7 @@ h1, h2, p { margin: 0; }
   .sheet { justify-content: flex-start; padding-bottom: 46px; }
   .sheet header { margin-top: 2vh; }
 }
+
+#world,#hud,#upgrade,#dialog,#world *,#hud *,#upgrade *,#dialog * {
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none;
+}
