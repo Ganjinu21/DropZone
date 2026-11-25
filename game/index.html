@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="shop.css">
   <link rel="stylesheet" href="lobby-pages.css">
   <link rel="stylesheet" href="talent-screen.css">
+  <link rel="stylesheet" href="rank-test.css">
 </head>
 <body>
   <section id="loading-screen" aria-labelledby="loading-title">
@@ -27,6 +28,10 @@
       <button type="button" id="loading-retry" hidden>다시 불러오기</button>
     </div>
   </section>
+  <details id="rank-test" hidden><summary>대원 테스트</summary><div class="rank-options">
+    <label>조작 대원<select id="test-crew"></select></label>
+    <label>무기 등급<select id="test-rank"><option value="">장착 등급</option></select></label>
+    <output id="test-current"></output></div></details>
   <canvas id="world" aria-label="을지로 전투 지역"></canvas>
   <main id="home" class="overlay" hidden>
     <div id="lobby-hub">
@@ -258,6 +263,9 @@
   <script src="raven-cels.js"></script>
   <script src="art/armory/painted-squad/frames.js"></script>
   <script src="operator-cels.js"></script>
+  <script src="art/armory/rank-crew/sights.js"></script>
+  <script src="rank-field.js"></script>
+  <script src="rank-test.js"></script>
   <script src="render.js"></script>
 </body>
 </html>

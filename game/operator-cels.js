@@ -61,12 +61,18 @@ function drawOperatorBody(g,m,index){
   const size=scale<=1?72:scale<=2?144:256;
   const image=art[role+(size===256?'Base':'Field'+size)];
   g.drawImage(image,index%8*size,Math.floor(index/8)*size,size,size,-36,-67.5,72,72);
+  const tier=memberTier(m),finish=art['rankSkill'+role+tier];
+  if(finish){
+    g.drawImage(finish,index%8*128,Math.floor(index/8)*128,128,128,-36,-67.5,72,72);
+    g.restore();return;
+  }
   for(let i=0;i<operatorSlots.length;i++){
     const slot=operatorSlots[i];
     const item=slot==='weapon'?m.weapon:gearByKey.get(slot==='shield'?m.shieldItem:m.loadout?.[slot]);
-    if(!item?.tier || !layers[i])continue;
+    const material=slot==='weapon' || slot==='shield'?item?.tier:tier;
+    if(!material || !layers[i])continue;
     const [sx,sy,w,h,x,y]=layers[i];
-    g.drawImage(art[role+'Finish'+item.rank],sx,sy,w,h,x*ratio-36,y*ratio-67.5,w*ratio,h*ratio);
+    g.drawImage(art[role+'Finish'+rankedTiers[material].rank],sx,sy,w,h,x*ratio-36,y*ratio-67.5,w*ratio,h*ratio);
   }
   g.restore();
 }

@@ -26,7 +26,7 @@ addEventListener('resize',resize);resize();
 function show(next){
  if(next==='home' || next==='pause')saveBattleCheckpoint();
  if(next==='end')clearBattleCheckpoint();
- mode=next;
+ mode=next;syncRankTest();
  for(const [id,visible] of Object.entries({home:next==='home',hud:next==='play',upgrade:next==='upgrade',dialog:['pause','end'].includes(next)}))$(id).hidden=!visible;
  if(next==='home'){resetLobbyView();refreshContinueMenu()}
  if(next==='play')saveBattleCheckpoint();
@@ -38,17 +38,18 @@ function startBattleAudio(){
 function start(initialStage=selectedStartStage){
  const entryStage=Number.isInteger(initialStage) && stages[initialStage-1]?initialStage:1;
  if(entryStage>highestPlayableStage())return;
- const lineup=getSelectedSquad();
+ const lineup=testLineup(getSelectedSquad());
  if(lineup.length!==formationSlots.length){openPreparation();return}
  startBattleAudio();
  savedEquipment=normalizedEquipment(savedEquipment);
  const talents=TalentTree.effects(armory.talentRanks);
  const pos=fieldMaps[entryStage-1].spawn;
+ const sortieEquipment=savedEquipment.map((row,id)=>testRow(id,row));
  const squad=names.map((_,id)=>{
    const slot=lineup.indexOf(id), deployed=slot>=0;
    const [front,side]=formationSlots[slot] || [0,0];
-   const gear=gearStats(id),max=Math.round((memberHealth[id]+gear.health)*(1+talents.hpBonus));
-   return {id,deployed,gear,loadout:savedEquipment[id],weapon:gearByKey.get(savedEquipment[id].weapon),shieldItem:savedEquipment[id].shield,x:pos.x+front,y:pos.y+side,hp:deployed?max:0,max,baseMax:max,
+   const gear=gearStats(id,sortieEquipment),max=Math.round((memberHealth[id]+gear.health)*(1+talents.hpBonus));
+   return {id,deployed,gear,testTier:developerMode?testGrades[id]:null,testOriginal:developerMode?{...savedEquipment[id]}:undefined,loadout:sortieEquipment[id],weapon:gearByKey.get(sortieEquipment[id].weapon),shieldItem:sortieEquipment[id].shield,x:pos.x+front,y:pos.y+side,hp:deployed?max:0,max,baseMax:max,
      cool:.15+id*.15,shoot:0,flip:1,hurt:0,gait:0,moving:false,moveSpeed:0,aimAngle:0};
  });
  run={...pos,floor:'surface',floors:{surface:freshFloor(),metro:freshFloor()},stair:-1,depth:0,t:0,level:1,xp:0,need:5,kills:0,lead:lineup[0],lineup:[...lineup],swap:0,face:1,dx:1,dy:0,heading:0,enemies:[],crystals:[],effects:[],marks:[],cues:[],pickupCool:0,entryStage,stage:entryStage,bossPhase:false,boss:null,walk:0,camera:{...pos},magnetUntil:0,up:Array(magnet+1).fill(0),squad,shield:0,lastHud:-1};
@@ -219,7 +220,7 @@ function setLeader(i){
  }
  outgoing.cool=sidearm.delay;
  incoming.cool=.24;
- run.lead=i;run.mark=null;run.swap=swapTime;
+ run.lead=i;syncRankTest();run.mark=null;run.swap=swapTime;
  const member=run.squad[i];
  combatCue('swap',member.x,member.y,.62,i,run.heading);
  const pitch=[330,392,494,294,440][i];

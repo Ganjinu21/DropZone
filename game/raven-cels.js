@@ -69,11 +69,12 @@ function drawRavenCels(g,m,age,skill){
   if(skill?.phase==='spin' && skill.follow<3 && !reduceMotion.matches)
     drawRavenFollow(g,art.ravenFollow,cel,skill.follow,288);
   else draw(scale<=1?art.ravenFieldCels:scale<=2?art.ravenField2x:art.ravenCels,-36,-67,72,72);
-  for(const slot of ravenWearSlots){
-    const item=gearByKey.get(m.loadout?.[slot]);
-    if(item?.tier>0){
+  const tier=memberTier(m),finish=art['rankSkillraven'+tier];
+  if(finish)draw(finish,-36,-67,72,72);
+  else for(const slot of ravenWearSlots){
+    if(tier>0){
       const [x,y]=ravenWearOrigins[slot][cel.index];
-      draw(art['raven-'+slot+item.rank],(x-72)/2,(y-134)/2);
+      draw(art['raven-'+slot+rankedTiers[tier].rank],(x-72)/2,(y-134)/2);
     }
   }
   if(m.weapon.tier>0){

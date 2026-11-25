@@ -9,9 +9,8 @@ const crewFits=[assaultVest,ravenVest,radioVest,assaultVest,radioVest];
 const portraitRoles=['bulk','raven','lynx','hammer','cct'];
 function fieldPortrait(id){return wornPortrait(id,run?.squad[id]?.loadout)}
 function wornPortrait(id,row){
-  const rank=gearByKey.get(row?.helmet)?.rank??'C';
-  if(id===1)return 'art/armory/raven-cels/portrait-'+rank.replace('+','-plus')+'.png';
-  return 'art/armory/painted-squad/'+portraitRoles[id]+'-portrait-'+rank.replace('+','-plus')+'.png';
+  const tier=memberTier({id,loadout:row});
+  return 'art/armory/rank-crew/'+portraitRoles[id]+'-face-'+tier+'.webp';
 }
 const crewOutfits=[];
 const wornSlots=['helmet','top','pants','boots'];

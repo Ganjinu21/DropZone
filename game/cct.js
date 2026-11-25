@@ -15,9 +15,9 @@ function callCobra(member){
   member.skillReadyAt=run.t+skillCooldownDuration(squadSkillDefs[4].cooldown);
   updateHud();return true;
 }
-function fireSupport(source,enemy,damage,awakened=false){
+function fireSupport(source,enemy,damage,awakened=false,tier){
   const angle=Math.atan2(chestY(enemy)-source.y,enemy.x-source.x);
-  run.effects.push({clip:'support_tracer',awakened,x:source.x,y:source.y,tx:enemy.x,ty:chestY(enemy),age:0,duration:.095});
+  run.effects.push({clip:'support_tracer',id:4,tier,awakened,x:source.x,y:source.y,tx:enemy.x,ty:chestY(enemy),age:0,duration:.095});
   damageEnemy(enemy,damage,angle,run,4);
 }
 function initializeRadioTeam(){
@@ -103,7 +103,7 @@ function updateRadioSupport(dt){
       const barrel=combatMuzzle(pose,1,false);
       const source={x:x+barrel.x*summonScale,y:y+barrel.y*summonScale};
       const damage=basicHitDamage(chief,basicWeaponProfile(chief,chief.id===run.lead));
-      fireSupport(source,enemy,damage*summonDamageRatio);
+      fireSupport(source,enemy,damage*summonDamageRatio,false,memberTier(chief));
       ally.shoot=.16;ally.lastShot=run.t;ally.cool=1.25/(1+run.talents.fireRateBonus);
     }
   }

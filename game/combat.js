@@ -108,7 +108,7 @@ function launchRound(member, barrel, target, weapon, lead, damage) {
     x:barrel.x, y:barrel.y, tx:barrel.x+Math.cos(angle)*length,
     ty:barrel.y+Math.sin(angle)*length, angle, id:member.id, lead,
     age:0, duration:length/weapon.speed, length, speed:weapon.speed,
-    sourceX:member.x, sourceY:member.y, family:member.weapon.family, flightHeight:target.y-ty, damage, remaining:pierce?2:1,
+    sourceX:member.x, sourceY:member.y, family:member.weapon.family, tier:memberTier(member), flightHeight:target.y-ty, damage, remaining:pierce?2:1,
     hit:new Set(), contact:contact?target:null
   });
 }
@@ -191,11 +191,12 @@ function shoot(member) {
   }
 
   if(family==='rocket'){
+    run.effects.push({id:member.id,tier:memberTier(member),lead,shotTime:run.t,col,clip:'hammer_muzzle',age:0,duration:.13,x:barrel.x,y:barrel.y});
     gunAudio.play('rocket-launch',lead? .64:.34);
     member.cool=weapon.delay/(1+run.talents.fireRateBonus);
     return;
   }
-  const state={id:member.id, lead, flip:member.flip, col, shotTime:run.t, angle:member.aimAngle, age:0};
+  const state={id:member.id, tier:memberTier(member), lead, flip:member.flip, col, shotTime:run.t, angle:member.aimAngle, age:0};
   run.effects.push({...state,clip:weapon.name+'_muzzle',x:barrel.x,y:barrel.y,duration:[.144,.096,.180,.089,.10][lead?member.id:3]});
   const back=sniper?21:6;
   run.effects.push({...state,clip:'brass',x:barrel.x-back*Math.cos(state.angle),y:barrel.y-back*Math.sin(state.angle),duration:.23});
@@ -212,7 +213,7 @@ function roundImpact(shot, enemy, x, y, state) {
   const pierce=shot.family==='sniper' || (shot.lead && shot.id===2 && !shot.family);
   const heavyBonus=pierce && (enemy.boss || enemy.type===2)?loadouts[2].armoredMultiplier:1;
   damageEnemy(enemy,Math.round(shot.damage*heavyBonus),shot.angle,state,shot.id);
-  state.effects.push({clip:pierce?'pierce_exit':'hit_spark',x,y,id:shot.id,
+  state.effects.push({tier:shot.tier,clip:Number.isInteger(shot.tier)?'rank-impact':pierce?'pierce_exit':'hit_spark',x,y,id:shot.id,
     lead:shot.lead,angle:shot.angle,age:0,duration:pierce?.148:.132});
   if (state===run && shot.lead && shot.id===run.lead) gunAudio.play('hit');
   shot.hit.add(enemy);
@@ -221,6 +222,7 @@ function roundImpact(shot, enemy, x, y, state) {
 
 function explodeRocket(shot,x,y,groundY,state){
   shot.remaining=0;
+  if(Number.isInteger(shot.tier))state.effects.push({clip:'rank-impact',tier:shot.tier,id:3,x,y,angle:shot.angle,age:0,duration:.30});
   detonateMortar({id:shot.id,tx:x,ty:y,groundY,angle:shot.angle,damage:shot.damage,radius:37,large:false},
     state,state===run?run.floor:otherFloor());
 }

@@ -117,6 +117,16 @@ function weaponMount(m,col,recoil=0){
 function combatAim(m,tx,ty,col){
   const facing=tx-Math.round(m.x);
   if(facing)m.flip=Math.sign(facing);
+  if(art['rankAim'+rankRoleNames[m.id]]){
+    m.aimPitch=Math.atan2(ty-(m.y-31),Math.abs(tx-m.x));
+    for(let i=0;i<3;i++){
+      const b=rankedBarrel(m,col,true);
+      m.aimPitch=clamp(Math.atan2(ty-b.y,(tx-b.x)*m.flip),-Math.PI/2,Math.PI/2);
+    }
+    m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
+    m.operatorAngle=m.aimAngle;
+    m.ravenSector=(Math.round(m.aimAngle*8/TAU)+8)%8;return;
+  }
   if(m.id===1 && m.weapon.family==='smg'){
     const angle=Math.atan2(ty-(m.y-32),tx-m.x);
     m.ravenSector=(Math.round(angle*8/TAU)+8)%8;
@@ -144,6 +154,8 @@ function combatAim(m,tx,ty,col){
   m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
 }
 function combatMuzzle(m,col,lead,pitch=m.aimPitch??0,recoil=m.weapon.family==='smg' && !reduceMotion.matches?4:2){
+  const ranked=rankedBarrel(m,col);
+  if(ranked)return ranked;
   if(operatorRoles[m.id])return operatorTip(m,operatorCel(m,run.t-(m.lastShot??-Infinity)));
   if(m.id===1 && m.weapon.family==='smg'){
     return ravenBarrel(m,ravenShotCel(m,run.t-(m.lastShot??-Infinity)),col===3);
@@ -232,6 +244,7 @@ const ravenFirePoses=[
   [.94,.09,.94,-.04],[.98,.03,.97,0],[1,-.04,.99,.02],[1,-.02,1,.01],[1,0,1,0]
 ].map(([width,lean,height,nod])=>({width,lean,height,nod}));
 function drawMemberGear(g,m,age,moving=false){
+  if(m.boarding==null && !(m.id===4 && run && run.t-(m.signalAt??-Infinity)<.83) && drawRankedMember(g,m,age,moving))return;
   if(operatorRoles[m.id]){drawOperatorGear(g,m,age,moving);return}
   if(m.id===1 && m.weapon.family==='smg'){drawRavenCels(g,m,age);return}
   const id=m.id,dy=crewTorsoY(m),glove=fieldGear(m.loadout,'gloves');
@@ -431,6 +444,7 @@ function drawTracer(mark) {
   const dx = mark.tx - mark.x, dy = mark.ty - mark.y;
   const x = mark.x + dx * t, y = mark.y + dy * t;
   const angle = mark.angle ?? Math.atan2(dy, dx);
+  if(drawRankRound(ctx,mark,x,y,angle))return;
   if(mark.family==='rocket'){
     ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.rotate(angle);
     ctx.fillStyle='#392e28';ctx.fillRect(-7,-2,14,5);
@@ -454,7 +468,9 @@ function drawTracer(mark) {
 }
 
 function drawEffect(e) {
+  if(e.clip==='rank-impact'){rankFlash(ctx,e,e.x,e.y,e.angle,true);return}
   if(e.clip==='support_tracer'){
+    if(Number.isInteger(e.tier)){const t=clamp(e.age/e.duration,0,1);drawRankRound(ctx,e,e.x+(e.tx-e.x)*t,e.y+(e.ty-e.y)*t,Math.atan2(e.ty-e.y,e.tx-e.x));return}
     if(e.awakened){drawStrafeTrace(e);return}
     const progress=reduceMotion.matches?1:clamp(e.age/e.duration,0,1);
     const head=.18+.82*progress,tail=Math.max(0,head-.36);
@@ -478,6 +494,7 @@ function drawEffect(e) {
     const smg=m.weapon.family==='smg';
     const tip=combatMuzzle(m,e.col,e.lead,m.aimPitch,firingKick(e.age)*(smg && !reduceMotion.matches?2:1));
     const angle=tip.angle??m.aimAngle??e.angle;
+    if(Number.isInteger(e.tier)){rankFlash(ctx,e,tip.x,tip.y,angle);return}
     drawTagEffect(e.clip,e.age,tip.x,tip.y,angle);
     if(smg && e.age<.047){
       ctx.save();ctx.translate(tip.x,tip.y);ctx.rotate(angle);
@@ -721,7 +738,7 @@ function flashTint(image) {
 }
 
 async function loadGame() {
-  const assets = Object.entries({ ...ART, ...tagArt, ...skillArt, ...awakenedArt });
+  const assets = Object.entries({ ...ART, ...rankArt, ...tagArt, ...skillArt, ...awakenedArt });
   const meter = $('loading-progress');
   meter.max = assets.length + 1;
   meter.value = 0;
@@ -740,7 +757,7 @@ async function loadGame() {
     art.infectedBossHit = flashTint(art.infectedBosses);
     art.tagEquipHit = flashTint(art.tagEquip);
     makeMap();
-    setLobbyReady();
+    setLobbyReady();syncRankTest();
     meter.value = meter.max;
     $('loading-screen').hidden = true;
     $('home').hidden = false;

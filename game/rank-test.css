@@ -1,0 +1,6 @@
+#rank-test{position:fixed;right:max(5px,env(safe-area-inset-right));top:39%;z-index:40;color:#f9efcf;background:#182828ed;border:1px solid #818577;border-radius:4px;font:13px/1.4 system-ui,sans-serif;box-shadow:0 2px 7px #1118;text-align:left}
+#rank-test summary{cursor:pointer;padding:8px;color:#f4d89c;list-style-position:inside}
+#rank-test .rank-options{display:grid;gap:7px;padding:0 9px 9px}
+#rank-test label{display:grid;gap:2px;color:#c5d1ca}
+#rank-test select{font:inherit;background:#263937;color:#fff1cd;border:1px solid #71847c;padding:4px;border-radius:3px}
+#rank-test output{color:#ffe4a4;font-weight:bold}
