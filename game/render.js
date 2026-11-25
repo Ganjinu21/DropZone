@@ -671,11 +671,11 @@ function render() {
   ctx.restore();
   const vehicle=run.activeSkill?.id===0?run.activeSkill:null;
   if(vehicle)actors.push({o:vehicle,draw:vehicle.awakened?drawMech:drawBunker});
-  if(!deployedBunker())for(const o of run.squad){
-    if(o.hp>0 && o.deployed && !(vehicle && o.id===0))actors.push({o,draw:drawHero});
+  for(const o of run.squad){
+    if(o.hp>0 && o.deployed && !(vehicle && (o.id===0 || vehicle.entered?.[o.id])))actors.push({o,draw:drawHero});
   }
   for(const m of [...run.squad,...(run.radioTeam||[])])if(m.hp<=0 && m.downFloor===run.floor)actors.push({o:m,draw:drawDowned});
-  if(!deployedBunker())for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:cctRadioSprite});
+  for(const ally of run.radioTeam||[])if(ally.hp>0)actors.push({o:ally,draw:cctRadioSprite});
   actors.push(...scenery);
   actors.sort((a, b) => a.o.y - b.o.y);
   for(const {o,draw,opacity} of actors){ctx.globalAlpha=opacity??1;draw(o)}

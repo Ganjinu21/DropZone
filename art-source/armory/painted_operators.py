@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from raven_cels import field_drawing
+from bulk_brace import brace_inbetweens
 
 SOURCE = Path(__file__).parent / 'painted-squad'
 OUT = SOURCE.parents[2] / 'game/art/armory/painted-squad'
@@ -144,6 +145,8 @@ def pack(role):
     if role=='hammer':cels+=register(role,'remote',1)
     breath_start=len(cels)
     cels+=register(role,'idle',1)
+    if role=='bulk':
+        cels+=brace_inbetweens(cels,breath_start)
     base=Image.new('RGBA',(8*SIZE,((len(cels)+7)//8)*SIZE))
     masks=[]; origins=[]; tips=[]
     for i,(cel,tip) in enumerate(cels):

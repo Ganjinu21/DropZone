@@ -73,7 +73,13 @@ function updateRadioSupport(dt){
       continue;
     }
     if(ally.floor!==run.floor){ally.x=run.x;ally.y=run.y;ally.floor=run.floor;ally.post=null}
-    if(fort){ally.x=fort.x;ally.y=fort.y;ally.moving=false;ally.post=null;ally.aimTarget=null;continue}
+    if(fort){
+      const x=ally.x,y=ally.y;
+      ally.post=null;ally.aimTarget=null;
+      rushToCover(ally,fort.radioCover?.[run.radioTeam.indexOf(ally)],nav,dt);
+      updateCrewStride(ally,ally.x-x,ally.y-y,dt,summonScale);
+      continue;
+    }
     const enemy=combatTargets(ally,188,false)[0]?.enemy;
     ally.aimTarget=enemy??null;
     if(enemy && enemy.x!==ally.x)ally.flip=Math.sign(enemy.x-ally.x);

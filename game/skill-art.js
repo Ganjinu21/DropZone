@@ -1,14 +1,17 @@
 'use strict';
 
 const skillArt = Object.fromEntries(Object.entries({
-  bunker: 'field-bunker', mechFold: 'field-fold', bulkRounds: 'bulk-ballistics',
+  bulkRounds: 'bulk-ballistics',
   ravenMuzzle:'raven-muzzle', ravenRounds: 'raven-ballistics', ravenFlight:'raven-flight', ravenContact:'raven-contact',
   ravenDrift:'raven-drift',
   lynxPierce: 'lynx-pierce', lynxBeam: 'lynx-beam',
   hammerFx: 'hammer-fx', hammerBlast: 'hammer-blast'
 }).map(([id, name]) => [id, 'art/skills/' + name + '.png']));
 
-const bunkerWidth = 112;
+skillArt.bunkerDeploy='art/skills/bulk-shield-deploy.webp';
+// World-space offsets from the planted shield to each port in the locked cel.
+const bunkerPorts=[[35,-33],[0,-6],[-35,-33],[0,-63]];
+const bunkerShellScale=1.48;
 const laserEnds = [.032,.072,.120,.178,.238,.313,.410];
 const blastEnds = [.036,.080,.137,.201,.275,.358,.444,.538,.641,.749,.865,.997];
 const frameAt = (age, ends) => ends.findIndex(end => age < end);
@@ -49,10 +52,8 @@ function skillShotSocket(m, s, angle, hand = 0) {
   if(s?.awakened && m.id===0)return mechShotSocket(s,angle);
   if(s?.awakened && m.id===3)return siegeShotSocket(m,s,hand);
   if (m.id === 0) {
-    const west = Math.cos(angle) < 0, front = Math.sin(angle) >= 0;
-    const u = front ? (west ? .145 : .86) : (west ? .10 : .90);
-    const v = front ? .735 : .12;
-    return {x:s.x + (u-.5)*bunkerWidth, y:s.y + (v-.92)*bunkerWidth*art.bunker.height/art.bunker.width};
+    const [dx,dy]=bunkerPorts[(Math.round(angle/(Math.PI/2))+4)%4];
+    return {x:s.x+dx*bunkerShellScale,y:s.y+dy*bunkerShellScale};
   }
   if (m.id === 3) {
     if(!s)return combatMuzzle(m,1,true);
@@ -133,82 +134,68 @@ function drawHammerSkill(m,s){
   if(contact>=0 && contact<1)skillFlash(art.hammerFx,1,Math.floor(contact*8),64,64,32,32,s.x+facing*17,s.y,0,.8);
 }
 
-function boardBunker(s, p) {
-  for (const m of run.squad) {
-    if (m.hp <= 0 || m.deployed === false) continue;
-    const from = s.boardFrom?.[m.id] || m;
-    const x = from.x+(s.x-from.x)*p, y = from.y+(s.y-from.y)*p;
-    ctx.save();
-    ctx.globalAlpha *= Math.min(1,(1-p)*3);
-    drawEquippedMember({...m,x,y,boarding:m.id===0?p:null,moving:p<1,gait:m.gait+p*Math.hypot(s.x-from.x,s.y-from.y)});
-    ctx.restore();
-  }
-  for(const [i,ally] of (run.radioTeam||[]).entries()){
-    const from=s.radioFrom?.[i];
-    if(ally.hp<=0 || !from)continue;
-    ctx.save();ctx.globalAlpha*=Math.min(1,(1-p)*3);
-    cctRadioSprite({...ally,x:from.x+(s.x-from.x)*p,y:from.y+(s.y-from.y)*p,moving:p<1,gait:ally.gait+p*Math.hypot(s.x-from.x,s.y-from.y)/summonScale});
-    ctx.restore();
-  }
-}
-
-function foldEase(value) {
-  const u = clamp(value,0,1);
-  return u*u*(3-2*u);
-}
-
-function foldingMech(s, baseline, armorEdge) {
-  const x = Math.round(s.x-56), y = Math.round(baseline);
-  const bend = foldEase((s.age-.10)/.23);
-  const crouched = foldEase((s.age-.22)/.10);
-  const reveal = foldEase(s.age/.065);
-  // Feet are registered to row 140 in both cells. Take the weight on the
-  // shins and upper legs first, leaving the head, cockpit and soles rigid.
-  const leg = Math.round(59*(1-.90*bend)), waist = Math.round(25*(1-.55*bend));
-  ctx.save();
-  ctx.beginPath();ctx.rect(x,armorEdge,112,Math.max(0,y-armorEdge+1));ctx.clip();
-  if (crouched < 1) {
-    ctx.save();
-    const jointEdge=y-Math.round(crouched*100);
-    ctx.beginPath();ctx.rect(x,y-145,112,145+jointEdge-y);ctx.clip();
-    ctx.globalAlpha *= reveal;
-    ctx.drawImage(art.mechFold,0,126,112,14,x,y-14,112,14);
-    ctx.drawImage(art.mechFold,0,67,112,59,x,y-14-leg,112,leg);
-    ctx.drawImage(art.mechFold,0,42,112,25,x,y-14-leg-waist,112,waist);
-    ctx.drawImage(art.mechFold,0,0,112,42,x,y-14-leg-waist-42,112,42);
-    ctx.restore();
-  }
-  if (crouched > 0) {
-    ctx.save();
-    const reach=Math.ceil(crouched*100);
-    ctx.beginPath();ctx.rect(x,y-reach,112,reach+1);ctx.clip();
-    skillCell(art.mechFold,1,0,112,144,s.x,y,56,140);
-    ctx.restore();
-  }
-  ctx.restore();
-  return 132-65*bend;
+// Start on the equipped field pose. These painted cels draw the left forearm
+// across the chest as the knees fold and the visor tucks behind the shield rim.
+const bunkerGuardCels=[36,37,8,38,39,9,40,41,10,42,43,11];
+function drawBunkerPilot(s,t){
+  const member=run.squad[0];
+  const step=Math.floor(t/bunkerCrouchTime*(bunkerGuardCels.length+1));
+  const cel=step===0?(s.entryCel??paintedOperators.bulk.breathStart)
+    :bunkerGuardCels[Math.min(step,bunkerGuardCels.length)-1];
+  drawOperatorBody(ctx,member,cel);
 }
 
 function drawBunker(s) {
-  const h = bunkerWidth*art.bunker.height/art.bunker.width;
-  const baseline = s.y+h*.08;
-  const deploy = s.phase==='deploy';
-  footShadow(s.x,s.y-1,43*(deploy ? clamp(s.age/.12,0,1) : 1));
-  let top = s.y-h*.92, sealEdge = baseline;
-  if (deploy) {
-    const seal = foldEase((s.age-.41)/.15);
-    // The new hull closes from the hatch to the planted feet. Two complementary
-    // masks keep the crew compartment solid throughout the transition.
-    sealEdge = seal>0 ? Math.ceil(baseline-h+(h+1)*seal) : baseline-144;
-    const mechHeight = foldingMech(s,baseline,sealEdge);
-    top = Math.min(baseline-mechHeight,seal>0 ? baseline-h : baseline);
-    if (s.age < .36) boardBunker(s,clamp(s.age/.36,0,1));
+  const t=s.phase==='retract'?s.foldTime:s.phase==='deploy'?s.age:bunkerDeployTime;
+  const next=frameAt(t,bunkerFrameEnds);
+  const frame=t<bunkerPlantTime?-1:next<0?bunkerFrameEnds.length-1:next;
+  const top=s.y-73*bunkerShellScale;
+  const planted=clamp((t-bunkerPlantTime)/.15,0,1);
+  ctx.save();ctx.globalAlpha*=1-planted;
+  footShadow(s.x,s.y-1,14);
+  ctx.restore();
+  ctx.save();ctx.globalAlpha*=planted;
+  footShadow(s.x,s.y-1,35*bunkerShellScale);
+  ctx.restore();
+  const sheet=art.bunkerDeploy,cell=sheet.width/6;
+  ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  const facing=s.plantFacing||1;
+  const impact=t-bunkerSlamAt;
+  const kick=s.phase==='deploy' && !reduceMotion.matches && impact>=0 && impact<.095
+    ?1.9*Math.cos(impact*81)*(1-impact/.095)**2:0;
+  const shell=i=>{
+    ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y)+kick);ctx.scale(facing,1);
+    ctx.drawImage(sheet,(i%6)*cell,Math.floor(i/6)*cell,cell,cell,
+      -64*bunkerShellScale,-112*bunkerShellScale,128*bunkerShellScale,128*bunkerShellScale);
+    ctx.restore();
+  };
+  if(frame>=1 && frame<=16)shell(18+frame);
+  if(frame<17){
+    for(const m of run.squad)if(s.entered?.[m.id] && m.hp>0 && m.deployed)drawHero(m);
+    ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(facing,1);
+    drawBunkerPilot(s,t);
+    ctx.restore();
   }
-  ctx.save();
-  if (deploy) {
-    ctx.beginPath();ctx.rect(s.x-bunkerWidth/2-1,baseline-145,bunkerWidth+2,145+sealEdge-baseline);ctx.clip();
+  if(frame>=0)shell(frame);
+  if(frame===18 && t<bunkerDeployTime){
+    const ignition=clamp((t-bunkerLampAt)/.045,0,1);
+    const glow=ignition*clamp((bunkerDeployTime-t)/.095,0,1);
+    ctx.save();
+    ctx.translate(Math.round(s.x),Math.round(s.y));
+    ctx.scale(facing*bunkerShellScale*.4,bunkerShellScale*.4);
+    // The closed cels differ only around this recessed amber indicator.
+    ctx.globalAlpha*=1-ignition;
+    ctx.drawImage(sheet,5*cell+150,2*cell+184,20,48,-10,-96,20,48);
+    ctx.restore();
+    ctx.save();ctx.translate(s.x,s.y-28.8*bunkerShellScale);
+    ctx.scale(bunkerShellScale*.57,bunkerShellScale);
+    ctx.globalAlpha*=s.phase==='deploy'?glow:0;
+    const spill=ctx.createRadialGradient(0,0,0,0,0,12);
+    spill.addColorStop(0,'rgba(255,247,196,.92)');
+    spill.addColorStop(.25,'rgba(255,186,68,.56)');
+    spill.addColorStop(1,'rgba(255,132,36,0)');
+    ctx.fillStyle=spill;ctx.fillRect(-12,-12,24,24);ctx.restore();
   }
-  ctx.drawImage(art.bunker,Math.round(s.x-bunkerWidth/2),Math.round(s.y-h*.92),bunkerWidth,h);
   ctx.restore();
   ctx.fillStyle='#172220';ctx.fillRect(s.x-23,top-8,46,6);
   ctx.fillStyle=s.hp>s.maxHp*.3?'#b2c294':'#e49460';ctx.fillRect(s.x-22,top-7,Math.ceil(44*s.hp/s.maxHp),4);

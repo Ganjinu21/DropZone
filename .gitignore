@@ -34,6 +34,7 @@ node_modules/
 !/work/check-stair-links.cjs
 !/work/check-squad-skills.cjs
 !/work/check-squad-skill-ui.cjs
+!/work/capture-shield-deploy.cjs
 !/work/check-zombie-stages.cjs
 !/work/select-test-squad.cjs
 !/work/check-lineup.cjs

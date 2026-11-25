@@ -37,7 +37,9 @@ const {chromium} = require('playwright');
         const steps=Math.round(seconds*100);
         for (let i=0;i<steps;i++) {
           const dt=.01;
-          run.t+=dt;tickSquadSkills(dt);advanceRounds(dt);
+          run.t+=dt;
+          if(deployedBunker())moveFormation(dt);
+          tickSquadSkills(dt);advanceRounds(dt);
           onStep();
           run.effects=run.effects.filter(effect=>(effect.age+=dt)<effect.duration);
         }
@@ -54,7 +56,7 @@ const {chromium} = require('playwright');
       const hp=run.squad[0].hp;
       hitSquadMember(run.enemies[0],run.squad[0],routes.surface,99);
       const marks=new Set(),sectors=new Set();
-      simulate(2.25,()=>{
+      simulate(bunkerDeployTime+1.67,()=>{
         for(const shot of run.marks){
           marks.add(shot);
           const ux=Math.cos(shot.angle),uy=Math.sin(shot.angle);

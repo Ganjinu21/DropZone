@@ -246,10 +246,11 @@ function updateHud(){
  }
  const active=run.activeSkill;
  const form=skillForm(run.lead);
- const canRelease=run.lead===0 && deployedBunker(active) && active.hp>0;
+ const retracting=deployedBunker(active) && active.phase==='retract';
+ const canRelease=run.lead===0 && deployedBunker(active) && !retracting && active.hp>0;
  const remaining=Math.ceil(squadSkillCooldown(run.lead));
- $('cast-name').textContent=canRelease?'벙커 해제':skillDisplayName(run.lead,form);
- $('cast-status').textContent=canRelease?`내구도 ${Math.ceil(active.hp)}/${active.maxHp}`:
+ $('cast-name').textContent=canRelease || retracting?'벙커 해제':skillDisplayName(run.lead,form);
+ $('cast-status').textContent=retracting?'접는 중':canRelease?`내구도 ${Math.ceil(active.hp)}/${active.maxHp}`:
    !form?'스킬트리 연구 필요':active?(active.awakened && active.id===0?'탑승 중':'사용 중'):
    remaining>0?remaining+'초':form===2 && run.lead===1?(3-ravenPendingCharges().length)+'/3 충전':form===2?'각성 발동':'스킬 발동';
  $('cast').disabled=!canRelease && (!form || !!active || remaining>0);
@@ -377,6 +378,8 @@ function moveFormation(dt) {
  const nav=routes[run.floor];
  const order=[run.lead,...run.lineup.filter(id=>id!==run.lead && run.squad[id].hp>0)];
  const locked=squadSkillLocked();
+ const fort=deployedBunker()?run.activeSkill:null;
+ if(fort && !fort.seats)assignBunkerCover(fort);
  const hx=Math.cos(run.heading),hy=Math.sin(run.heading);
  const follow=1-Math.exp(-12*dt);
  const spacing=stairFormationScale(run);
@@ -388,10 +391,14 @@ function moveFormation(dt) {
    let reach=spacing;
    while(reach>0 && !nav.clear(run.x,run.y,run.x+reach*offsetX,run.y+reach*offsetY,4))reach=Math.max(0,reach-.25);
    const tx=run.x+reach*offsetX,ty=run.y+reach*offsetY;
-   const stepX=(tx-m.x)*follow,stepY=(ty-m.y)*follow;
+   const dx=tx-m.x,dy=ty-m.y;
+   const gap=Math.hypot(dx,dy);
+   if(m.leavingCover && gap<2)m.leavingCover=false;
+   const step=m.leavingCover?Math.min(follow,220*dt/Math.max(1,gap)):follow;
    const bx=m.x,by=m.y;
-   if(!locked){
-     if(nav.clear(m.x,m.y,tx,ty,4))nav.slide(m,stepX,stepY,4);
+   if(fort && m.id!==0)moveBunkerCrew(m,fort,nav,dt);
+   else if(!locked){
+     if(nav.clear(m.x,m.y,tx,ty,4))nav.slide(m,dx*step,dy*step,4);
      else {m.speed=160;nav.chase(m,run,dt);}
    }
    m.cool-=dt;m.shoot-=dt;m.hurt-=dt;
@@ -466,7 +473,8 @@ function update(dt){
      if(distance<closest){near=m;closest=distance}
    }
    const inBunker=deployedBunker();
-   if(closest<(inBunker?38:19) && (near.hurt<=0 || inBunker) && nav.clear(e.x,e.y,near.x,near.y,0)){
+   if(inBunker){near=target;closest=dist(e,target)}
+   if(closest<(inBunker?36*bunkerShellScale:19) && (near.hurt<=0 || inBunker) && nav.clear(e.x,e.y,near.x,near.y,0)){
      hitSquadMember(e,near,nav);
      if(mode!=='play')return;
    }

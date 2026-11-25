@@ -85,7 +85,7 @@ const {chromium} = require('playwright');
     });
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[0,1,2]);
     const expected = [
-      {sound:'cannon', sprites:['mechFold','bunker','bulk','bulkRounds']},
+      {sound:'cannon', sprites:['bunkerDeploy','bulkRounds']},
       {sound:'smgA', sprites:['ravenSpin','ravenMuzzle','ravenFlight']},
       {sound:'pierce', sprites:['lynx','lynxBeam','lynxPierce']},
       {sound:'burst', sprites:['hammer','hammerFx','hammerBlast']}
@@ -131,6 +131,12 @@ const {chromium} = require('playwright');
         await button.tap();
         await page.evaluate(()=>{
           run.t+=20;
+          tickSquadSkills(bunkerDeployTime);
+          if(run.activeSkill.age>bunkerBoardingAt || run.activeSkill.beat!==0)
+            throw Error('The shield doors closed before boarding');
+          for(let i=0;i<90;i++){moveFormation(1/60);tickSquadSkills(1/60)}
+          if(run.activeSkill.phase!=='fire' || !run.lineup.filter(id=>id!==0).every(id=>run.activeSkill.entered[id]))
+            throw Error('The bunker must wait for the two squadmates to board');
           hitSquadMember(run.enemies[0],run.squad[0],routes[run.floor],run.activeSkill.hp-1);
           updateHud();
         });
@@ -139,7 +145,15 @@ const {chromium} = require('playwright');
         const before=await blasts();
         await button.tap();
         assert.equal(await blasts(),before,'manual release caused an explosion');
-        assert.equal(await page.locator('#cast-status').textContent(),'10초');
+        assert.equal(await page.locator('#cast-status').textContent(),'접는 중');
+        assert.ok(await button.isDisabled());
+        assert.ok(await page.evaluate(()=>{
+          const beat=run.activeSkill.beat,readyAt=run.squad[0].skillReadyAt;
+          tickSquadSkills(.3);
+          if(activateSquadSkill() || run.activeSkill.beat!==beat)return false;
+          tickSquadSkills(bunkerDeployTime/1.25);
+          return !run.activeSkill && run.squad[0].skillReadyAt===readyAt;
+        }));
         await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt-.01;updateHud()});
         assert.ok(await button.isDisabled());
         await page.keyboard.press('Space');
@@ -147,7 +161,13 @@ const {chromium} = require('playwright');
         await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt;updateHud()});
         await page.keyboard.press('Space');
         assert.ok(await page.evaluate(()=>run.activeSkill?.hp===squadSkillDefs[0].durability));
+        await page.evaluate(()=>tickSquadSkills(.24));
         await button.tap();
+        assert.ok(await page.evaluate(()=>{
+          const partial=run.activeSkill.foldTime;
+          tickSquadSkills(.2);
+          return partial===.24 && !run.activeSkill;
+        }));
       }
     }
     await page.evaluate(() => { skillUI.setup(); shoot(run.squad[3]); });

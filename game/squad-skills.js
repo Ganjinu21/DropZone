@@ -1,6 +1,14 @@
 'use strict';
 
 const ravenWindup=.30, ravenFiringTime=5.04;
+// The feet start to deploy as the pilot is still dropping into cover.
+const bunkerPlantTime=.14, bunkerCrouchTime=.26;
+const bunkerFrameEnds=[.180,.217,.255,.294,.332,.370,.412,.450,.492,.530,
+  .572,.612,.651,.817,.867,.901,.930,1.070,1.210];
+const bunkerBoardingAt=bunkerFrameEnds[12]+.0001; // fully assembled, leaves open
+const bunkerSlamAt=bunkerFrameEnds[16];
+const bunkerLampAt=bunkerFrameEnds[17];
+const bunkerDeployTime=bunkerFrameEnds[18];
 const squadSkillDefs = [
   {name:'벙커 전개', awakenedName:'미니건 메카', cooldown:15, recallCooldown:10, durability:160},
   {name:'쌍기관단총 난사', awakenedName:'삼중 난사', duration:ravenWindup+ravenFiringTime, cooldown:10},
@@ -55,6 +63,52 @@ function deployedBunker(skill=run.activeSkill){
   return skill?.id===0 && !skill.awakened;
 }
 
+function bunkerPost(fort,dx,dy){
+  const nav=routes[run.floor];
+  for(const reach of [1,.75,.5,.25]){
+    const x=fort.x+dx*reach,y=fort.y+dy*reach;
+    if(nav.clear(fort.x,fort.y,x,y,4))return {x,y};
+  }
+  return {x:fort.x,y:fort.y};
+}
+
+function assignBunkerCover(fort){
+  const crew=run.lineup.map(id=>run.squad[id]).filter(m=>m.id!==0 && m.hp>0);
+  crew.sort((a,b)=>a.x-b.x || a.y-b.y);
+  fort.seats={};fort.doorsteps={};fort.returnPosts={};fort.entered={};
+  crew.forEach((m,i)=>{
+    const side=i?1:-1;
+    fort.seats[m.id]=bunkerPost(fort,side*18,-9);
+    fort.doorsteps[m.id]=bunkerPost(fort,side*23,5);
+    fort.returnPosts[m.id]={x:m.x,y:m.y};
+    // Older checkpoints stored exterior cover positions, even with doors shut.
+    if(fort.phase==='fire' || (fort.phase==='retract' && fort.foldTime>bunkerBoardingAt)){
+      Object.assign(m,fort.seats[m.id]);
+      fort.entered[m.id]=true;
+    }
+  });
+  fort.radioCover=(run.radioTeam||[]).map(ally=>bunkerPost(fort,ally.side*35,-54));
+}
+
+function moveBunkerCrew(m,fort,nav,dt){
+  const seat=fort.seats[m.id],door=fort.doorsteps[m.id];
+  if(!seat)return;
+  if(fort.phase==='retract'){
+    if(fort.foldTime>bunkerBoardingAt)return;
+    if(fort.entered[m.id] && dist(m,door)<2)fort.entered[m.id]=false;
+    rushToCover(m,fort.entered[m.id]?door:fort.returnPosts[m.id],nav,dt);
+    return;
+  }
+  if(dist(m,door)<2 || dist(m,seat)<2)fort.entered[m.id]=true;
+  rushToCover(m,fort.entered[m.id]?seat:door,nav,dt);
+}
+
+function rushToCover(m,post,nav,dt){
+  if(!post)return;
+  m.speed=Math.min(280,90+dist(m,post)*8);
+  nav.chase(m,post,dt);
+}
+
 const mechStats={hp:240,duration:8,cooldown:20,spinUp:.4,interval:.095};
 
 function squadSkillLocked() {
@@ -67,12 +121,17 @@ function activateSquadSkill() {
   const form=skillForm(id);
   if (member.hp<=0 || member.deployed===false || !form) return false;
   if (id===0 && deployedBunker() && run.activeSkill.hp>0) {
-    cancelSquadSkill();
+    const fort=run.activeSkill;
+    if(fort.phase==='retract')return false;
+    fort.foldTime=fort.phase==='fire'?bunkerDeployTime:Math.min(fort.age,bunkerDeployTime);
+    fort.phase='retract';
+    member.skillReadyAt=run.t+skillCooldownDuration(def.recallCooldown);
+    updateHud();
     return true;
   }
   if (run.activeSkill || squadSkillCooldown(id)>0) return false;
   if(id===4)return callCobra(member);
-  const firstBeat=[.58,ravenWindup,.42,.82][id];
+  const firstBeat=[bunkerDeployTime,ravenWindup,.42,.82][id];
   const phase=['deploy','spin','charge','deploy'][id];
   const skill={id,awakened:form===2,phase,x:member.x,y:member.y,floor:run.floor,age:0,duration:def.duration,
     angle:run.heading,initialAngle:run.heading,beat:0,nextShot:firstBeat,lastFire:-Infinity};
@@ -86,11 +145,9 @@ function activateSquadSkill() {
   }else if (id===0) {
     initializeRadioTeam();
     skill.hp=skill.maxHp=def.durability;
-    skill.boardFrom=run.squad.map(m=>({x:m.x,y:m.y}));
-    skill.radioFrom=run.radioTeam?.map(m=>({x:m.x,y:m.y}));
-    for(const occupant of [...run.squad.filter(m=>m.deployed),...(run.radioTeam||[])]){
-      if(occupant.hp>0){occupant.x=skill.x;occupant.y=skill.y}
-    }
+    skill.entryCel=operatorCel(member,run.t-(member.lastShot??-Infinity));
+    skill.plantFacing=member.flip||1;
+    assignBunkerCover(skill);
   }
   if (id===3) skill.plantFacing=member.flip||1;
   if (id===1 && run.talents.ravenCap)skill.duration+=1;
@@ -112,12 +169,15 @@ function cancelSquadSkill() {
   const skill=run.activeSkill;
   if (!skill) return;
   const member=run.squad[skill.id];
-  if (skill.id===0) {
+  if (skill.id===0 && (skill.phase!=='retract' || skill.hp<=0)) {
     const def=squadSkillDefs[0];
     member.skillReadyAt=run.t+skillCooldownDuration(skill.awakened?mechStats.cooldown:skill.hp>0?def.recallCooldown:def.cooldown);
   }
   member.cool=Math.max(.19,member.cool);
   member.shoot=0; member.burstIndex=0;
+  if(deployedBunker(skill))for(const m of run.squad){
+    if(m.id!==0 && m.deployed && m.hp>0)m.leavingCover=true;
+  }
   run.activeSkill=null;
   updateHud();
 }
@@ -395,7 +455,7 @@ function fireSkillBeat(member,skill) {
   skill.lastFire=skill.age;
   member.lastShot=run.t; member.shoot=.18;
   if (skill.id===0) {
-    const heading=skill.awakened?run.heading:-Math.PI*.75+(beat%4)*Math.PI*.5;
+    const heading=skill.awakened?run.heading:-Math.PI*.5+(beat%4)*Math.PI*.5;
     const candidates=combatTargets(member,285,false);
     const target=skill.awakened?candidates[0]?.enemy:candidates.find(({enemy})=>
       aimDistance(skillAim(member,enemy,heading),heading)<=Math.PI*.25)?.enemy;
@@ -427,12 +487,32 @@ function tickSquadSkills(dt) {
   if (!skill) return;
   const member=run.squad[skill.id];
   if (skill.id!==run.lead || member.hp<=0 || skill.floor!==run.floor) {cancelSquadSkill();return}
+  if(deployedBunker(skill) && skill.phase==='retract'){
+    skill.foldTime=Math.max(0,skill.foldTime-dt*1.25);
+    if(skill.foldTime===0)cancelSquadSkill();
+    return;
+  }
+  const previousAge=skill.age;
   skill.age+=dt;
+  if(deployedBunker(skill) && skill.phase==='deploy' && skill.age>bunkerBoardingAt){
+    if(!skill.seats)assignBunkerCover(skill);
+    const boarding=run.squad.some(m=>m.hp>0 && skill.seats[m.id] &&
+      (!skill.entered[m.id] || dist(m,skill.seats[m.id])>2));
+    if(boarding)skill.age=bunkerBoardingAt;
+    if(previousAge<bunkerSlamAt && skill.age>=bunkerSlamAt){
+      skillAudio.play(0,'plant',.8);
+      tone(106,.13,.085,'triangle',0,47);
+    }
+  }
   if (skill.id!==1 && skill.duration!==undefined && skill.age>=skill.duration) {cancelSquadSkill();return}
   if (!squadSkillLocked()) {skill.x=member.x; skill.y=member.y}
   switch (skill.id) {
     case 0:
-      skill.phase=skill.age<(skill.awakened?mechStats.spinUp:.58)?'deploy':'fire';
+      if(skill.phase==='deploy'){
+        const ready=skill.awakened?mechStats.spinUp:bunkerDeployTime;
+        skill.nextShot=Math.max(skill.nextShot,ready);
+        if(skill.age>=ready)skill.phase='fire';
+      }
       if (skill.phase!=='fire') return;
       break;
     case 1: updateRavenPose(skill,member);break;
