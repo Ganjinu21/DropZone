@@ -114,8 +114,9 @@ const {chromium}=require('playwright');
     const actual=await page.evaluate(()=>{
       const seen=new Set(),original=ctx.drawImage;
       ctx.drawImage=function(img,...args){seen.add(img);return original.call(this,img,...args)};
-      drawHero(run.squad[0]);const front=seen.has(art[run.squad[0].weapon.key]);seen.clear();
-      setLeader(1);drawHero(run.squad[0]);const rear=seen.has(art[run.squad[0].weapon.key]);
+      const finish=art['bulkFinish'+run.squad[0].weapon.rank];
+      drawHero(run.squad[0]);const front=seen.has(finish);seen.clear();
+      setLeader(1);drawHero(run.squad[0]);const rear=seen.has(finish);
       ctx.drawImage=original;return [run.squad[0].weapon.key,front,rear];
     });
     assert.deepEqual(actual,[drop.key,true,true]);
@@ -132,7 +133,10 @@ const {chromium}=require('playwright');
           const before=member.weapon;member.weapon=i;
           try{
             drawEquippedMember(member);
-            if(!seen.has(art[i.key]) || (i.family==='smg' && !seen.has(art[i.key+'-far'])))failures.push(i.key);
+            const role=operatorRoles[id];
+            const base=role?[role+'Base',role+'Field72',role+'Field144']:['ravenCels','ravenFieldCels','ravenField2x'];
+            const finish=role?role+'Finish'+i.rank:'raven-finish'+i.rank;
+            if(!base.some(key=>seen.has(art[key])) || (i.tier && !seen.has(art[finish])))failures.push(i.key);
           }
           finally{ctx.drawImage=original;member.weapon=before}
         }
@@ -141,7 +145,8 @@ const {chromium}=require('playwright');
         const drawn=[],original=ctx.drawImage;
         ctx.drawImage=function(img,...args){drawn.push(img);return original.call(this,img,...args)};
         try{drawEquippedMember({...run.squad[0],shieldItem:shield.key})}finally{ctx.drawImage=original}
-        if(!drawn.includes(art[shield.key]))failures.push(shield.key);
+        const keys=shield.tier?['bulkFinish'+shield.rank]:['bulkBase','bulkField72','bulkField144'];
+        if(!keys.some(key=>drawn.includes(art[key])))failures.push(shield.key);
       }
       return failures;
     });

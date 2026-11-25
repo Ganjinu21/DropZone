@@ -3,9 +3,9 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
-from locomotion import BODY_Y, CELL, RIGS, ROOT, dress_leg, legs_and_coat, walk_targets
+from locomotion import BODY_Y, CELL, RIGS, ROOT, POSE_ROWS, dress_leg, legs_and_coat, walk_targets
 
-CROP = (8,68,120,124)
+CROP = (8,50,120,124)
 RANKS = ('C','B','A','S','S-plus')
 SLOTS = ('pants','boots')
 
@@ -39,11 +39,11 @@ def leg_coordinates(leg, rest, far):
     return coords
 
 
-def posed_coordinates(body, stride, role):
+def posed_coordinates(body, stride, role,row,direction):
     rig = RIGS[role]
     coat, legs = legs_and_coat(body,rig)
     maps = [leg_coordinates(leg,rest,far) for far,(leg,rest) in enumerate(zip(legs,rig['legs']))]
-    poses = [None,*walk_targets(body,role)]
+    poses = [None,*walk_targets(body,role,direction=direction)]
     for column, pose in enumerate(poses):
         frame = column-1
         coordinates = Image.new('RGBA',CELL)
@@ -56,7 +56,7 @@ def posed_coordinates(body, stride, role):
         upper = Image.new('L',CELL)
         upper.paste(coat.getchannel('A'),(0,BODY_Y[frame] if column else 0))
         coordinates.putalpha(ImageChops.subtract(coordinates.getchannel('A'),upper))
-        rendered = stride.crop((frame*192,role*128,(frame+1)*192,(role+1)*128)) if column else body
+        rendered = stride.crop((frame*192,row*128,(frame+1)*192,(row+1)*128)) if column else body
         coordinates.putalpha(ImageChops.darker(coordinates.getchannel('A'),rendered.getchannel('A')))
         yield coordinates.crop(CROP)
 
@@ -103,9 +103,9 @@ def build_worn_armor(armory_dir):
     bodies = Image.open(armory_dir/'bodies.png').convert('RGBA')
     stride = Image.open(armory_dir/'crew-stride.png').convert('RGBA')
     cells = []
-    for role in range(len(RIGS)):
+    for row,(role,direction) in enumerate(POSE_ROWS):
         body = bodies.crop((role*192,0,(role+1)*192,128))
-        cells.append(list(posed_coordinates(body,stride,role)))
+        cells.append(list(posed_coordinates(body,stride,role,row,direction)))
     out = armory_dir/'worn'
     out.mkdir(exist_ok=True)
     cw,ch = CROP[2]-CROP[0],CROP[3]-CROP[1]

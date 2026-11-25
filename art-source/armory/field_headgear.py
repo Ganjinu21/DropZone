@@ -13,6 +13,12 @@ PATCH=('.##.##.###','#..#....#.','#..#....#.','#..#....#.','.##.##..#.')
 
 def head(body,role,rank,catalog):
     top=body.crop((0,0,192,48))
+    if role==1:
+        tier=RANKS.index(rank)
+        w,h=[(22,11),(24,13),(25,15),(27,16),(28,17)][tier]
+        cap=Image.open(catalog/'helmet'/(rank+'.png')).convert('RGBA').resize((w,h),Image.Resampling.NEAREST)
+        top.alpha_composite(cap,(66-w//2,19-h))
+        return top
     x,brow=FIT[role]
     layer=ImageDraw.Draw(top)
     # Only the crown is removed. Ears, faces, masks, scarf tails, the radio whip and

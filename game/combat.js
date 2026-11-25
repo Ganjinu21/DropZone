@@ -162,6 +162,7 @@ function shoot(member) {
     return;
   }
   if (sniper) run.mark=target;
+  member.lastShot=run.t;
   combatAim(member,target.x,chestY(target),col,lead);
   const barrel=combatMuzzle(member,col,lead);
   member.aimAngle=Math.atan2(Math.sin(member.aimPitch),member.flip*Math.cos(member.aimPitch));
@@ -174,8 +175,8 @@ function shoot(member) {
   const back=sniper?21:6;
   run.effects.push({...state,clip:'brass',x:barrel.x-back*Math.cos(state.angle),y:barrel.y-back*Math.sin(state.angle),duration:.23});
   if (lead) gunAudio.play(dual?(col===1?'raven-a':'raven-b'):weapon.name);
-  member.burstIndex=dual?(beat+1)%4:0;
-  member.cool=dual && member.burstIndex!==0 ? .106 : weapon.delay;
+  member.burstIndex=dual && member.ammo>0?(beat+1)%3:0;
+  member.cool=dual && member.burstIndex!==0 ? .068 : weapon.delay;
 }
 
 function roundImpact(shot, enemy, x, y, state) {
@@ -184,10 +185,6 @@ function roundImpact(shot, enemy, x, y, state) {
   damageEnemy(enemy,Math.round(shot.damage*heavyBonus),shot.angle,state,shot.id);
   state.effects.push({clip:pierce?'pierce_exit':'hit_spark',x,y,id:shot.id,
     lead:shot.lead,angle:shot.angle,age:0,duration:pierce?.148:.132});
-  if (shot.skillRound==='raven') {
-    state.effects.push({skillFx:'smgTrail',awakened:shot.awakened,x:shot.x,y:shot.y,tx:x,ty:y,
-      angle:shot.angle,id:1,age:0,duration:.16});
-  }
   if (state===run && shot.lead && shot.id===run.lead) gunAudio.play('hit');
   shot.hit.add(enemy);
   shot.remaining--;
@@ -218,7 +215,8 @@ function advanceRounds(dt, state=run, floor=run.floor) {
   let kept=0;
   for (const shot of state.marks) {
     const from=shot.age*shot.speed;
-    shot.age=Math.min(shot.duration,shot.age+dt);
+    shot.age=Math.min(shot.duration,shot.age+(shot.firstStep??dt));
+    if(shot.firstStep!=null)delete shot.firstStep;
     const to=shot.age*shot.speed, ux=Math.cos(shot.angle), uy=Math.sin(shot.angle);
     if (shot.contact) {
       if (shot.contact.hp>0 && state.enemies.includes(shot.contact)) {
@@ -226,12 +224,17 @@ function advanceRounds(dt, state=run, floor=run.floor) {
       }
       shot.contact=null;
     }
-    const collisions=shot.remaining>0 ? rayCollisions(shot,state,floor,from,to) : [];
+    const collisions=shot.skillRound!=='raven' && shot.remaining>0 ? rayCollisions(shot,state,floor,from,to) : [];
     for (const {enemy,enter} of collisions) {
       roundImpact(shot,enemy,shot.x+ux*enter,shot.y+uy*enter,state);
       if (shot.remaining===0) break;
     }
-    if (shot.remaining>0 && shot.age<shot.duration) state.marks[kept++]=shot;
+    if (shot.remaining<=0) continue;
+    if (shot.age<shot.duration) state.marks[kept++]=shot;
+    else if (shot.skillRound==='raven') {
+      state.effects.push({skillFx:'ravenGroundHit',id:1,x:shot.tx,y:shot.ty,
+        flight:shot,angle:shot.angle,age:0,duration:(shot.secondary && !shot.groundSpark) ? .48 : .68});
+    }
   }
   state.marks.length=kept;
 }

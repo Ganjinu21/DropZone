@@ -99,3 +99,13 @@ node work/review-shots.cjs
 진행·증강·승패·재시작과 터치 이동 중 선두 교대를 확인합니다. 에셋 가공 스크립트에는 Python, Pillow가 필요하며 도로 생성에는 NumPy도 사용합니다. 게임 실행과 APK 빌드에는 가공이 완료된 `game/`의 에셋을 그대로 사용합니다.
 
 Galmuri 폰트의 라이선스는 `game/Galmuri-LICENSE.txt`에 있습니다.
+
+## 전투 작업실
+
+```powershell
+node design/combat-lab/server.cjs
+```
+
+브라우저에서 `http://127.0.0.1:8765`를 엽니다. 세로형 실게임 화면에서 선두와 표적 배치를 선택한 뒤 기본 공격이나 스킬을 재생할 수 있습니다. 일시 정지, 프레임 이동, 속도 변경과 추가 이펙트별 비교를 지원합니다. `game/` 또는 `design/combat-lab/`을 저장하면 현재 설정으로 장면을 다시 엽니다.
+
+이펙트 시안은 `design/combat-lab/fixture.js`에 있습니다. 작업실 서버가 미리보기에서만 이 스크립트를 불러옵니다.

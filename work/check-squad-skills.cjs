@@ -67,15 +67,40 @@ const {chromium} = require('playwright');
       startAt(1,foes([1370,1004],[1200,1004]));
       activateSquadSkill();
       const raven=run.activeSkill,echoes=new Set(),hands=new Set(),phases=new Set();
-      simulate(3.05,()=>{
+      const bursts=[];
+      let previousBeat=0;
+      simulate(raven.duration+.4,()=>{
+        if(raven.beat>previousBeat){
+          if(bursts.at(-1)?.cel!==raven.poseCel)bursts.push({cel:raven.poseCel,shots:0});
+          bursts.at(-1).shots+=raven.beat-previousBeat;
+          previousBeat=raven.beat;
+        }
         phases.add(raven.phase);
+        if(raven.beat>0)hands.add(run.squad[1].shotColumn);
         for(const fx of run.effects){
           if(fx.skillFx==='spinEcho')echoes.add(fx);
-          if(fx.skillFx==='smgFire')hands.add(fx.hand);
+
         }
       });
       result.raven={phases:[...phases],echoes:echoes.size,hands:hands.size,shots:raven.beat,
-        damage:run.enemies.map(e=>500-e.hp)};
+        bursts:bursts.map(b=>b.shots),damage:run.enemies.map(e=>500-e.hp)};
+      const ring=Array.from({length:24},(_,i)=>{
+        const angle=i*TAU/24;
+        return [1280+95*Math.cos(angle),1004+95*Math.sin(angle)];
+      });
+      startAt(1,foes(...ring));activateSquadSkill();simulate(1.0);
+      result.raven.ringHits=run.enemies.filter(e=>e.hp<500).length;
+      startAt(1,foes([1280,997]));activateSquadSkill();simulate(.29);
+      result.raven.windup=run.activeSkill.beat===0 && run.marks.length===0 && run.enemies[0].hp===500 && run.activeSkill.poseCel===63;
+      simulate(.06);
+      const slowed=run.enemies[0],firstHp=slowed.hp;
+      simulate(.12);const beforeSecond=slowed.hp;
+      simulate(.07);result.raven.fastHits=slowed.hp<beforeSecond && firstHp===beforeSecond;
+      result.raven.slow=ravenMovementScale(slowed);
+      result.raven.chances=[105,105.1,155.1,210.1,265.1,315,315.1].map(ravenHitChance);
+      cancelSquadSkill();simulate(.85);
+      result.raven.recovered=ravenMovementScale(slowed);
+      result.raven.insideRingHit=run.enemies[0].hp<500;
       startAt(2,foes([1370,1004],[1410,1008],[1440,1011]));
       activateSquadSkill();
       const beams=new Set();
@@ -84,7 +109,7 @@ const {chromium} = require('playwright');
       startAt(1,foes(),6);
       const chargeStart=run.t,casts=[];
       for(let n=0;n<3;n++){
-        casts.push(activateSquadSkill());simulate(3.05);
+        casts.push(activateSquadSkill());simulate(.2);cancelSquadSkill();
       }
       result.charges={casts,blocked:!activateSquadSkill(),deadlines:ravenPendingCharges().map(t=>Math.round(t-chargeStart))};
       run.t=chargeStart+10;
@@ -160,9 +185,15 @@ const {chromium} = require('playwright');
     assert.equal(result.bulk.protected,true);
     assert.ok(result.bulk.shots>=10 && result.bulk.sectors===4 && result.bulk.hurt);
     assert.equal(result.cooldownBlocks,true);
-    assert.deepEqual(result.raven.phases,['forward','spin']);
-    assert.ok(result.raven.echoes>=8 && result.raven.hands===2 && result.raven.shots>=30);
+    assert.deepEqual(result.raven.phases,['spin']);
+    assert.ok(result.raven.echoes>=8 && result.raven.hands===2 && result.raven.shots===96);
+    assert.deepEqual(result.raven.bursts,Array(32).fill(3));
     assert.ok(result.raven.damage.every(d=>d>0));
+    assert.equal(result.raven.ringHits,24);
+    assert.equal(result.raven.insideRingHit,true);
+    assert.equal(result.raven.fastHits,true);assert.equal(result.raven.windup,true);
+    assert.deepEqual(result.raven.chances,[1,.9,.8,.7,.6,.6,0]);
+    assert.equal(result.raven.slow,.65);assert.equal(result.raven.recovered,1);
     assert.equal(result.lynx.beams,4);
     assert.ok(result.lynx.damaged.every(d=>d>=58));
     assert.equal(result.hammer.before,500);

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drop Zone · 전투 작업실</title>
+<link rel="stylesheet" href="lab.css">
+<main>
+  <aside>
+    <h1>전투 작업실</h1>
+    <label>선두 대원<select id="crew"></select></label>
+    <label>선두 무기 등급<select id="rank"><option>C</option><option>B</option><option selected>A</option><option>S</option><option>S+</option></select></label>
+    <label>장면<select id="scene"><option value="single">단일 표적</option><option value="line">일렬 표적</option><option value="swarm">포위 표적</option><option value="boss">잡몹과 보스 경고</option><option value="live">실제 웨이브</option></select></label>
+    <label>재생 속도<select id="speed"><option value="1">1×</option><option value="0.5">½×</option><option value="0.25">¼×</option></select></label>
+    <div class="buttons"><button id="basic">기본 공격</button><button id="skill">스킬 발동</button><button id="pause">일시 정지</button><button id="step">1프레임</button><button id="reset">장면 초기화</button></div>
+    <fieldset><legend>추가 이펙트</legend>
+      <label><input id="flash" type="checkbox" checked> 총구·발동 섬광</label>
+      <label><input id="trail" type="checkbox" checked> 탄도·잔광</label>
+      <label><input id="impact" type="checkbox" checked> 명중·착탄</label>
+    </fieldset>
+    <p id="status" role="status">게임 에셋 로딩 중</p>
+    <p>파일 저장 시 자동 새로고침. 대원·장면·속도·이펙트 설정은 유지됩니다.</p>
+  </aside>
+  <iframe id="preview" title="세로형 실게임 전투 미리보기"></iframe>
+</main>
+<script src="lab.js"></script>
+</html>
+

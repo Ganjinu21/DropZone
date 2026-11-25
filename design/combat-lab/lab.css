@@ -1,0 +1,19 @@
+* { box-sizing: border-box }
+body { margin: 0; background: #101923; color: #eee9df; font: 15px/1.5 system-ui, sans-serif }
+main { max-width: 880px; margin: auto; padding: 18px; display: grid; grid-template-columns: 260px minmax(0,1fr); gap: 24px; align-items: start }
+aside { padding: 18px; border: 1px solid #475562; background: #182431 }
+h1 { margin: 0 0 16px; font-size: 22px }
+label { display: block; margin-bottom: 10px }
+select, button { background: #263646; border: 1px solid #607282; color: inherit; border-radius: 3px; padding: 8px; font: inherit }
+select { display: block; width: 100%; margin-top: 4px }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 }
+#basic, #skill { color: #191c23; background: #efbe70; font-weight: bold }
+button, select, input { cursor: pointer }
+fieldset { border: 1px solid #607282; margin: 0 }
+fieldset label { margin: 4px 0 }
+p { font-size: 13px; color: #bac5cf; margin-bottom: 0 }
+iframe { display: block; margin: 0 auto; width: min(100%, 420px, calc((100dvh - 36px) * .49)); aspect-ratio: 9 / 19.5; background: #0a1118; border: 1px solid #607282 }
+@media(max-width:640px) {
+  main { display: flex; flex-direction: column; gap: 10px; padding: 10px; align-items: stretch }
+  iframe { width: min(100%, 360px) }
+}

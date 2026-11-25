@@ -242,3 +242,5 @@
 #continue-run[hidden]{display:none}
 #upgrade header{display:flex;align-items:center;justify-content:space-between;gap:8px}
 #upgrade-home{min-height:38px;padding:4px 10px;font:inherit;font-size:13px;color:#e3e8db;background:#283932;border:1px solid #89977e}
+
+.figure[data-inspect="1"] canvas, img[src*="raven-cels/portrait-"] { image-rendering: auto; }

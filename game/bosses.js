@@ -61,7 +61,7 @@ function tickBossAttack(dt, nav) {
     mark.age+=dt;
     if (mark.age<cfg.windup || mark.done) continue;
     if (cfg.kind==='charge') {
-      const step=Math.min(mark.length-mark.travel,420*dt);
+      const step=Math.min(mark.length-mark.travel,420*ravenMovementScale(boss)*dt);
       const px=boss.x,py=boss.y;
       const tx=boss.x+step*mark.dx, ty=boss.y+step*mark.dy;
       if (nav.clear(boss.x,boss.y,tx,ty,4)) {

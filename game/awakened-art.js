@@ -77,9 +77,8 @@ function siegeShotSocket(m,s,port=0){
 function drawSiegeLauncher(m,s){
   const p=siegeRackPose(m,s),f=p.facing;
   ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(f,1);
-  drawCrewBody(ctx,m,false,-.2);
-  const glove=fieldGear(m.loadout,'gloves');
-  ctx.save();ctx.translate(0,-28);drawCrewHand(ctx,3,false,4,3,glove);drawCrewHand(ctx,3,true,11,1,glove);ctx.restore();
+  const index=operatorSkillCel(m,s);
+  drawOperatorBody(ctx,m,index);
   ctx.restore();
   ctx.save();ctx.translate(Math.round(p.x),Math.round(p.y));ctx.scale(f,1);
   for(const end of [-15,15]){
@@ -93,11 +92,10 @@ function drawPulseArms(m,s){
   const since=s.age-s.lastFire;
   if(m.id===1){
     for(let hand=0;hand<2;hand++){
-      const angle=s.phase==='spin'?s.angle+hand*Math.PI:s.angle;
-      const socket=skillShotSocket(m,s,angle,hand),c=Math.cos(angle),v=Math.sin(angle);
+      const socket=skillShotSocket(m,s,s.angle,hand),c=Math.cos(socket.angle),v=Math.sin(socket.angle);
       const width=since<.09?10:4;
-      skillPixelLine(socket.x-c*width,socket.y-v*width,socket.x,socket.y,'#4fbbb1',2);
-      skillPixelLine(socket.x-c*3,socket.y-v*3,socket.x,socket.y,'#cff8dc');
+      skillPixelLine(socket.x-c*width,socket.y-v*width,socket.x,socket.y,'#f04b67',2);
+      skillPixelLine(socket.x-c*3,socket.y-v*3,socket.x,socket.y,'#ffc6cc');
     }
   }else if(m.id===2 && s.phase==='charge'){
     const socket=skillShotSocket(m,s,s.angle);

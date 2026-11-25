@@ -63,6 +63,7 @@ function paintPrep(){
   $('slots-right').innerHTML=['helmet','top','pants'].map(slotButton).join('');
   for(const canvas of $('crew-figures').querySelectorAll('canvas')){
     const id=Number(canvas.closest('button').dataset.inspect);
+    if(id===1){canvas.width=336;canvas.height=256}
     drawCrewPreview(canvas,id,draftEquipment[id]);
   }
   paintInventory();

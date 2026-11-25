@@ -1,0 +1,77 @@
+'use strict';
+
+const operatorRoles=['bulk',null,'lynx','hammer','cct'];
+const operatorSlots=['weapon','shield','helmet','top','pants','boots','gloves'];
+const operatorBreathBeats=[0,1,2,3,2,1];
+const operatorCelArt={};
+for(const role of operatorRoles.filter(Boolean)){
+  const dir='art/armory/painted-squad/'+role;
+  operatorCelArt[role+'Base']=dir+'.webp';
+  for(const size of [72,144])operatorCelArt[role+'Field'+size]=dir+'-'+size+'.webp';
+  for(const {rank} of rankedTiers.slice(1)){
+    operatorCelArt[role+'Finish'+rank]=dir+'-'+rank.replace('+','-plus')+'.webp';
+  }
+}
+
+// Five gun elevations plus horizontal reflection cover eight screen directions.
+function operatorAimCel(angle,recoil){
+  const step=Math.round(Math.atan2(Math.sin(angle),Math.abs(Math.cos(angle)))/(Math.PI/4));
+  return step===0?(recoil?3:2):[4,5,2,6,7][step+2]+(recoil?8:0);
+}
+function operatorCel(m,age,moving=m.moving){
+  if(m.boarding!=null)return 8+Math.min(3,Math.floor(m.boarding*4));
+  const now=typeof run==='object' && run?run.t:0;
+  const signal=now-(m.signalAt??-Infinity);
+  if(m.id===4 && signal>=0 && signal<.83)return 8+Math.min(3,Math.floor(signal/.205));
+  if(age>=0 && age<.20)return operatorAimCel(m.operatorAngle??m.aimAngle??0,age>=.038 && age<.135);
+  if(moving){
+    const stride=crewStrideFrame(m);
+    if(m.walkRow===6 || m.walkRow===7)return (m.walkRow===6?24:28)+(stride>>1);
+    return 16+stride;
+  }
+  const rest=paintedOperators[operatorRoles[m.id]].breathStart;
+  if(reduceMotion.matches)return rest;
+  const period=[1.65,0,1.85,1.55,1.72][m.id];
+  const phase=((now/period+m.id*.17)%1+1)%1;
+  return rest+operatorBreathBeats[Math.floor(phase*operatorBreathBeats.length)];
+}
+function operatorSkillCel(m,s,angle=s.angle){
+  const since=s.age-s.lastFire;
+  if(m.id===2){
+    const aim=operatorAimCel(angle,s.phase!=='charge' && since<.13);
+    if(aim!==2 && aim!==3)return aim;
+    if(s.phase==='charge')return s.age<.15?8:s.age<.33?9:10;
+    return since<.13?11:10;
+  }
+  const plant=clamp(Math.min(s.age/.64,(s.duration-s.age)/.40),0,1);
+  const frame=plant<.27?0:plant<.60?1:plant<.88 || since<.13?2:3;
+  return (s.awakened?32:8)+frame;
+}
+function operatorTip(m,index,facing=m.flip||1,x=m.x,y=m.y){
+  const [px,py,a]=paintedOperators[operatorRoles[m.id]].tips[index];
+  const angle=a*Math.PI/180;
+  return {x:Math.round(x)+facing*(px-128)*72/256,y:Math.round(y)+(py-240)*72/256,
+    angle:Math.atan2(Math.sin(angle),facing*Math.cos(angle))};
+}
+function drawOperatorBody(g,m,index){
+  const role=operatorRoles[m.id],layers=paintedOperators[role].layers[index];
+  const ratio=72/128;
+  g.save();g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+  const transform=g.getTransform(),scale=Math.hypot(transform.a,transform.b);
+  const size=scale<=1?72:scale<=2?144:256;
+  const image=art[role+(size===256?'Base':'Field'+size)];
+  g.drawImage(image,index%8*size,Math.floor(index/8)*size,size,size,-36,-67.5,72,72);
+  for(let i=0;i<operatorSlots.length;i++){
+    const slot=operatorSlots[i];
+    const item=slot==='weapon'?m.weapon:gearByKey.get(slot==='shield'?m.shieldItem:m.loadout?.[slot]);
+    if(!item?.tier || !layers[i])continue;
+    const [sx,sy,w,h,x,y]=layers[i];
+    g.drawImage(art[role+'Finish'+item.rank],sx,sy,w,h,x*ratio-36,y*ratio-67.5,w*ratio,h*ratio);
+  }
+  g.restore();
+}
+function drawOperatorGear(g,m,age,moving){
+  g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
+  drawOperatorBody(g,m,operatorCel(m,age,moving));
+  g.restore();
+}

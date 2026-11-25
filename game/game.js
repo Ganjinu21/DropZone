@@ -6,13 +6,19 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), dist=(a,b)=>Math.hypot(a.x-b.x,a
 const names=['벌크','레이븐','링스','해머','CCT'], roles=['돌격병','SMG 양손잡이','저격병','로켓병','공중통제사'];
 const memberHealth=[145,98,85,102,94];
 ['bulk','raven','lynx','hammer','cct'].forEach((role,id)=>{
- ART['face'+id]='art/armory/'+role+'-portrait.png';
+ ART['face'+id]=id===1?'art/armory/raven-cels/portrait-C.png':'art/armory/painted-squad/'+role+'-portrait-C.png';
 });
 const formationSlots = [[23, 0], [-15, -24], [-18, 24]];
 const swapTime = 1.5;
 let mode='home',run,viewW=960,viewH=540,stick=null,pressed=new Set(),sound,last=0,selected=0,offers=[];
 function clock(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0')}
-function resize(){viewH=innerHeight>innerWidth?Math.round(420*innerHeight/innerWidth):540;viewW=Math.round(viewH*innerWidth/innerHeight);cv.width=viewW;cv.height=viewH;ctx.imageSmoothingEnabled=false}
+function resize(){
+ viewH=innerHeight>innerWidth?Math.round(420*innerHeight/innerWidth):540;
+ viewW=Math.round(viewH*innerWidth/innerHeight);
+ const density=clamp(innerWidth*(window.devicePixelRatio||1)/viewW,1,2);
+ cv.width=Math.round(viewW*density);cv.height=Math.round(viewH*density);
+ ctx.imageSmoothingEnabled=false;
+}
 addEventListener('resize',resize);resize();
 function show(next){
  if(next==='home' || next==='pause')saveBattleCheckpoint();
@@ -318,7 +324,9 @@ function updateCrewStride(m,dx,dy,dt,scale=1){
  if(!m.moving)return;
  if(m.shoot<=0 && !m.aimTarget && Math.abs(dx)>dt*8)m.flip=Math.sign(dx);
  const backing=dx*m.flip<0 && Math.abs(dx)>Math.abs(dy)*.5;
- const advance=(backing?-distance:distance)/scale;
+ const depth=Math.abs(dy)>Math.abs(dx)*(m.walkRow>=6?.88:1.18);
+ m.walkRow=depth?(dy>0?6:7):backing?5:1;
+ const advance=(backing && !depth?-distance:distance)/scale;
  m.gait=((m.gait+advance)%crewStrideLength+crewStrideLength)%crewStrideLength;
 }
 function moveFormation(dt) {

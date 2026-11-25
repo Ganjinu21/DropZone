@@ -20,8 +20,13 @@ FIELD_RIG = dict(
     split=((74,63),(88,64),(104,63)), reach=18
 )
 # Lynx's cloak hangs behind the back leg; its hem moves with the upper body.
-RIGS = [FIELD_RIG, FIELD_RIG, dict(FIELD_RIG,waist=((0,88),(32,87),*FIELD_RIG['waist'][1:])),
+RAVEN_RIG=dict(legs=(((55,61),(43,83),(32,102)),((66,61),(83,81),(88,100))),
+               waist=((0,66),(45,66),(53,60),(67,61),(79,68),(110,68)),
+               split=((60,58),(83,63),(105,64)),reach=19)
+RIGS = [FIELD_RIG, RAVEN_RIG, dict(FIELD_RIG,waist=((0,88),(32,87),*FIELD_RIG['waist'][1:])),
         FIELD_RIG, FIELD_RIG]
+# Extra atlas rows share Raven's source pixels and wearable fitting coordinates.
+POSE_ROWS=[(i,'forward') for i in range(len(RIGS))]+[(1,s) for s in ('back','down','up')]
 
 # A planted foot travels backwards an equal distance on each contact frame.
 # During the return it passes the grounded ankle with a clear toe and knee lift.
@@ -58,6 +63,9 @@ def legs_and_coat(body, rig):
             if y >= waist-2:  # overlap under the original belt
                 legs[int(x >= divider)].putpixel((x,y), color)
             pelvis_depth=max(0,5-abs(x-center)*.3)
+            if rig is RAVEN_RIG:
+                # Retain the seat of the trousers across both moving hip sockets.
+                pelvis_depth=max(2,10-abs(x-center)*.38)
             if y >= waist+pelvis_depth:
                 upper.putpixel((x,y),(0,0,0,0))
     return upper, legs
@@ -71,7 +79,7 @@ def knee_position(hip, ankle, upper_length, lower_length):
     return (hip[0]+(dx*along+dy*height)/distance,hip[1]+(dy*along-dx*height)/distance)
 
 
-def pose(leg, rig, frame, is_far, sole):
+def pose(leg, rig, frame, is_far, sole, direction='forward'):
     hip,knee,ankle = leg
     phase=(frame+4*is_far)%8
     # Both knees aim forward. Slight camera-depth separation keeps the far sole
@@ -81,6 +89,24 @@ def pose(leg, rig, frame, is_far, sole):
     planted_y = 119 - 2*is_far - round(depth)
     lane = (rig['legs'][0][0][0]+rig['legs'][1][0][0])/2 + (1 if is_far else -1)
     foot = (round(lane+rig['reach']*TRAVEL[phase]), planted_y-LIFT[phase])
+    if rig is RAVEN_RIG:
+        lateral=direction in ('up','down')
+        reach=4 if lateral else 12 if direction=='back' else 17
+        pitch=radians((-5,-3,0,2,6,7,4,-2)[phase]*(.45 if lateral else 1))
+        depth=max(dx*sin(pitch)+dy*cos(pitch) for dx,dy in sole)
+        lane=60+(3 if is_far else -3)
+        perspective=(1 if direction=='down' else -1)*6*TRAVEL[phase] if lateral else 0
+        lift=(0,0,0,0,1,4,6,3)[phase]
+        foot=(round(lane+reach*TRAVEL[phase]), round(119-3*is_far+perspective-depth-lift))
+        rotation=(2,1,0,-1,-2,-1,0,1)[phase]
+        pelvis=(hip[0]+rotation,hip[1]+BODY_Y[frame])
+        # Key the femur from heel contact through toe-off and the passing pose.
+        # The ankle stays on its contact path while the knee leads the swing.
+        swing=(24,17,4,-9,-16,-5,17,29)[phase]
+        angle=radians(swing*(.48 if lateral else .78 if direction=='back' else 1))
+        length=hypot(knee[0]-hip[0],knee[1]-hip[1])
+        raised_knee=(pelvis[0]+length*sin(angle),pelvis[1]+length*cos(angle))
+        return (pelvis,raised_knee,foot),pitch
     pelvis = (hip[0], hip[1]+BODY_Y[frame])
     knee = knee_position(pelvis, foot, hypot(knee[0]-hip[0],knee[1]-hip[1]),
                          hypot(ankle[0]-knee[0], ankle[1]-knee[1]))
@@ -111,7 +137,7 @@ def bone_pixels(layer, start, end, before, after, width):
     return result
 
 
-def place_piece(piece, source, target, angle, length_ratio=1, source_angle=0):
+def place_piece(piece, source, target, angle, length_ratio=1, source_angle=0, anatomical=False):
     """Rigid rotation about the painted joint, with length adjustment along the limb only."""
     c,s = cos(angle),sin(angle)
     u,v = cos(source_angle),sin(source_angle)
@@ -119,6 +145,10 @@ def place_piece(piece, source, target, angle, length_ratio=1, source_angle=0):
     # Inverse rotate target coordinates then unscale along the original bone axis.
     a,b = c*(1+change*u*u)-s*change*u*v, s*(1+change*u*u)+c*change*u*v
     d,e = c*change*u*v-s*(1+change*v*v), s*change*u*v+c*(1+change*v*v)
+    if anatomical:
+        # Pillow samples destination -> source: undo rotation, then axial stretch.
+        xx,xy,yy=1+change*u*u,change*u*v,1+change*v*v
+        a,b,d,e=xx*c-xy*s,xx*s+xy*c,xy*c-yy*s,xy*s+yy*c
     tx,ty = target
     coeffs = (a,b,source[0]-a*tx-b*ty,d,e,source[1]-d*tx-e*ty)
     return piece.transform(CELL, Image.Transform.AFFINE, coeffs, Image.Resampling.NEAREST)
@@ -143,14 +173,15 @@ def dress_leg(layer, rest, moved, pitch):
     x,y=knee
     ImageDraw.Draw(pad_mask).ellipse((x-8,y-7,x+8,y+7),fill=255)
     kneepad.paste(layer,mask=pad_mask)
-    result=place_piece(shin,knee,k,lower_turn,lower_ratio,lower_angle)
-    result.alpha_composite(place_piece(thigh,hip,h,upper_turn,upper_ratio,upper_angle))
-    result.alpha_composite(place_piece(kneepad,knee,k,(upper_turn+lower_turn)*.5))
-    result.alpha_composite(place_piece(boot,ankle,a,pitch))
+    raven=rest in RAVEN_RIG['legs']
+    result=place_piece(shin,knee,k,lower_turn,lower_ratio,lower_angle,raven)
+    result.alpha_composite(place_piece(thigh,hip,h,upper_turn,upper_ratio,upper_angle,raven))
+    result.alpha_composite(place_piece(kneepad,knee,k,(upper_turn+lower_turn)*.5,anatomical=raven))
+    result.alpha_composite(place_piece(boot,ankle,a,pitch,anatomical=raven))
     return result
 
 
-def walk_targets(body, role, legs=None):
+def walk_targets(body, role, legs=None,direction='forward'):
     """Return near/far (hip, knee, ankle) coordinates and boot pitch per frame.
     Source sole pixels determine the ankle height for each tipped boot. Use this
     pose from the original body even when rendering a fitted equipment layer.
@@ -163,25 +194,26 @@ def walk_targets(body, role, legs=None):
         ax,ay=ankle
         soles.append([(x-ax,y-ay) for y in range(ay-3,CELL[1]) for x in range(CELL[0])
                       if leg.getpixel((x,y))[3]>64])
-    return [[pose(rest,rig,frame,bool(i),soles[i]) for i,rest in enumerate(rig['legs'])]
+    return [[pose(rest,rig,frame,bool(i),soles[i],direction) for i,rest in enumerate(rig['legs'])]
             for frame in range(8)]
 
 
 def stride_sheet(path):
     path=Path(path)
     bodies=Image.open(path.parent/'bodies.png').convert('RGBA')
-    atlas=Image.new('RGBA',(8*CELL[0],len(RIGS)*CELL[1]))
-    for role,rig in enumerate(RIGS):
+    atlas=Image.new('RGBA',(8*CELL[0],len(POSE_ROWS)*CELL[1]))
+    for row,(role,direction) in enumerate(POSE_ROWS):
+        rig=RIGS[role]
         body=bodies.crop((role*CELL[0],0,(role+1)*CELL[0],CELL[1]))
         coat,legs=legs_and_coat(body,rig)
-        for frame,targets in enumerate(walk_targets(body,role,legs)):
+        for frame,targets in enumerate(walk_targets(body,role,legs,direction)):
             cel=Image.new('RGBA',CELL)
             for i in [1,0]:
                 rest=rig['legs'][i]
                 moved,pitch=targets[i]
                 cel.alpha_composite(dress_leg(legs[i],rest,moved,pitch))
             cel.alpha_composite(coat,(0,BODY_Y[frame]))
-            atlas.alpha_composite(cel,(frame*CELL[0],role*CELL[1]))
+            atlas.alpha_composite(cel,(frame*CELL[0],row*CELL[1]))
     atlas.save(path,optimize=True)
 
 

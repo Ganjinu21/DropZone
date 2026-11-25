@@ -1,8 +1,9 @@
 'use strict';
 
+const ravenWindup=.30, ravenFiringTime=5.04;
 const squadSkillDefs = [
   {name:'벙커 전개', awakenedName:'미니건 메카', cooldown:15, recallCooldown:10, durability:160},
-  {name:'쌍기관단총 난사', awakenedName:'삼중 난사', duration:3, cooldown:10},
+  {name:'쌍기관단총 난사', awakenedName:'삼중 난사', duration:ravenWindup+ravenFiringTime, cooldown:10},
   {name:'관통 사격', awakenedName:'집중 레일건', duration:2.55, cooldown:11},
   {name:'박격포 포격', awakenedName:'다연장 공성포', duration:3.65, cooldown:13},
   {name:'코브라 공중지원',awakenedName:'A-10 공중지원',duration:7,cooldown:28}
@@ -69,10 +70,12 @@ function activateSquadSkill() {
   }
   if (run.activeSkill || squadSkillCooldown(id)>0) return false;
   if(id===4)return callCobra(member);
-  const firstBeat=[.58,.18,.42,.82][id];
-  const phase=['deploy','forward','charge','deploy'][id];
+  const firstBeat=[.58,ravenWindup,.42,.82][id];
+  const phase=['deploy','spin','charge','deploy'][id];
   const skill={id,awakened:form===2,phase,x:member.x,y:member.y,floor:run.floor,age:0,duration:def.duration,
     angle:run.heading,initialAngle:run.heading,beat:0,nextShot:firstBeat,lastFire:-Infinity};
+  if(id===1)Object.assign(skill,{poseCel:60,angle:-1.05,initialAngle:-Math.PI/2,
+    sprayTick:0,sprayDirections:[],burstDirections:[]});
   if(skill.awakened && id===2)skill.nextShot=1;
   if(skill.awakened && id===3)skill.nextShot=.60;
   if(id===0 && skill.awakened){
@@ -165,6 +168,14 @@ function clearShotRange(member,angle,range) {
 }
 
 function skillRay(member,skill,heading,target,range,hand) {
+  const spinning=skill.id===1 && skill.phase==='spin';
+  if(spinning){
+    const reach=clearShotRange(member,heading,range);
+    const inset=Math.min(19,reach),ux=Math.cos(heading),uy=Math.sin(heading);
+    return {x:member.x+ux*inset,y:member.y-25+uy*inset,
+      tx:member.x+ux*reach,ty:member.y-25+uy*reach,angle:heading,length:reach-inset,
+      sourceX:member.x,sourceY:member.y,id:member.id,lead:true,hit:new Set(),age:0};
+  }
   const barrel=skillShotSocket(member,skill,heading,hand);
   let angle=heading, contact=null;
   if (target) {
@@ -182,14 +193,16 @@ function skillRay(member,skill,heading,target,range,hand) {
 function fireSkillBullet(member,skill,heading,target,hand) {
   const bulk=skill.id===0;
   const shot=skillRay(member,skill,heading,target,bulk?285:315,hand);
-  const speed=bulk?650:860;
-  const damage=Math.round((bulk && !skill.awakened?21:9)*(1+member.weapon.power/100)*weaponRunMultiplier(member.id));
+  if(!bulk)shot.smokeSeed=Math.floor(Math.random()*65536);
+  const speed=bulk?650:1080;
+  const damage=Math.round((bulk && !skill.awakened?21:skill.phase==='spin'?4.5:9)*(1+member.weapon.power/100)*weaponRunMultiplier(member.id));
   Object.assign(shot,{speed,duration:shot.length/speed,damage,awakened:skill.awakened,
     remaining:1,skillRound:bulk?'bulk':'raven'});
   run.marks.push(shot);
-  run.effects.push({skillFx:bulk?'bunkerFire':'smgFire',x:shot.x,y:shot.y,angle:shot.angle,
-    id:member.id,hand,awakened:skill.awakened,lead:true,age:0,duration:bulk?.115:.075});
+  if(bulk)run.effects.push({skillFx:'bunkerFire',x:shot.x,y:shot.y,angle:shot.angle,
+    id:member.id,hand,awakened:skill.awakened,lead:true,age:0,duration:.115});
   skillAudio.play(member.id,bulk?'cannon':hand?'smgB':'smgA',bulk?.42:.32);
+  return shot;
 }
 
 function fireRailBeam(member,skill) {
@@ -283,6 +296,101 @@ function fireBarrageShell(member,skill) {
   fireMortar(member,{x:member.x+Math.cos(angle)*reach,y:member.y+Math.sin(angle)*reach},skill);
 }
 
+const ravenBodyTurns=2, ravenSectors=24;
+// One turn in 48 firing beats, three shots per pose. Arms close across the
+// chest and open again as the weight passes from one boot to the other.
+const ravenTurnBeats=48;
+const ravenShotCount=ravenBodyTurns*ravenTurnBeats;
+const ravenPoseTime=3*ravenFiringTime/ravenShotCount;
+// A short three-shot burst followed by a held silhouette before the next pivot.
+function ravenShotAt(beat){
+  return ravenWindup+Math.floor(beat/3)*ravenPoseTime+(beat%3)*.041;
+}
+const ravenChoreography=[
+  [0,66],[3,48],[6,52],[9,64],[12,53],[15,65],[18,56],[21,68],
+  [24,50],[27,58],[30,69],[33,67],[36,54],[39,70],[42,55],[45,71]
+];
+function ravenStepAtBeat(beat){
+  return ravenChoreography.findIndex((_,i)=>beat<(ravenChoreography[i+1]?.[0]??ravenTurnBeats));
+}
+function updateRavenPose(skill,member){
+  if(skill.age<ravenWindup){
+    const time=skill.age*4/ravenWindup,frame=Math.min(3,Math.floor(time));
+    skill.poseCel=60+frame;
+    skill.poseFacing=1;skill.follow=Math.floor((time-frame)*4);
+    skill.angle=[-1.05,-1.28,-.25,-.82][frame];
+    return;
+  }
+  const turns=(skill.age-ravenWindup)*ravenBodyTurns/ravenFiringTime;
+  const beat=(turns%1)*ravenTurnBeats;
+  const index=ravenStepAtBeat(beat);
+  const [start,cel]=ravenChoreography[index];
+  const end=ravenChoreography[index+1]?.[0]??ravenTurnBeats;
+  if(skill.poseCel!==cel){
+    run.effects.push({skillFx:'spinEcho',id:1,x:member.x,y:member.y,angle:skill.angle,
+      poseCel:skill.poseCel,poseFacing:skill.poseFacing,follow:skill.follow,age:0,duration:.11});
+  }
+  skill.poseCel=cel;skill.poseFacing=1;
+  skill.follow=Math.min(3,Math.floor((beat-start)*4/(end-start)));
+  skill.angle=Math.PI/2+turns*TAU;
+}
+const ravenFieldRadius=315;
+const ravenSprayInterval=.0125;
+// Draw one random heading from each clock sector before refilling the bag.
+// Independent bags keep the decorative rounds and three-shot bursts unpaired.
+function ravenRainHeading(bag,origin){
+  if(!bag.length){
+    for(let i=0;i<ravenSectors;i++)bag.push(i);
+    for(let i=bag.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [bag[i],bag[j]]=[bag[j],bag[i]];
+    }
+  }
+  return origin+(bag.pop()+Math.random()-.5)*TAU/ravenSectors;
+}
+function emitRavenRain(member,skill){
+  const elapsed=skill.age-ravenWindup;
+  if(elapsed<0 || reduceMotion.matches)return;
+  // Skip expired tracers if a delayed frame covers a large part of the cast.
+  skill.sprayTick=Math.max(skill.sprayTick,Math.floor((elapsed-.38)/ravenSprayInterval));
+  while(skill.sprayTick*ravenSprayInterval<=elapsed && skill.sprayTick*ravenSprayInterval<ravenFiringTime){
+    const tick=skill.sprayTick++;
+    const heading=ravenRainHeading(skill.sprayDirections,skill.initialAngle);
+    const ray=skillRay(member,skill,heading,null,ravenFieldRadius-Math.random()*62,tick%2);
+    const speed=850+Math.random()*220, duration=ray.length/speed;
+    const age=elapsed-tick*ravenSprayInterval;
+    if(age>=duration)continue;
+    run.marks.push({...ray,skillRound:'raven',secondary:true,tracerLength:58+Math.random()*34,
+      groundSpark:tick%6===0,smokeSeed:Math.floor(Math.random()*65536),
+      firstStep:age,remaining:1,speed,duration});
+  }
+}
+function ravenHitChance(distance){
+  if(distance<=105)return 1;
+  if(distance<=155)return .9;
+  if(distance<=210)return .8;
+  if(distance<=265)return .7;
+  return distance<=ravenFieldRadius?.6:0;
+}
+function hitRavenCircle(member,power,quadrant){
+  let landed=false;
+  for(const enemy of run.enemies){
+    if(enemy.hp<=0)continue;
+    const dx=enemy.x-member.x,dy=enemy.y-member.y;
+    const angle=Math.atan2(dy,dx);
+    const sector=Math.floor(((angle+TAU+Math.PI/2) % TAU)/(TAU/4));
+    if(sector!==quadrant)continue;
+    const chance=ravenHitChance(Math.hypot(dx,dy));
+    if(!chance || !routes[run.floor].clear(member.x,member.y,enemy.x,enemy.y,0))continue;
+    if(chance<1 && Math.random()>=chance)continue;
+    damageEnemy(enemy,power,angle,run,member.id);
+    enemy.ravenSlowUntil=run.t+.8;
+    run.effects.push({skillFx:'ravenStrike',x:enemy.x,y:chestY(enemy),id:member.id,lead:true,
+      angle,reach:Math.hypot(dx,dy),age:0,duration:.21});
+    landed=true;
+  }
+  if(landed)gunAudio.play('hit');
+}
 function fireSkillBeat(member,skill) {
   const beat=skill.beat,hand=beat%2;
   skill.lastFire=skill.age;
@@ -296,19 +404,13 @@ function fireSkillBeat(member,skill) {
     fireSkillBullet(member,skill,skill.angle,target,hand);
     skill.nextShot+=skill.awakened?mechStats.interval:.145;
   } else if (skill.id===1) {
-    let heading=skill.angle;
-    if (skill.phase==='spin') heading+=hand*Math.PI;
-    const candidates=combatTargets(member,315,false);
-    const target=candidates.find(({enemy})=>skill.phase!=='spin' ||
-      aimDistance(skillAim(member,enemy,heading),heading)<.22)?.enemy;
-    heading=skillAim(member,target,heading);
-    if (skill.phase==='forward') skill.angle=heading;
-    member.flip=Math.cos(skill.angle)<0?-1:1;
+    const heading=ravenRainHeading(skill.burstDirections,skill.initialAngle);
     member.shotColumn=hand?3:1;
-    if (skill.phase==='spin' && hand===0) run.effects.push({skillFx:'spinEcho',id:1,lead:true,awakened:skill.awakened,
-      x:member.x,y:member.y,gait:member.gait,moving:member.moving,angle:skill.angle,age:0,duration:.22});
-    fireSkillBullet(member,skill,heading,target,hand);
-    skill.nextShot+=skill.phase==='spin'?.07:.077;
+    const main=fireSkillBullet(member,skill,heading,null,hand);
+    const quadrant=[0,2,1,3][beat%4],pulse=Math.floor(beat/4)%3;
+    const power=Math.floor(main.damage/3)+(pulse<main.damage%3?1:0);
+    hitRavenCircle(member,power,quadrant);
+    skill.nextShot=beat+1<ravenShotCount?ravenShotAt(beat+1):Infinity;
   } else if (skill.id===2) {
     fireRailBeam(member,skill);
     skill.nextShot=skill.awakened || beat===3?Infinity:skill.nextShot+.52;
@@ -327,22 +429,21 @@ function tickSquadSkills(dt) {
   const member=run.squad[skill.id];
   if (skill.id!==run.lead || member.hp<=0 || skill.floor!==run.floor) {cancelSquadSkill();return}
   skill.age+=dt;
-  if (skill.duration!==undefined && skill.age>=skill.duration) {cancelSquadSkill();return}
+  if (skill.id!==1 && skill.duration!==undefined && skill.age>=skill.duration) {cancelSquadSkill();return}
   if (!squadSkillLocked()) {skill.x=member.x; skill.y=member.y}
   switch (skill.id) {
     case 0:
       skill.phase=skill.age<(skill.awakened?mechStats.spinUp:.58)?'deploy':'fire';
       if (skill.phase!=='fire') return;
       break;
-    case 1:
-      if (skill.age>=1.32) {
-        if (skill.phase==='forward') skill.initialAngle=skill.angle;
-        skill.phase='spin';
-        skill.angle=skill.initialAngle+(skill.age-1.32)*TAU/0.78;
-      }
-      break;
+    case 1: updateRavenPose(skill,member);break;
     case 2: skill.phase=skill.age<(skill.awakened?1:.42)?'charge':'pierce'; break;
     case 3: skill.phase=skill.age<(skill.awakened?.60:.78)?'deploy':skill.age<(skill.awakened?2.45:3.20)?'barrage':'recover'; break;
   }
   while (skill.nextShot<=skill.age) fireSkillBeat(member,skill);
+  if(skill.id===1 && skill.phase==='spin'){
+    emitRavenRain(member,skill);
+    skill.ribbonAngle=skill.initialAngle+clamp((skill.age-ravenWindup)/ravenFiringTime,0,1)*ravenBodyTurns*TAU;
+    if(skill.age>=skill.duration)cancelSquadSkill();
+  }
 }

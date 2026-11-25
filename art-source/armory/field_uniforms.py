@@ -265,13 +265,50 @@ def separate_arms(dressed, template):
     return body,arms
 
 
+def restore_operator(body, original, index):
+    # Register the approved face and its silhouette at the tall rig's collar.
+    bounds = [(16,15,94,59), (18,18,90,74), (15,19,95,83),
+              (25,8,87,47), (30,5,96,47)]
+    offsets = [(6,-9), (9,-13), (6,-13), (0,0), (0,0)]
+    cell = original.crop((index*192,0,(index+1)*192,128))
+    left,top,right,bottom = bounds[index]
+    patch = cell.crop((left,top,right,bottom))
+    # Below the collar only retain the trailing scarf or hood behind the shoulder.
+    if index in (1,2):
+        ImageDraw.Draw(patch).polygon([(43,52-top),(right-left,48-top),
+            (right-left,bottom-top),(28,bottom-top)],fill=(0,0,0,0))
+    dx,dy=offsets[index]
+    body.paste((0,0,0,0),(36,0,94,43))
+    body.alpha_composite(patch,(left+dx,top+dy))
+    return body
+
+
 def publish(out):
     out=Path(out)
     bodies=Image.new('RGBA',(len(ROLES)*CELL[0],CELL[1]))
     arms=Image.new('RGBA',bodies.size)
-    starters=publish_base_and_helmets(out,[uniform(role) for role in ROLES])
+    original=Image.open(Path(__file__).with_name('original-operators.png')).convert('RGBA')
+    operators=[restore_operator(uniform(role),original,i) for i,role in enumerate(ROLES)]
+    raven=Image.open(Path(__file__).with_name('raven-original.png')).convert('RGBA')
+    raven=raven.crop(raven.getchannel('A').point(lambda a:255 if a>100 else 0).getbbox())
+    raven=raven.resize((76,114),Image.Resampling.NEAREST)
+    raven.putalpha(raven.getchannel('A').point(lambda a:255 if a>120 else 0))
+    operators[1]=Image.new('RGBA',CELL)
+    operators[1].paste(raven,(25,6))
+    starters=publish_base_and_helmets(out,operators)
     for i,(role,dressed) in enumerate(zip(ROLES,starters)):
         body,hands=separate_arms(dressed,'cct' if role in ('cct','lynx') else 'hammer')
+        if role=='raven':
+            body=dressed.copy()
+            hands=Image.new('RGBA',CELL)
+            # Isolate bent forearms from the new art at their painted elbow seams.
+            for far,points in enumerate([[(45,44),(56,43),(60,40),(68,40),(69,46),(62,49),(50,52),(44,50)],
+                                         [(71,48),(77,45),(77,42),(82,42),(84,46),(81,49),(75,53),(69,53)]]):
+                cutout=mask(points)
+                part=Image.new('RGBA',CELL)
+                part.paste(body,mask=cutout)
+                body.paste((0,0,0,0),(0,0,*CELL),cutout)
+                hands.alpha_composite(part,(76 if far else 0,0))
         bodies.paste(body,(i*CELL[0],0))
         arms.paste(hands,(i*CELL[0],0))
     bodies.save(out/'bodies.png',optimize=True)

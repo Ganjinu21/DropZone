@@ -69,12 +69,12 @@ const {chromium} = require('playwright');
       return {beat,early,inFlight,afterBurst,heavyMarked,pierced,rankedHit,supports,front,rear,pointBlank:close.hp};
     });
     assert.deepEqual(results.beat.map(([c])=>c),[1,3,1,3]);
-    assert.ok(results.beat[3][1]>results.beat[0][1]*3);
+    assert.deepEqual(results.beat.map(([,delay])=>delay),[.068,.068,.49,.068]);
     assert.deepEqual([results.early,results.inFlight,results.afterBurst],[120,120,76]);
     assert.equal(results.heavyMarked,true);
     assert.deepEqual(results.pierced,[65,82,120]);
     assert.deepEqual(results.rankedHit,[36,120]);
-    assert.deepEqual(results.supports,[[1,1.18,113,120],[1,.106,109,120],[1,1.16,82,82]]);
+    assert.deepEqual(results.supports,[[1,1.18,113,120],[1,.068,109,120],[1,1.16,82,82]]);
     assert.ok(Math.abs(results.front-3.6)<.001 && results.rear===8);
     assert.equal(results.pointBlank,109);
     const audio=await page.evaluate(()=>{

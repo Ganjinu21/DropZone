@@ -253,7 +253,7 @@ async function exerciseFormation(page) {
             const draw=ctx.drawImage;
             let firingFrame=false;
             ctx.drawImage=function(img,...args){
-              if(img===art[item.artKey+'-skill'])firingFrame=true;
+              if(img===art[item.artKey+(family==='smg'?'':'-skill')])firingFrame=true;
               return draw.call(this,img,...args);
             };
             try{
@@ -270,11 +270,12 @@ async function exerciseFormation(page) {
     const turns=await page.evaluate(()=>{
       const m={...run.squad[1],loadout:{...savedEquipment[1],helmet:'helmet-6'},
         moving:true,gait:5,weapon:gearByKey.get('smg-6')};
-      const body=crewOutfitSheet(m),arms=art['smg-6-skill'];
+      const body=crewOutfitSheet(m);
       const draw=ctx.drawImage,seen=[];
       ctx.drawImage=function(image,...args){
-        if(image===body)seen.push('body');
-        if(image===arms)seen.push(args[1]/72);
+        if(image===body && seen.at(-1)!=='body')seen.push('body');
+        if(image===art['smg-6-far'])seen.push('far');
+        if(image===art['smg-6'])seen.push('near');
         return draw.call(this,image,...args);
       };
       try{
@@ -284,13 +285,13 @@ async function exerciseFormation(page) {
           drawSpinner(m,skill);
           const stand=skillShotSocket({...m,moving:false},skill,skill.angle);
           const walk=skillShotSocket(m,skill,skill.angle);
-          return [seen.join(','),walk.y-stand.y];
+          return [seen.join(','),walk.y-stand.y+crewTorsoY({...m,moving:false})];
         });
       }finally{ctx.drawImage=draw}
     });
     turns.forEach(([planes,dy],i)=>{
-      assert.equal(planes,[1+(i>>3),'body',3+(i>>3)].join(','));
-      assert.equal(dy,1);
+      assert.equal(planes,'far,body,near');
+      assert.ok(Math.abs(dy-1)<1e-6);
     });
     // The worn helmet and vest must stay exposed on both specialist rigs,
     // including when the weapon, helmet and vest have different ranks.

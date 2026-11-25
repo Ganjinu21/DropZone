@@ -65,12 +65,14 @@ const {chromium} = require('playwright');
       };
       // Capture real draws and decoded audio starts; a populated asset list alone
       // wouldn't detect a missing render hook or a sound played by a benched leader.
-      const sprites = new Map([...Object.keys(skillArt),'crewBodies','crewStride','rocket-3','smg-3-skill','sniper-3-skill'].map(key => [art[key],key]));
+      const sprites = new Map(Object.keys(skillArt).map(key => [art[key],key]));
+      for(const role of operatorRoles.filter(Boolean)){
+        for(const suffix of ['Base','Field72','Field144'])sprites.set(art[role+suffix],role);
+      }
+      sprites.set(art.ravenFollow,'ravenSpin');
       const draw = ctx.drawImage.bind(ctx);
       ctx.drawImage = (image,...args) => {
         if (sprites.has(image)) skillUI.drawn.add(sprites.get(image));
-        // Dressed bodies share an atlas: the first cell is idle, the next eight are walking frames.
-        if(crewOutfits.some(outfit=>outfit?.sheet===image))skillUI.drawn.add(args[0]>=192?'crewStride':'crewBodies');
         return draw(image,...args);
       };
       const audio = new Map([...skillAudio.buffers,...gunAudio.buffers].map(([name,buffer])=>[buffer,name]));
@@ -82,10 +84,10 @@ const {chromium} = require('playwright');
     });
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[0,1,2]);
     const expected = [
-      {sound:'cannon', sprites:['mechFold','bunker','crewStride','bulkRounds']},
-      {sound:'smgA', sprites:['crewBodies','smg-3-skill','ravenRounds']},
-      {sound:'pierce', sprites:['crewBodies','sniper-3-skill','lynxBeam','lynxPierce']},
-      {sound:'burst', sprites:['crewBodies','rocket-3','hammerFx','hammerBlast']}
+      {sound:'cannon', sprites:['mechFold','bunker','bulk','bulkRounds']},
+      {sound:'smgA', sprites:['ravenSpin','ravenMuzzle','ravenFlight']},
+      {sound:'pierce', sprites:['lynx','lynxBeam','lynxPierce']},
+      {sound:'burst', sprites:['hammer','hammerFx','hammerBlast']}
     ];
     for (const [id,cast] of expected.entries()) {
       if (id===3) {

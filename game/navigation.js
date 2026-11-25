@@ -1,6 +1,9 @@
 'use strict';
 
 // The same foot-level footprints drive movement, sight, and the pursuit graph.
+function ravenMovementScale(who){
+  return who.ravenSlowUntil && who.ravenSlowUntil > run.t ? .65 : 1;
+}
 class MapRoutes {
   constructor(map) {
     this.width = map.bounds.w;
@@ -125,7 +128,7 @@ class MapRoutes {
     const dx=tx-who.x,dy=ty-who.y,len=Math.hypot(dx,dy);
     if(len<.01)return;
     if(Math.abs(dx)>1)who.flip=dx<0?-1:1;
-    const step=Math.min(1,who.speed*dt/len);
+    const step=Math.min(1,who.speed*ravenMovementScale(who)*dt/len);
     // The whole segment to the goal or waypoint has clearance, including diagonal corners.
     who.x+=dx*step;
     who.y+=dy*step;

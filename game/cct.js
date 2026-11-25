@@ -10,6 +10,7 @@ function cctRadioSprite(member){
 }
 function callCobra(member){
   const awakened=skillForm(4)===2;
+  member.signalAt=run.t;
   run.cobra={awakened,age:0,duration:awakened?11:squadSkillDefs[4].duration,shot:.5,flip:1,x:member.x,y:member.y-76};
   member.skillReadyAt=run.t+squadSkillDefs[4].cooldown;
   updateHud();return true;
@@ -87,9 +88,11 @@ function updateRadioSupport(dt){
     // The small CCT replica tracks the opponent from its scaled shoulder.
     const pose={...ally,id:4,x:0,y:0,weapon:chief.weapon};
     const x=Math.round(ally.x),y=Math.round(ally.y);
+    const firing=ally.cool<=0 && magazineReady(ally,chief.weapon);
+    if(firing)pose.lastShot=run.t;
     combatAim(pose,(enemy.x-x)/summonScale,(chestY(enemy)-y)/summonScale,1);
-    ally.flip=pose.flip;ally.aimPitch=pose.aimPitch;
-    if(ally.cool<=0 && magazineReady(ally,chief.weapon)){
+    ally.flip=pose.flip;ally.aimPitch=pose.aimPitch;ally.operatorAngle=pose.operatorAngle;
+    if(firing){
       spendRound(ally,chief.weapon);
       const barrel=combatMuzzle(pose,1,false);
       const source={x:x+barrel.x*summonScale,y:y+barrel.y*summonScale};
