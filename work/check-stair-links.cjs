@@ -8,7 +8,7 @@ const path = require('path');
   });
   try {
     const page = await browser.newPage({viewport:{width:960,height:540}});
-    await page.addInitScript(()=>window.requestAnimationFrame=()=>0);
+    await page.addInitScript(()=>{window.requestAnimationFrame=()=>0;localStorage.setItem('dropzone.developer-mode','false')});
     await page.goto(pathToFileURL(path.resolve('game/index.html')).href);
     await page.locator('#start:enabled').waitFor();
     await require('./select-test-squad.cjs')(page);

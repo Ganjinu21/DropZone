@@ -25,6 +25,24 @@ const {chromium}=require('playwright');
     }
     const older=await tab();
     await require('./select-test-squad.cjs')(older,[0,1,4]);
+    const development=await older.evaluate(()=>{
+      const fresh=TalentTree.effects(restoredArmory(null).talentRanks);
+      run.talents=TalentTree.effects({});run.rerollsLeft=0;initializeRadioTeam();
+      run.up[vitality]=1;
+      for(const m of [...run.squad,...run.radioTeam]){
+        m.baseMax=m.id==null?30:memberHealth[m.id]+m.gear.health;
+        m.max=Math.round(m.baseMax*1.3);m.hp=m.deployed===false?0:m.max*.5;
+      }
+      run.radioTeam[0].hp=0;
+      run=decodeBattle(encodeBattle()).state;
+      const hp=run.squad[0],full=JSON.stringify(run.talents)===JSON.stringify(fresh);
+      const updated=hp.baseMax===Math.round((memberHealth[0]+hp.gear.health)*(1+fresh.hpBonus)) &&
+        hp.max===Math.round(hp.baseMax*1.3) && hp.hp===hp.max*.5 && run.radioTeam[0].hp===0;
+      const granted=run.rerollsLeft;run.rerollsLeft=0;
+      const again=decodeBattle(encodeBattle()).state;
+      return {full,updated,granted,spent:again.rerollsLeft,idempotent:again.squad[0].hp===hp.hp};
+    });
+    assert.deepEqual(development,{full:true,updated:true,granted:1,spent:0,idempotent:true});
     const migration=await older.evaluate(()=>{
       const results=[];
       Object.assign(run.talents,{bulkSkill:true,ravenSkill:true,cctSkill:true});
@@ -51,12 +69,13 @@ const {chromium}=require('playwright');
       run.activeSkill=null;run.cobra=null;run.lead=0;
       const m=run.squad[0];
       m.loadout={...m.loadout,weapon:'pistol-3'};m.weapon=gearByKey.get(m.loadout.weapon);
-      if(!activateSquadSkill())throw Error('missing legacy base bunker fixture');
+      if(!activateSquadSkill(1))throw Error('missing legacy base bunker fixture');
       delete run.activeSkill.awakened;
+      run.activeSkill.entryRecruitCel=50; // Former head-on aim, stride 2.
       m.loadout.weapon='pistol-6';m.weapon=gearByKey.get(m.loadout.weapon);
       const legacy=JSON.parse(encodeBattle());legacy.version=1;
       run=decodeBattle(JSON.stringify(legacy)).state;
-      const preserved=deployedBunker() && run.activeSkill.hp>0;
+      const preserved=deployedBunker() && run.activeSkill.hp>0 && run.activeSkill.entryRecruitCel===crewMotion.down*6+2;
       activateSquadSkill();tickSquadSkills(bunkerDeployTime);
       run.t=run.squad[0].skillReadyAt+.1;activateSquadSkill();
       const awakened=run.activeSkill?.awakened===true;
@@ -118,7 +137,7 @@ const {chromium}=require('playwright');
         return set.call(this,k,v);
       };
       window.restoreStorage=()=>{Storage.prototype.setItem=set};
-      start();run.t=94;show('home');
+      start();applyUpgrade();run.t=94;show('home');
     });
     await latest.locator('#start').click();await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
     assert.equal(await latest.evaluate(()=>run.t),94);

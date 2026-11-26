@@ -2,6 +2,7 @@
 
 const summonScale=.8;
 const summonDamageRatio=.8;
+const radioBaseHealth=30;
 
 function cctRadioSprite(member){
   ctx.save();ctx.translate(member.x,member.y);ctx.scale(summonScale,summonScale);
@@ -24,7 +25,7 @@ function fireSupport(source,enemy,damage,awakened=false,tier){
 function initializeRadioTeam(){
   const chief=run.squad[4];
   if(!chief?.deployed || run.radioTeam)return;
-  const baseMax=Math.round(30*(1+run.talents.hpBonus)),max=Math.round(baseMax*(1+.3*run.up[vitality]));
+  const baseMax=Math.round(radioBaseHealth*(1+run.talents.hpBonus)),max=Math.round(baseMax*(1+.3*run.up[vitality]));
   run.radioTeam=[-1,1].map(side=>({
     side,x:chief.x,y:chief.y,hp:max,max,baseMax,gear:chief.gear,gait:0,flip:1,shoot:0,cool:1,
     grace:1,floor:run.floor,patrolTime:0,moving:false

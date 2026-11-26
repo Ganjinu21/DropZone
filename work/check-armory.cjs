@@ -14,6 +14,7 @@ const {chromium}=require('playwright');
     const newSortie=async()=>{
       await page.locator('#start:enabled').tap();
       if(await page.locator('#replace-run').isVisible()){await page.locator('#ask-replace').tap();await page.locator('#replace-confirm').tap();}
+      if(await page.locator('#upgrade').isVisible())await page.locator('#equip').tap();
       await page.locator('#hud').waitFor();
     };
     const screenshot=async name=>{
@@ -67,11 +68,13 @@ const {chromium}=require('playwright');
     assert.deepEqual(await page.evaluate(()=>run.squad.slice(0,3).map(m=>m.weapon.key)),['pistol-6','smg-6','sniper-6']);
     const kit=await page.evaluate(()=>{
       const m=run.squad[0], w=m.weapon;
-      magazineReady(m,w);m.ammo=1;spendRound(m,w);
-      return [m.max-memberHealth[0],m.gear.evadeChance,m.gear.critChance,
-        Math.round(1000*(m.reloadAt-run.t)/w.reload),Math.round(100*m.gear.movement)];
+      magazineReady(m,w);m.ammo=1;
+      const random=Math.random;
+      try{Math.random=()=>.99;spendRound(m,w)}finally{Math.random=random}
+      return [m.baseMax,m.gear.evadeChance,m.gear.critChance,
+        Math.round(1000*(m.reloadAt-run.t)*(1+run.talents.reloadBonus)/w.reload),Math.round(100*m.gear.movement)];
     });
-    assert.deepEqual(kit,[65,.15,.22,741,122]);
+    assert.deepEqual(kit,[294,.15,.22,741,122]);
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();
     await page.locator('#shop').tap();
     assert.ok(await page.evaluate(()=>developerMode && equipmentCatalog.filter(i=>i.weapon).every(i=>owns(i.key))));

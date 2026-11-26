@@ -165,7 +165,8 @@ function restoredArmory(raw){
     return Number.isInteger(tier) && rankedTiers[tier]?tier:0;
   });
   return {crewTiers,diamonds:!raw && developerMode?3000:safeCount(raw?.diamonds),counts,...restoredSupply(raw),
-    bossTokens,talentRanks:TalentTree.restoreRanks(raw?.talentRanks),bossClaims:restoredBossClaims(raw?.bossClaims)};
+    bossTokens,talentRanks:developerMode?{...TalentTree.maxRanks}:TalentTree.restoreRanks(raw?.talentRanks),
+    bossClaims:restoredBossClaims(raw?.bossClaims)};
 }
 let armory=restoredArmory(readLocal(armoryKey)),sessionStorageOnly=false;
 function owns(key){

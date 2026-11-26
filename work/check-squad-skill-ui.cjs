@@ -201,13 +201,30 @@ const {chromium} = require('playwright');
     assert.equal(crossing.floor,'metro');
     assert.equal(crossing.cast,null,'skill continued on a different floor');
     assert.ok(crossing.cooldown>0);
-    // A tap dispatches one cast in the test profile, including with no skill research.
-    // Normal profile training and its drag controls are exercised above.
+    // Existing partially trained developer saves should be complete on the next load.
     const testPage=await browser.newPage({viewport:{width:402,height:874},isMobile:true,hasTouch:true});
     testPage.on('pageerror',error=>errors.push(error.message));
-    await testPage.addInitScript(()=>{window.requestAnimationFrame=()=>0;localStorage.setItem('dropzone.developer-mode','true')});
+    await testPage.addInitScript(()=>{
+      window.requestAnimationFrame=()=>0;
+      if(localStorage.getItem('dropzone.dev.armory.v1'))return;
+      localStorage.setItem('dropzone.dev.armory.v1',JSON.stringify({diamonds:17,bossTokens:2,talentRanks:{command:1,'raven-1':1}}));
+      localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:23,bossTokens:1,talentRanks:{command:1,'bulk-1':1}}));
+    });
     await testPage.goto(pathToFileURL(path.join(__dirname,'../game/index.html')).href);
+    await testPage.locator('#start:enabled').waitFor();
+    await testPage.locator('#hub-talents').tap();
+    const tree=await testPage.evaluate(()=>{
+      const nodes=TalentTree.nodes.filter(n=>n.costs.length);
+      return {ranks:nodes.map(n=>TalentTree.status(n.id).rank),limits:nodes.map(n=>n.costs.length),
+        shown:document.querySelectorAll('#talent-board .is-bought').length,secret:TalentTree.status('classified-1').rank,
+        balance:[armory.diamonds,armory.bossTokens]};
+    });
+    assert.deepEqual(tree.ranks,tree.limits);assert.equal(tree.shown,tree.limits.length);
+    assert.equal(tree.secret,0);assert.deepEqual(tree.balance,[17,2]);
+    assert.ok(await testPage.locator('#talent-buy').isDisabled());
+    await testPage.locator('#hub-home').tap();
     await testPage.locator('#start:enabled').tap();
+    await testPage.locator('#equip').tap();
     await testPage.locator('#hud').waitFor();
     await testPage.locator('#rank-test summary').tap();
     for(const tier of [0,4]){
@@ -223,8 +240,8 @@ const {chromium} = require('playwright');
           return {id,live:!!skill,awakened:!!skill?.awakened,phase:skill?.phase,
             trained:!!run.talents[skillRoutes[id]+'Skill']};
         });
-        assert.equal(active.id,id);assert.ok(active.live);assert.equal(active.awakened,tier===4);
-        assert.equal(active.trained,false);assert.notEqual(active.phase,'retract');
+        assert.equal(active.id,id);assert.ok(active.live);assert.equal(active.awakened,tier===4 || id===0);
+        assert.equal(active.trained,true);assert.notEqual(active.phase,'retract');
       }
     }
     for(const id of [0,1,2,3,4]){
@@ -246,7 +263,7 @@ const {chromium} = require('playwright');
             return {awakening:skill?.awakened,advanced:skill.age>0,
               saved:restored?.awakened,rank:run.squad[id].weapon.rank,trained:!!run.talents[skillRoutes[id]+'Skill']};
           });
-          assert.deepEqual(cast,{awakening:awakened,advanced:true,saved:awakened,rank:tier?'S+':'C',trained:false});
+          assert.deepEqual(cast,{awakening:awakened,advanced:true,saved:awakened,rank:tier?'S+':'C',trained:true});
           assert.ok(await button.isDisabled(),'a second tap must not restart the current preview');
         }
       }
@@ -257,6 +274,15 @@ const {chromium} = require('playwright');
         updateHud();
       });
     }
+    await testPage.locator('#rank-test summary').tap();
+    await testPage.locator('#pause').tap();await testPage.locator('#homebtn').tap();
+    await testPage.locator('#shop').tap();await testPage.locator('#profile-mode').tap();
+    await testPage.locator('#start:enabled').waitFor();
+    assert.deepEqual(await testPage.evaluate(()=>[developerMode,armory.talentRanks,armory.diamonds,armory.bossTokens]),
+      [false,{command:1,'bulk-1':1},23,1]);
+    await testPage.locator('#shop').tap();await testPage.locator('#profile-mode').tap();
+    await testPage.locator('#start:enabled').waitFor();
+    assert.ok(await testPage.evaluate(()=>developerMode && TalentTree.nodes.every(n=>(armory.talentRanks[n.id]||0)===n.costs.length)));
     await testPage.close();
     assert.deepEqual(errors,[]);
     console.log('Mobile drag casts, test HUD taps, and both saved skill previews for all five operators with C and S+ gear passed.');

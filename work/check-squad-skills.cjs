@@ -10,6 +10,7 @@ const {chromium} = require('playwright');
     const errors = [];
     page.on('pageerror',error=>errors.push(error.message));
     await page.addInitScript(()=>{
+      localStorage.setItem('dropzone.developer-mode','false');
       const keys=['pistol-0','smg-0','sniper-0','rocket-0','ar-0'];
       localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
       localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));

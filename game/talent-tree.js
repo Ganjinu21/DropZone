@@ -144,5 +144,8 @@ const TalentTree = (() => {
     }
     return result;
   }
-  return {routes,nodes,byId,visible,restoreRanks,status,effects};
+  const maxRanks=Object.freeze(Object.fromEntries(
+    nodes.filter(node=>node.costs.length>0).map(node=>[node.id,node.costs.length])
+  ));
+  return {routes,nodes,byId,visible,restoreRanks,status,effects,maxRanks};
 })();

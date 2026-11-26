@@ -16,6 +16,7 @@ const {chromium}=require('playwright');
     await page.addInitScript(()=>{window.requestAnimationFrame=()=>0});
     await page.goto('http://forms.test/index.html');
     await page.locator('#start:enabled').click();
+    await page.locator('#equip').click();
     await page.locator('#hud').waitFor();
     const plate=await page.evaluate(async()=>{
       const check=(test,message)=>{if(!test)throw Error(message)};
@@ -23,6 +24,7 @@ const {chromium}=require('playwright');
       const ground='#3b4343',newCanvas=(width,height)=>Object.assign(document.createElement('canvas'),{width,height});
       const makePanel=(id,awakened)=>{
         start();
+        applyUpgrade();
         const member=run.squad[id],grade=awakened?6:3;
         Object.assign(run,{x:1250,y:1004,lead:id,marks:[],effects:[],enemies:[],cues:[],activeSkill:null,cobra:null});
         Object.assign(member,{x:run.x,y:run.y,hp:member.max,skillReadyAt:0,flip:1,deployed:true,moving:false,
@@ -31,7 +33,7 @@ const {chromium}=require('playwright');
         member.loadout={...member.loadout,helmet:'helmet-'+grade,gloves:'gloves-'+grade,top:'top-'+grade,pants:'pants-'+grade,boots:'boots-'+grade};
         const target={x:run.x+140,y:run.y-1,hp:1e8,max:1e8,type:1,phase:0,speed:0,hit:0,flip:-1};
         const wing={...target,x:target.x+16,y:target.y-18};run.enemies=[target,wing];
-        check(activateSquadSkill(),'activate '+id+' '+grade);
+        check(activateSquadSkill(awakened?2:1),'activate '+id+' '+grade);
         const time=(awakened?[.94,.68,1.06,.80,.74]:[1.0,.68,.48,1.29,.64])[id];
         const step=.01;
         for(let i=0;i<Math.round(time/step);i++){

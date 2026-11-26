@@ -74,9 +74,9 @@ function drawRecruitFinish(g,image,source,box,points,tier,key){
 // Six complete illustrations per action. The player's traveled distance selects
 // the next footfall, even when the shooting timer resets between those footfalls.
 const crewFrameSize=256,crewFrameHeight=164,crewFrameFoot=[109,243];
-const crewMotion={guard:0,travel:1,toward:2,away:3,zenith:4,up:5,level:6,down:7,nadir:8,skill:9};
+const crewMotion={guard:0,travel:1,toward:2,away:3,up:4,level:5,down:6,skill:7};
 // The supplied sheets have four side strides and grounded up/level/down key poses.
-const fieldKeys={walk:60,up:64,level:65,down:66};
+const fieldKeys={walk:48,up:52,level:53,down:54};
 function hasFieldKeys(m){return m.id!==3 && outfitTier(m)>=2}
 function crewFootfall(m){
   const beat=Math.floor((m.gait||0)*6/crewStrideLength);
@@ -85,8 +85,10 @@ function crewFootfall(m){
 function recruitAimCel(m,moving=m.moving,angle){
   angle??=m.aimSector!=null?m.aimSector*Math.PI/4:m.operatorAngle??m.aimAngle??0;
   const pitch=Math.atan2(Math.sin(angle),Math.abs(Math.cos(angle)));
-  const action=crewMotion.level+Math.round(pitch/(Math.PI/4));
-  if(!moving && hasFieldKeys(m) && action>=crewMotion.up && action<=crewMotion.down)
+  // The simulation tracks all eight bearings. Even a target directly above
+  // or below the squad uses a three-quarter illustration and its muzzle.
+  const action=crewMotion.level+clamp(Math.round(pitch/(Math.PI/4)),-1,1);
+  if(!moving && hasFieldKeys(m))
     return fieldKeys.level+action-crewMotion.level;
   const phase=moving?crewFootfall(m):0;
   return action*6+phase;

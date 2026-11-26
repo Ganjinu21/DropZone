@@ -54,13 +54,13 @@ function encodeBattle(){
     return {ref:references.get(value)};
   }
   const root=encode(run);
-  return JSON.stringify({version:5,root,nodes,phase:mode==='upgrade'?'upgrade':'play',
+  return JSON.stringify({version:6,root,nodes,phase:mode==='upgrade'?'upgrade':'play',
     choices:mode==='upgrade'?offers:[],choice:mode==='upgrade'?selected:0});
 }
 
 function decodeBattle(text){
   const data=JSON.parse(text);
-  if(![1,2,3,4,5].includes(data.version) || !Array.isArray(data.nodes) || !['play','upgrade'].includes(data.phase))throw Error('작전 형식');
+  if(![1,2,3,4,5,6].includes(data.version) || !Array.isArray(data.nodes) || !['play','upgrade'].includes(data.phase))throw Error('작전 형식');
   const objects=data.nodes.map(n=>Array.isArray(n)?[]:Array.isArray(n.set)?new Set():{});
   function decode(value){
     if(value===null || typeof value!=='object')return value;
@@ -91,9 +91,19 @@ function decodeBattle(text){
      !['surface','metro'].includes(state.floor) || !stages[state.stage-1]?.waves[state.wave-1] ||
      ![state,state.floors.surface,state.floors.metro].every(f=>floorLists.every(key=>Array.isArray(f[key]))))throw Error('작전 상태');
   for(const m of state.squad)m.weapon=gearByKey.get(m.loadout.weapon);
-  // Pre-tree runs continue with their starting gear and no new training.
-  state.talents={...TalentTree.effects({}),...state.talents};
-  state.rerollsLeft=Math.min(state.talents.rerolls,Math.max(0,state.rerollsLeft||0));
+  const savedTalents={...TalentTree.effects({}),...state.talents};
+  state.talents=developerMode?TalentTree.effects(TalentTree.maxRanks):savedTalents;
+  if(state.talents.hpBonus!==savedTalents.hpBonus){
+    for(const m of [...state.squad,...(state.radioTeam||[])]){
+      const health=m.id==null?radioBaseHealth:memberHealth[m.id]+(m.gear.health||0);
+      const fraction=m.hp/m.max;
+      m.baseMax=Math.round(health*(1+state.talents.hpBonus));
+      m.max=m.deployed===false?m.baseMax:Math.round(m.baseMax*(1+.3*state.up[vitality]));
+      m.hp=fraction*m.max;
+    }
+  }
+  const spentRerolls=clamp(savedTalents.rerolls-(state.rerollsLeft||0),0,savedTalents.rerolls);
+  state.rerollsLeft=Math.max(0,state.talents.rerolls-spentRerolls);
   state.defeatedBosses??=[];
   if(data.version<3 && !state.bossPhase && !state.bigWave){
     const oldSeconds=state.stage===10?14:18+(state.wave-1)*2;
@@ -101,6 +111,12 @@ function decodeBattle(text){
   }
   const skill=state.activeSkill,craft=state.cobra;
   if(skill){
+    if(data.version<6 && skill.id===0 && Number.isInteger(skill.entryRecruitCel)){
+      const cel=skill.entryRecruitCel;
+      // The two retired camera rows now use their nearest three-quarter view.
+      const rows=[0,1,2,3,4,4,5,6,6,7];
+      skill.entryRecruitCel=cel>=60?Math.min(fieldKeys.down,cel-12):rows[Math.floor(cel/6)]*6+cel%6;
+    }
     const member=state.squad[skill.id],form=developerMode && skill.testSpecial?(skill.awakened?2:1):skillForm(skill.id,state);
     if(!member?.deployed || member.hp<=0 || member.id!==state.lead || !form || skill.awakened && form!==2 ||
        (skill.id===1 && skill.age>=ravenDuration)){

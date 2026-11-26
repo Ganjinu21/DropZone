@@ -66,7 +66,8 @@ async function exerciseFormation(page) {
       for(const m of run.squad){
         const subject={...m,x:150.3,y:170.4,gait:0,moving:true,aimTarget:{hp:999}};
         delete subject.aimSector;
-        for(const [sector,row] of [6,7,8,7,6,5,4,5].entries()){
+        const {up,level,down}=crewMotion;
+        for(const [sector,row] of [level,down,down,down,level,up,up,up].entries()){
           const a=sector*Math.PI/4;
           combatAim(subject,subject.x+100*Math.cos(a),subject.y-32+100*Math.sin(a),1);
           check(subject.aimSector===sector && Math.floor(recruitAimCel(subject)/6)===row,'wrong octant '+m.id+'/'+sector);

@@ -17,6 +17,7 @@ const gameDirectory=path.join(__dirname,'../game');
     await page.addInitScript(()=>{window.requestAnimationFrame=()=>0});
     await page.goto('http://clothing.test/index.html');
     await page.locator('#start:enabled').click();
+    await page.locator('#equip').click();
     await page.locator('#hud').waitFor();
     const proofs=await page.evaluate(async exportProofs=>{
       const check=(ok,detail)=>{if(!ok)throw Error(detail)};
@@ -45,7 +46,17 @@ const gameDirectory=path.join(__dirname,'../game');
             x:30,y:65,flip:1,walkRow:1,moving:true,aimTarget:{hp:100},operatorAngle:0,ravenSector:0};
           clear();drawCrewPreview(shot,id,row);checkUniform(id,'barracks',tier);
           const promoted={...row,weapon:weaponFamilies[id]+'-'+rank.variant,shield:'shield-'+rank.variant};
+          const set=frameSet(m);
+          check(set.frames.height===2560 && crewFrameAnchors[set.role][tier].length===55,'unexpected field atlas layout');
+          for(const moving of [false,true]){
+            for(const sign of [-1,1]){
+              const vertical=recruitAimCel(m,moving,sign*Math.PI/2);
+              check(vertical===recruitAimCel(m,moving,sign*Math.PI/4),'axial pose used for '+set.role+'/'+rank.rank);
+            }
+          }
           if(id===0){
+            const bounds=crewFrameAnchors.bulk[tier].map(([, , ,l,t,r,b])=>[r-l,b-t].join('x'));
+            check(new Set(bounds).size===1,'shield dimensions changed within '+rank.rank);
             const field=new Set(),barracks=new Set();
             for(const {variant} of rankedTiers){
               const shield='shield-'+variant;

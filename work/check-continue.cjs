@@ -64,7 +64,7 @@ function combatSnapshot() {
       run.up[6]=2;run.up[firepower]=1;
       if(!activateSquadSkill()) throw Error('Cobra fixture failed');
       run.cobra.age=2.5;setLeader(0);
-      if(!activateSquadSkill()) throw Error('Bunker fixture failed');
+      if(!activateSquadSkill(1)) throw Error('Bunker fixture failed');
       hitBunker(boss,routes[run.floor],23,false);
       run.radioTeam[1].hp=0;run.radioTeam[1].respawn=3.25;
       bulk.hp-=17;chief.hp-=19;
@@ -113,7 +113,7 @@ function combatSnapshot() {
     await resume();
     assert.deepEqual(await page.evaluate(()=>run.up),upgraded,'normal sortie overwrote developer sortie');
     assert.ok((await page.evaluate(()=>run.t))>73);
-    await home();await tap('start');await tap('ask-replace');await tap('replace-confirm');await page.locator('#hud').waitFor();
+    await home();await tap('start');await tap('ask-replace');await tap('replace-confirm');await page.locator('#upgrade').waitFor();
     assert.ok(await page.evaluate(()=>run.stage===1 && run.t===0 && run.up.every(rank=>rank===0) &&
       !run.activeSkill && !run.cobra && !run.boss && run.squad[4].weapon.key==='ar-1'),
       'replacement failed to start fresh with the current locker');

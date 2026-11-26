@@ -11,6 +11,7 @@ const {chromium} = require('playwright');
     page.on('pageerror',error=>errors.push(error.message));
     await page.addInitScript(()=>{
       window.requestAnimationFrame=()=>0;
+      localStorage.setItem('dropzone.developer-mode','false');
       localStorage.setItem('dropzone.squad.v1','[1,0,2]');
     });
     await page.goto(pathToFileURL(path.join(__dirname,'../game/index.html')).href);
@@ -41,7 +42,7 @@ const {chromium} = require('playwright');
         check(error<1e-6,'Enemy deviated from leader '+run.lead+' on '+run.floor+', error '+error);
       }
       for(const angle of [45,135,225,315]){
-        arrange(1300,1000);
+        arrange(1180,975);
         const radians=angle*Math.PI/180, radius=150;
         const enemy=spawn(radians,radius);
         check(enemy && Math.abs(enemy.x-run.x-radius*Math.cos(radians))<.01 &&
@@ -55,7 +56,7 @@ const {chromium} = require('playwright');
       check(passedNearerAlly,'Test must include an ally closer than the leader');
 
       // Approach from the opposite side of the parked sedan on the boulevard.
-      arrange(1420,1182);
+      arrange(1281,778);
       const leader=run.squad[run.lead],nav=routes.surface;
       const enemy=spawn(Math.PI,170);
       check(enemy && !nav.clear(enemy.x,enemy.y,leader.x,leader.y,4),'Expected sedan blocking the direct path');
@@ -74,10 +75,10 @@ const {chromium} = require('playwright');
       check(wing.hp<wingHP,'Enemy passed through a squadmate without contact damage');
 
       // Descend through a real entrance, then follow a tag across the open west concourse.
-      Object.assign(run,TransitKit.stairPoint(SURFACE.exits[0],TransitKit.stairLength*.7));
+      Object.assign(run,TransitKit.stairPoint(cityMaps.surface.exits[0],TransitKit.stairLength*sceneryScale*.7));
       updateStairDepth();
       check(run.floor==='metro','Could not enter station');
-      arrange(615,1035);
+      arrange(510,790);
       const inbound=spawn(3*Math.PI/4,175);
       check(inbound,'Missing station spawn');
       checkStraightStep(inbound);

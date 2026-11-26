@@ -13,7 +13,9 @@ const launchSquad=require('./select-test-squad.cjs');
     page.on('pageerror',error=>errors.push(error.message));
     await page.addInitScript(()=>{
       window.requestAnimationFrame=()=>0;
-      localStorage.setItem('dropzone.dev.equipment.v2',JSON.stringify([
+      localStorage.setItem('dropzone.developer-mode','false');
+      localStorage.setItem('dropzone.armory.v1',JSON.stringify({owned:['pistol-6','ar-6','smg-3']}));
+      localStorage.setItem('dropzone.equipment.v2',JSON.stringify([
         {weapon:'pistol-6',shield:'shield-0'},{weapon:'smg-3'},{},{},{weapon:'ar-6'}
       ]));
     });

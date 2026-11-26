@@ -42,6 +42,11 @@ function skillPixelLine(x1,y1,x2,y2,color,thickness=1){
 
 function hammerFlip(m) { return m.flip < 0 ? -1 : 1; }
 
+function rifleSkillFacing(m,angle){
+  const horizontal=Math.cos(angle);
+  return Math.abs(horizontal)<Math.sin(Math.PI/8)?(m.flip||1):Math.sign(horizontal);
+}
+
 function recruitSkillCel(m,s,angle=s.angle){
   const skill=crewMotion.skill*6;
   if(m.id===2){
@@ -71,12 +76,12 @@ function skillShotSocket(m, s, angle, hand = 0) {
     if(!s)return combatMuzzle(m,1,true);
     return recruitSocket(m,recruitSkillCel(m,s),s.plantFacing||hammerFlip(m),s.x,s.y);
   }
-  return recruitSocket(m,recruitSkillCel(m,s,angle),Math.cos(angle)<0?-1:1);
+  return recruitSocket(m,recruitSkillCel(m,s,angle),rifleSkillFacing(m,angle));
 }
 
 function drawRifleSkill(m,s){
   if(m.id===1){drawRavenCels(ctx,m,s.age-s.lastFire,s);return}
-  const facing=Math.cos(s.angle)<0?-1:1;
+  const facing=rifleSkillFacing(m,s.angle);
   const index=recruitSkillCel(m,s);
   drawRecruit(ctx,{...m,flip:facing},Infinity,false,index);
   if(s.phase==='charge'){

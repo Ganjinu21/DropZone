@@ -13,15 +13,18 @@ for(const {rank} of rankedTiers){
 
 function ravenBodyCel(m,age,skill){
   if(skill?.phase==='spin'){
-    if(skill.poseCel!=null)return {index:skill.poseCel,facing:skill.poseFacing??1};
     const turns=((skill.angle??Math.PI/2)-Math.PI/2)/TAU;
     const beat=(turns-Math.floor(turns))*ravenTurnBeats;
-    return {index:ravenChoreography[ravenStepAtBeat(beat)][1],facing:1};
+    const pose=skill.poseCel??ravenChoreography[ravenStepAtBeat(beat)][1];
+    // Keep both hands, the muzzle flashes and afterimages on the same angled
+    // painting, including during a spin restored from an earlier checkpoint.
+    return {index:ravenSidePoses[pose]??pose,facing:skill.poseFacing??1};
   }
   const t=skill?.age??0;
   const frame=t<.09?0:t<.18?1:2+((skill?.beat||1)-1)%3*2+(age>=.037?1:0);
   return {index:40+frame,facing:Math.cos(skill?.angle??0)<0?-1:1};
 }
+const ravenSidePoses={50:49,60:49,61:58,68:57};
 function ravenBarrel(m,cel,hand){
   const pair=ravenBarrels[cel.index-28],j=hand?3:0;
   const a=pair[j+2]*Math.PI/180;

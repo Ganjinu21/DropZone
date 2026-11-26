@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from PIL import Image
+from shield_registration import register_shield
 
 HERE = Path(__file__).resolve().parent
 GAME = HERE.parents[2] / 'game'
@@ -16,7 +17,7 @@ ART = GAME / 'art/armory'
 DEST = ART / 'crew-frames'
 ROLES = ('bulk', 'raven', 'lynx', 'hammer', 'cct')
 RANKS = ('C', 'B', 'A', 'S', 'S-plus')
-ACTIONS = ('guard', 'travel', 'toward', 'away', 'zenith', 'up', 'level', 'down', 'nadir', 'skill')
+ACTIONS = ('guard', 'travel', 'toward', 'away', 'up', 'level', 'down', 'skill')
 TILE, HEIGHT, PIVOT, SOLE = 256, 164, 109, 243
 ANGLES = {'zenith':-90, 'up':-43, 'level':0, 'down':42, 'nadir':90}
 LANCZOS = Image.Resampling.LANCZOS
@@ -175,6 +176,7 @@ def pack_raven_skills():
 def pack():
     data={}
     barrel_marks=json.loads((HERE.parent/'field-reference'/'barrels.json').read_text())
+    shields=json.loads((HERE/'bulk'/'shields.json').read_text())
     stands={
         'bulk':[[.47,79,80,2,93,47,138,210]],'raven':[[.52,99,136.7,33,145.3,143.2]],
         'lynx':[[.43,196,126,29]],'hammer':[[.46,122,62,-20]],'cct':[[.48,129,115,27]]}
@@ -184,20 +186,26 @@ def pack():
             actions=ACTIONS
             sheet=Image.new('RGBA',(6*TILE,(len(actions)+2)*TILE));marks=[]
             for i,action in enumerate(actions):
+                source='travel' if role=='bulk' and action=='away' else action
                 for step in range(6):
-                    im=Image.open(HERE/role/rank/f'{action}-{step+1}.webp').convert('RGBA')
-                    sheet.paste(im,(step*TILE,i*TILE))
-                    points=pose_points(im,action,role)
-                    authored=barrel_marks[role][rank].get(action)
+                    im=Image.open(HERE/role/rank/f'{source}-{step+1}.webp').convert('RGBA')
+                    points=pose_points(im,source,role)
+                    authored=barrel_marks[role][rank].get(source)
                     if authored:
                         points[:2]=authored[step][:2]
                         if role=='raven':points[3:5]=authored[step][2:4]
+                    if role=='bulk':
+                        im,points=register_shield(im,shields[rank][source][step],shields[rank]['size'],points,SOLE)
+                    sheet.paste(im,(step*TILE,i*TILE))
                     marks.append(points)
-            for i,action in enumerate(('travel','travel','travel','travel','up','level','down','down')):
+            for i,action in enumerate(('travel','travel','travel','travel','up','level','down')):
                 index=len(actions)*6+i
                 im=Image.open(HERE/role/rank/f'key-{i+1}.webp').convert('RGBA')
+                points=pose_points(im,action,role)
+                if role=='bulk':
+                    im,points=register_shield(im,shields[rank]['key'][i],shields[rank]['size'],points,SOLE)
                 sheet.paste(im,(index%6*TILE,index//6*TILE))
-                marks.append(pose_points(im,action,role))
+                marks.append(points)
             directory=DEST/role;directory.mkdir(parents=True,exist_ok=True)
             sheet.save(directory/f'{rank}.webp',quality=95,method=4)
             data[role].append(marks)

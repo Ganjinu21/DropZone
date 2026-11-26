@@ -10,5 +10,6 @@ module.exports = async function selectTestSquad(page, ids = [0, 1, 2]) {
   await page.locator('#prep-save').click();
   await page.locator('#start').click();
   if (await page.locator('#replace-run').isVisible()){await page.locator('#ask-replace').click();await page.locator('#replace-confirm').click();}
+  if (await page.locator('#upgrade').isVisible()) await page.locator('#equip').click();
   await page.locator('#hud').waitFor();
 };
