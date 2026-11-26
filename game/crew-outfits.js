@@ -11,6 +11,7 @@ function fieldPortrait(id){return uniformPortrait(id,outfitTier(run.squad[id]))}
 function wornPortrait(id){return uniformPortrait(id,armory.crewTiers[id])}
 function uniformPortrait(id,tier){
   if(id===1)return tier===0?'art/armory/raven-cels/portrait-C.png':'art/armory/raven-cels/uniform-face-'+tier+'.webp';
+  if(tier===0)return 'art/armory/recruits/'+portraitRoles[id]+'-face.webp';
   return 'art/armory/rank-crew/'+portraitRoles[id]+'-face-'+uniformColumn[tier]+'.webp';
 }
 const crewOutfits=[];

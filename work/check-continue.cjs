@@ -36,7 +36,7 @@ function combatSnapshot() {
     };
     const home = async () => {await tap('pause'); await tap('homebtn')};
     const resume = async (screen='hud') => {
-      await tap('continue-run');
+      await tap('start');await tap('continue-run');
       await page.locator('#'+screen).waitFor();
     };
     const switchProfile = async () => {
@@ -46,7 +46,7 @@ function combatSnapshot() {
     };
     const saveKey = 'dropzone.dev.run.v1';
     const hasSave = key=>page.evaluate(k=>localStorage.getItem(k)!==null,key);
-    const canContinue = ()=>page.locator('#continue-run:visible:enabled').count();
+    const canContinue = ()=>page.evaluate(()=>Number(Boolean(savedBattle)));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../game/index.html')).href);
     await selectSquad(page,[4,0,3]);
     assert.ok(await hasSave(saveKey),'start did not immediately checkpoint');
@@ -113,7 +113,7 @@ function combatSnapshot() {
     await resume();
     assert.deepEqual(await page.evaluate(()=>run.up),upgraded,'normal sortie overwrote developer sortie');
     assert.ok((await page.evaluate(()=>run.t))>73);
-    await home();await tap('start');await tap('replace-confirm');await page.locator('#hud').waitFor();
+    await home();await tap('start');await tap('ask-replace');await tap('replace-confirm');await page.locator('#hud').waitFor();
     assert.ok(await page.evaluate(()=>run.stage===1 && run.t===0 && run.up.every(rank=>rank===0) &&
       !run.activeSkill && !run.cobra && !run.boss && run.squad[4].weapon.key==='ar-1'),
       'replacement failed to start fresh with the current locker');

@@ -49,16 +49,20 @@ function operatorSkillCel(m,s,angle=s.angle){
   const frame=plant<.27?0:plant<.60?1:plant<.88 || since<.13?2:3;
   return (s.awakened?32:8)+frame;
 }
+// Original painted atlases have different numbers of pixels from helmet to sole.
+const operatorRestHeight=[60.47,54.75,54.84,56.53,55.12];
+function operatorBodyScale(id){return crewHeight[id]/operatorRestHeight[id]}
 function operatorTip(m,index,facing=m.flip||1,x=m.x,y=m.y){
   const [px,py,a]=paintedOperators[operatorRoles[m.id]].tips[index];
-  const angle=a*Math.PI/180;
-  return {x:Math.round(x)+facing*(px-128)*72/256,y:Math.round(y)+(py-240)*72/256,
+  const angle=a*Math.PI/180,unit=72/256*operatorBodyScale(m.id);
+  return {x:Math.round(x)+facing*(px-128)*unit,y:Math.round(y)+(py-240)*unit,
     angle:Math.atan2(Math.sin(angle),facing*Math.cos(angle))};
 }
 function drawOperatorBody(g,m,index){
   const role=operatorRoles[m.id],layers=paintedOperators[role].layers[index];
   const ratio=72/128;
   g.save();g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+  const bodyScale=operatorBodyScale(m.id);g.scale(bodyScale,bodyScale);
   const transform=g.getTransform(),scale=Math.hypot(transform.a,transform.b);
   const size=scale<=1?72:scale<=2?144:256;
   const image=art[role+(size===256?'Base':'Field'+size)];
@@ -80,11 +84,11 @@ function drawOperatorBody(g,m,index){
 }
 // Both atlases register the feet at the origin. Keep the sight and shoulders
 // on the firing cel while the lower legs follow distance travelled.
-function drawWalkingShot(g,legs,upper){
-  const split=-19;
-  g.save();g.beginPath();g.rect(-38,split,76,28);g.clip();
+function drawWalkingShot(g,legs,upper,scale=1){
+  const split=-19*scale;
+  g.save();g.beginPath();g.rect(-44*scale,split,88*scale,30*scale);g.clip();
   legs();g.restore();
-  g.save();g.beginPath();g.rect(-38,-74,76,74+split);g.clip();
+  g.save();g.beginPath();g.rect(-44*scale,-76*scale,88*scale,76*scale+split);g.clip();
   upper();g.restore();
 }
 function drawOperatorGear(g,m,age,moving){
@@ -92,7 +96,7 @@ function drawOperatorGear(g,m,age,moving){
   const index=operatorCel(m,age,moving);
   // Aim frames occupy 2–7 and 12–15. Boarding and signals own the full body.
   if(moving && ((index>=2 && index<=7) || (index>=12 && index<=15))){
-    drawWalkingShot(g,()=>drawOperatorBody(g,m,operatorWalkCel(m)),()=>drawOperatorBody(g,m,index));
+    drawWalkingShot(g,()=>drawOperatorBody(g,m,operatorWalkCel(m)),()=>drawOperatorBody(g,m,index),operatorBodyScale(m.id));
   }else drawOperatorBody(g,m,index);
   g.restore();
 }

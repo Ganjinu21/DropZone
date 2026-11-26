@@ -28,6 +28,7 @@ node_modules/
 !/work/icon-generated.png
 !/work/test.cjs
 !/work/touch.cjs
+!/work/drag-control.cjs
 !/work/review-shots.cjs
 !/work/check-combat-render.cjs
 !/work/check-tag-combat.cjs

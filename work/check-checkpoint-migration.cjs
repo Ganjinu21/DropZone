@@ -27,6 +27,7 @@ const {chromium}=require('playwright');
     await require('./select-test-squad.cjs')(older,[0,1,4]);
     const migration=await older.evaluate(()=>{
       const results=[];
+      Object.assign(run.talents,{bulkSkill:true,ravenSkill:true,cctSkill:true});
       for(const variant of [0,1,3,5,6]){
         for(const id of [0,1,4]){
           const m=run.squad[id];run.lead=id;
@@ -43,7 +44,7 @@ const {chromium}=require('playwright');
       return results;
     });
     for(const row of migration){
-      assert.equal(row.active,row.variant>=3,'restored invalid skill form '+JSON.stringify(row));
+      assert.equal(row.active,true,'lost a trained skill during migration '+JSON.stringify(row));
       if(row.active)assert.ok(row.base,'previously fired base skill turned into awakened');
     }
     const crossover=await older.evaluate(()=>{
@@ -56,7 +57,8 @@ const {chromium}=require('playwright');
       const legacy=JSON.parse(encodeBattle());legacy.version=1;
       run=decodeBattle(JSON.stringify(legacy)).state;
       const preserved=deployedBunker() && run.activeSkill.hp>0;
-      activateSquadSkill();run.t=run.squad[0].skillReadyAt+.1;activateSquadSkill();
+      activateSquadSkill();tickSquadSkills(bunkerDeployTime);
+      run.t=run.squad[0].skillReadyAt+.1;activateSquadSkill();
       const awakened=run.activeSkill?.awakened===true;
       const current=decodeBattle(encodeBattle()).state;
       return {preserved,awakened,restoredMech:current.activeSkill?.awakened===true};
@@ -73,7 +75,7 @@ const {chromium}=require('playwright');
       localStorage.setItem(checkpointKey,JSON.stringify(archive));
       return {fieldKit,vitality,before:[...run.up]};
     });
-    await older.reload();await older.locator('#continue-run:visible').click();await older.locator('#upgrade').waitFor();
+    await older.reload();await older.locator('#start').click();await older.locator('#continue-run').click();await older.locator('#upgrade').waitFor();
     const offer=await older.evaluate(()=>({cards:[...offers],selected,up:[...run.up],level:run.level}));
     assert.equal(offer.selected,1);assert.equal(offer.cards[0],fixture.fieldKit);assert.equal(offer.cards[2],fixture.vitality);
     assert.ok(offer.cards[1]!==1 && new Set(offer.cards).size===3);assert.deepEqual(offer.up,fixture.before);
@@ -82,15 +84,15 @@ const {chromium}=require('playwright');
     assert.deepEqual(await older.evaluate(()=>run.up),fixture.before.map((v,i)=>v+Number(i===offer.cards[1])));
     await older.evaluate(()=>{window.holdCheckpointEvents=true;run.t=26;saveBattleCheckpoint()});
     const latest=await tab();
-    await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
+    await latest.locator('#start').click();await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
     await latest.evaluate(()=>{run.t=49;saveBattleCheckpoint()});
     await older.evaluate(()=>{run.t=30;saveBattleCheckpoint()});
     await older.waitForFunction(()=>mode==='home');
     assert.equal(await latest.evaluate(()=>decodeBattle(persistentBattle()).state.t),49,'stale writer changed newer run');
-    await older.locator('#continue-run').click();await older.locator('#hud').waitFor();
+    await older.locator('#start').click();await older.locator('#continue-run').click();await older.locator('#hud').waitFor();
     await latest.waitForFunction(()=>mode==='home');
     await latest.evaluate(()=>{window.holdCheckpointEvents=true});
-    await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
+    await latest.locator('#start').click();await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
     // The older tab has not observed the second takeover. Ending its old graph
     // cannot delete the current run. Later, an old save cannot resurrect a win.
     await older.evaluate(()=>end(false));await older.waitForFunction(()=>mode==='home');
@@ -110,7 +112,7 @@ const {chromium}=require('playwright');
       window.restoreStorage=()=>{Storage.prototype.setItem=set};
       start();run.t=94;show('home');
     });
-    await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
+    await latest.locator('#start').click();await latest.locator('#continue-run').click();await latest.locator('#hud').waitFor();
     assert.equal(await latest.evaluate(()=>run.t),94);
     await latest.evaluate(()=>{restoreStorage();run.t=95;saveBattleCheckpoint();show('home')});
     assert.equal(await latest.evaluate(()=>decodeBattle(persistentBattle()).state.t),95);

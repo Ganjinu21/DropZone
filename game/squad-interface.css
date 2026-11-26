@@ -31,8 +31,8 @@
 #loading-title span, #main-menu #game-title span { color:#ffce77;text-shadow:inherit; }
 #loading-title i, #main-menu #game-title i { display:none; }
 #lobby-pages > #main-menu {
-  background:linear-gradient(180deg,#07111acc,transparent 28%,transparent 49%,#081016b0 75%,#0a1118 100%),
-    url(art/hub/operations.webp) center 38% / cover no-repeat #17232a;
+  background:radial-gradient(ellipse at 50% 35%,#29353b,#172128 55%,#111920);
+  justify-content:center;
   gap:8px;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));
 }
 #main-menu .home-mast, #main-menu .mission-selector, #main-menu .lobby-controls { width:min(100%,510px); }
@@ -43,11 +43,12 @@
   color:#e3fbfa;background:linear-gradient(150deg,#32464de6,#101b23f2);border:1px solid #82909599;
   border-radius:3px;box-shadow:var(--frame);font:700 13px/1.2 var(--hub-font);font-variant-numeric:tabular-nums;
 }
-#main-menu .mission-selector { margin:auto 0 0; }
-#main-menu .lobby-controls { margin:0;gap:6px; }
+#main-menu .mission-selector { width:min(100%,48dvh,440px);margin:auto 0 0; }
+#main-menu .lobby-controls { max-width:min(100%,48dvh,440px); }
+#main-menu .lobby-controls { margin:0 0 auto;gap:6px; }
 #main-menu .lobby-controls .controlhint { text-align:center;color:#d4dce0;font-size:11px;letter-spacing:.02em; }
-#stage-preview { border:1px solid #8e9b9c8a;border-radius:3px;box-shadow:var(--frame); }
-#main-menu #stage-preview-art { height:clamp(87px,14dvh,157px);max-height:none;object-position:center 50%; }
+#stage-preview { aspect-ratio:1; border:1px solid #8e9b9c8a;border-radius:3px;box-shadow:var(--frame); }
+#main-menu #stage-preview-art { position:absolute;inset:0;width:100%;height:100%;aspect-ratio:1;max-height:none;object-fit:cover;object-position:var(--stage-focus,50%) center; }
 #stage-preview figcaption {
   position:absolute;inset:auto 0 0;display:block;padding:24px 12px 8px;border:0;
   background:linear-gradient(transparent,#0a131bd9 54%,#0b121a);text-shadow:0 1px 4px #03070b;
@@ -57,33 +58,35 @@
 .stage-switch { display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:4px;margin-top:4px; }
 #stage-label { border:1px solid #5d6c7280;background:var(--steel);border-radius:2px;font-size:14px;color:#e0e4e0;letter-spacing:.04em; }
 #main-menu .lobby-controls nav #start { height:clamp(46px,6.3dvh,58px);font-size:17px;letter-spacing:.055em; }
-#main-menu #continue-run { width:100%;margin:0; }
+#replace-run .popup-buttons {display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#replace-run .popup-buttons button {min-width:0;width:100%;min-height:44px;}
+#replace-run #continue-run {grid-column:1/-1;}
+#replace-run [hidden] {display:none;}
 #main-menu .lobby-controls #start::before { display:none; }
 #main-menu #start::after { border-left-color:currentColor; }
 
 @media (orientation:landscape) {
   #lobby-pages > #main-menu {
-    grid-template-columns:minmax(245px,410px) 1fr;grid-template-rows:1fr auto auto;align-content:center;
-    gap:9px;padding:max(16px,env(safe-area-inset-top)) max(5vw,env(safe-area-inset-right)) 3vh max(5vw,env(safe-area-inset-left));
-    background-image:linear-gradient(90deg,#0a131beb,transparent 70%),url(art/hub/operations-wide.webp);
-    background-size:cover;background-position:center;
+    display:grid;grid-template-columns:minmax(190px,360px) minmax(0,auto);grid-template-rows:auto auto;
+    justify-content:center;align-content:center;align-items:center;column-gap:clamp(18px,6vw,85px);row-gap:24px;
+    padding:max(10px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) 10px max(18px,env(safe-area-inset-left));
   }
-  #main-menu .home-mast { grid-area:1/1;flex-flow:row;align-items:flex-start;justify-content:space-between; }
-  #main-menu .mission-selector { grid-area:2/1;width:100%;margin:0; }
-  #main-menu .lobby-controls { grid-area:3/1;width:100%;margin:0; }
-  #main-menu #stage-preview-art { height:clamp(82px,17dvh,155px); }
+  #main-menu .home-mast {grid-area:1/1;height:auto;align-self:end;flex-flow:row;justify-content:space-between;}
+  #main-menu .mission-selector {grid-area:1/2/3/3;width:min(40vw,calc(100dvh - 150px),475px);margin:0;}
+  #main-menu .lobby-controls {grid-area:2/1;align-self:start;width:100%;max-width:none;margin:0;}
 }
 @media (orientation:landscape) and (max-height:490px) {
-  #lobby-pages > #main-menu { gap:4px;padding-block:max(5px,env(safe-area-inset-top)) 3px;grid-template-columns:minmax(245px,39%) 1fr; }
-  #main-menu #game-title {font-size:32px;margin:4px 0;}
-  #main-menu #stage-preview-art {height:54px;}
-  #main-menu .lobby-controls .controlhint {display:none;}
+  #lobby-pages > #main-menu {grid-template-columns:minmax(190px,33vw) auto;row-gap:12px;}
+  #main-menu #game-title {font-size:clamp(32px,9dvh,46px);margin:4px 0;}
   #main-menu .lobby-controls nav #start {height:44px;}
 }
-@media (min-width:1050px) and (min-height:640px) {
-  #lobby-pages > #main-menu { padding-block:8vh 6vh; }
-  #main-menu #game-title { font-size:clamp(70px,8.6dvh,110px); }
+@media (orientation:portrait) and (max-height:680px) {
+  #main-menu .mission-selector,#main-menu .lobby-controls {width:min(100%,42dvh);}
+  #main-menu #game-title {font-size:clamp(29px,7dvh,43px);}
 }
+#main-menu .hint-touch {display:flex;justify-content:center;flex-wrap:wrap;}
+#hud :is(.operator,#cast) {touch-action:none;}
+#hud .drag-ready {outline:2px solid var(--field-selected);outline-offset:-3px;}
 
 /* Recessed fasteners, a machined lip and a dark lower edge share the same light source. */
 [data-field-control], #talent-buy, .draw-supply, #confirm-diamonds, #rates-done,
@@ -299,7 +302,16 @@
 
 /* A crew grade belongs to the operator. Its control sits outside the pick button. */
 #prep-screen .formation {grid-template-rows:auto minmax(120px,1fr) auto;}
-#prep-screen .figure-1,#prep-screen .figure-2 {bottom:12%;}
+#prep-screen .figure-0 {width:54%;left:23%;height:94%;}
+#prep-screen :is(.figure-1,.figure-2) {width:37%;height:66%;bottom:20%;}
+#prep-screen .figure-1 {left:0;}
+#prep-screen .figure-2 {right:0;}
+@media (orientation:portrait) {
+  #prep-screen .figure-0 {width:85%;left:7.5%;height:83%;}
+  #prep-screen :is(.figure-1,.figure-2) {width:52%;height:57%;bottom:26%;}
+  #prep-screen .figure-1 {left:-3%;}
+  #prep-screen .figure-2 {right:-3%;}
+}
 .promotion-panel {
   display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-content:center;
   padding:7px 9px;border:1px solid #526671;border-radius:3px;

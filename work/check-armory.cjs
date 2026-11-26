@@ -13,7 +13,7 @@ const {chromium}=require('playwright');
     await page.locator('#select-team:enabled').waitFor();
     const newSortie=async()=>{
       await page.locator('#start:enabled').tap();
-      if(await page.locator('#replace-run').isVisible())await page.locator('#replace-confirm').tap();
+      if(await page.locator('#replace-run').isVisible()){await page.locator('#ask-replace').tap();await page.locator('#replace-confirm').tap();}
       await page.locator('#hud').waitFor();
     };
     const screenshot=async name=>{

@@ -45,6 +45,7 @@ const shoulder = { x: 32, y: 32 };
 const tagArt = {
   ...ravenCelArt,
   ...operatorCelArt,
+  ...recruitArt,
   ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon || i.family==='shield').flatMap(i=>{
     if(i.family==='shield')return [[i.key,i.asset+'-field.png']];
     if(i.family==='smg')return [[i.key,i.asset+'-near.png'],[i.key+'-far',i.asset+'-far.png'],[i.key+'-pair',itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
@@ -154,6 +155,7 @@ function combatAim(m,tx,ty,col){
   m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
 }
 function combatMuzzle(m,col,lead,pitch=m.aimPitch??0,recoil=m.weapon.family==='smg' && !reduceMotion.matches?4:2){
+  if(usesRecruitArt(m))return recruitSocket(m);
   if(usesFieldUniform(m))return uniformSocket(m,col,m.uniformElevation??m.aimPitch??0);
   if(operatorRoles[m.id])return operatorTip(m,operatorCel(m,run.t-(m.lastShot??-Infinity)));
   if(m.id===1 && m.weapon.family==='smg'){
@@ -243,6 +245,7 @@ const ravenFirePoses=[
   [.94,.09,.94,-.04],[.98,.03,.97,0],[1,-.04,.99,.02],[1,-.02,1,.01],[1,0,1,0]
 ].map(([width,lean,height,nod])=>({width,lean,height,nod}));
 function drawMemberGear(g,m,age,moving=false){
+  if(usesRecruitArt(m)){drawRecruit(g,m,age,moving);return}
   if(usesFieldUniform(m)){drawFieldUniform(g,m,age,moving);return}
   if(operatorRoles[m.id]){drawOperatorGear(g,m,age,moving);return}
   if(m.id===1 && m.weapon.family==='smg'){drawRavenCels(g,m,age);return}
@@ -281,9 +284,9 @@ function drawMemberGear(g,m,age,moving=false){
 function drawCrewPreview(canvas,id,row){
   const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
   const weapon=gearByKey.get(row.weapon);
-  g.save();g.scale(canvas.width/84,canvas.height/64);
-  if(id===0){g.translate(4,5);g.scale(.90,.90)}
-  drawMemberGear(g,{id,weapon,loadout:row,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?29:38,y:60},Infinity);
+  g.save();g.scale(canvas.width/64,canvas.height/68);
+  if(id===1)drawBarracksRaven(g,weapon,31,65);
+  else drawMemberGear(g,{id,weapon,loadout:row,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?25:31,y:65},Infinity);
   g.restore();
 }
 function drawEquippedMember(m){
@@ -361,7 +364,7 @@ function drawHero(m) {
   else if(skill)drawRifleSkill(m,skill);
   else drawEquippedMember(m);
   if(skill?.awakened && (m.id===1 || m.id===2))drawPulseArms(m,skill);
-  if (lead) leaderChevron(m.x, m.y - [68,64,60,61,60][m.id]);
+  if (lead) leaderChevron(m.x,m.y-crewHeight[m.id]-8);
 }
 
 function drawBossSprite(stage, frame, x, y, flip, hit, height = 88) {

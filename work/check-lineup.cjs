@@ -1,3 +1,4 @@
+const dragControl=require('./drag-control.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -38,7 +39,7 @@ const launchSquad = require('./select-test-squad.cjs');
     const buttons=page.locator('#party button');
     assert.deepEqual(await buttons.evaluateAll(nodes=>nodes.map(n=>+n.dataset.i)),ids);
     assert.equal(await page.evaluate(()=>run.lead),3);
-    await page.keyboard.press('2');
+    await dragControl(page,page.locator('#party .operator').nth(1));
     assert.equal(await page.evaluate(()=>run.lead),2);
     await page.locator('#pause').tap();
     assert.deepEqual(await page.locator('#loadout [data-operator]').evaluateAll(nodes=>nodes.map(n=>+n.dataset.operator)),ids);

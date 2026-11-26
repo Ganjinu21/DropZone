@@ -1,3 +1,4 @@
+const dragControl=require('./drag-control.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -26,7 +27,7 @@ const {chromium} = require('playwright');
     const party = page.locator('#party [data-operator]');
     assert.equal(await party.count(), 3);
     assert.ok(await page.locator('#cast').isDisabled());
-    await page.keyboard.press('Space');
+    await dragControl(page,page.locator('#cast'));
     assert.ok(await page.evaluate(()=>!run.activeSkill));
     await page.evaluate(() => {
       window.skillUI = {
@@ -52,14 +53,14 @@ const {chromium} = require('playwright');
         },
         playCast() {
           const skill = run.activeSkill, start = [run.x,run.y];
-          if (skill.id === 0) pressed.add('KeyD');
+          if (skill.id === 0) stick={x:0,y:0,dx:1,dy:0};
           for (let frame=0; run.activeSkill && frame<600; frame++) {
             if(skill.id===0 && frame===390)hitSquadMember(run.enemies[0],run.squad[0],routes[run.floor],skill.hp);
             if(!run.activeSkill)break;
             update(1/60);
             if (frame%5===0) render();
           }
-          pressed.delete('KeyD');
+          stick=null;
           return {start, finish:[run.x,run.y], ended:!run.activeSkill, cooldown:squadSkillCooldown(skill.id),
             drawn:[...this.drawn], sounds:this.sounds.slice()};
         }
@@ -95,18 +96,17 @@ const {chromium} = require('playwright');
         await page.locator('#pause').tap();
         await page.locator('#homebtn').tap();
         await launch(page,[3,1,2]);
-      } else if (id) await party.nth(id).tap();
+      } else if (id) await dragControl(page,party.nth(id));
       assert.equal(await page.evaluate(() => run.lead),id);
       const roster = await page.evaluate(() => skillUI.roster());
       assert.equal(roster.length,3);
       assert.ok(roster.includes(id));
       await page.evaluate(() => skillUI.setup());
-      if (id%2) await page.keyboard.press('Space');
-      else await page.locator('#cast').tap();
+      await dragControl(page,page.locator('#cast'));
       assert.equal(await page.evaluate(() => run.activeSkill?.id),id);
       if (id===0) {
         await page.locator('#pause').tap();
-        await page.keyboard.press('Space');
+        assert.ok(await page.locator('#cast').isHidden());
         const paused = await page.evaluate(() => {
           const before = [run.t,run.activeSkill.age];
           for (let frame=0;frame<5;frame++) tick(last+16);
@@ -122,13 +122,13 @@ const {chromium} = require('playwright');
       if (id===0) assert.deepEqual(result.finish,result.start,'bunker moved under held movement input');
       for (const sprite of cast.sprites) assert.ok(result.drawn.includes(sprite),'not drawn on game canvas: '+sprite);
       assert.ok(result.sounds.includes(cast.sound),'not played through Web Audio: '+cast.sound);
-      await page.keyboard.press('Space');
+      await dragControl(page,page.locator('#cast'));
       assert.equal(await page.evaluate(() => run.activeSkill),null,'cooldown allowed another UI cast');
       if (id===0) {
         assert.equal(result.cooldown,15,'destruction must start the full cooldown');
         const button=page.locator('#cast');
         await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt;updateHud()});
-        await button.tap();
+        await dragControl(page,button);
         await page.evaluate(()=>{
           run.t+=20;
           tickSquadSkills(bunkerDeployTime);
@@ -143,7 +143,7 @@ const {chromium} = require('playwright');
         assert.equal(await page.locator('#cast-name').textContent(),'벙커 해제');
         const blasts=()=>page.evaluate(()=>run.effects.filter(fx=>fx.skillFx==='blast').length);
         const before=await blasts();
-        await button.tap();
+        await dragControl(page,button);
         assert.equal(await blasts(),before,'manual release caused an explosion');
         assert.equal(await page.locator('#cast-status').textContent(),'접는 중');
         assert.ok(await button.isDisabled());
@@ -156,13 +156,13 @@ const {chromium} = require('playwright');
         }));
         await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt-.01;updateHud()});
         assert.ok(await button.isDisabled());
-        await page.keyboard.press('Space');
+        await dragControl(page,page.locator('#cast'));
         assert.equal(await page.evaluate(()=>run.activeSkill),null);
         await page.evaluate(()=>{run.t=run.squad[0].skillReadyAt;updateHud()});
-        await page.keyboard.press('Space');
+        await dragControl(page,page.locator('#cast'));
         assert.ok(await page.evaluate(()=>run.activeSkill?.hp===squadSkillDefs[0].durability));
         await page.evaluate(()=>tickSquadSkills(.24));
-        await button.tap();
+        await dragControl(page,button);
         assert.ok(await page.evaluate(()=>{
           const partial=run.activeSkill.foldTime;
           tickSquadSkills(.2);
@@ -172,7 +172,7 @@ const {chromium} = require('playwright');
     }
     await page.evaluate(() => { skillUI.setup(); shoot(run.squad[3]); });
     assert.deepEqual(await page.evaluate(() => skillUI.sounds),['rocket-launch']);
-    await party.nth(1).tap();
+    await dragControl(page,party.nth(1));
     const impact = await page.evaluate(() => {
       skillUI.sounds.length=0;
       for (let f=0;f<85;f++) update(1/60);
@@ -184,13 +184,13 @@ const {chromium} = require('playwright');
     await page.locator('#pause').tap();
     await page.locator('#homebtn').tap();
     await page.locator('#start:enabled').tap();
-    await page.locator('#replace-confirm').tap();
+    await page.locator('#ask-replace').tap();await page.locator('#replace-confirm').tap();
     assert.deepEqual(await page.evaluate(() => run.squad.map(m=>squadSkillCooldown(m.id))),[0,0,0,0,0]);
     assert.deepEqual(await page.evaluate(() => skillUI.roster()),[1,2,3]);
-    await party.nth(2).tap();
+    await dragControl(page,party.nth(2));
     assert.ok(await page.locator('#cast').isDisabled(),'new sortie retained the previous test loadout');
     await page.evaluate(()=>skillUI.equipBase());
-    await page.keyboard.press('Space');
+    await dragControl(page,page.locator('#cast'));
     assert.equal(await page.evaluate(() => run.activeSkill?.id),2);
     const crossing = await page.evaluate(() => {
       Object.assign(run,TransitKit.stairPoint(cityMaps.surface.exits[0],TransitKit.stairLength*.61));
@@ -201,7 +201,7 @@ const {chromium} = require('playwright');
     assert.equal(crossing.cast,null,'skill continued on a different floor');
     assert.ok(crossing.cooldown>0);
     assert.deepEqual(errors,[]);
-    console.log('Mobile tap/Space casts across two selected trios, real draws/audio, pause, bunker movement lock, tag, restart and stairs passed.');
+    console.log('Mobile drag casts across two selected trios, real draws/audio, pause, bunker movement lock, tag, restart and stairs passed.');
   } finally {
     await browser.close();
   }

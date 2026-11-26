@@ -5,12 +5,14 @@ const TAU=Math.PI*2;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const names=['벌크','레이븐','링스','해머','CCT'], roles=['돌격병','SMG 양손잡이','저격병','로켓병','공중통제사'];
 const memberHealth=[145,98,85,102,94];
+const crewHeightCm=[194,170,170,176,182];
+const crewHeight=crewHeightCm.map(cm=>54.75*cm/170);
 ['bulk','raven','lynx','hammer','cct'].forEach((role,id)=>{
- ART['face'+id]=id===1?'art/armory/raven-cels/portrait-C.png':'art/armory/painted-squad/'+role+'-portrait-C.png';
+ ART['face'+id]=id===1?'art/armory/raven-cels/portrait-C.png':'art/armory/recruits/'+role+'-face.webp';
 });
 const formationSlots = [[23, 0], [-15, -24], [-18, 24]];
 const swapTime = 1.5;
-let mode='home',run,viewW=960,viewH=540,stick=null,pressed=new Set(),sound,last=0,selected=0,offers=[];
+let mode='home',run,viewW=960,viewH=540,stick=null,sound,last=0,selected=0,offers=[];
 function clock(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0')}
 let renderScale=1;
 function resize(){
@@ -30,7 +32,7 @@ function show(next){
  for(const [id,visible] of Object.entries({home:next==='home',hud:next==='play',upgrade:next==='upgrade',dialog:['pause','end'].includes(next)}))$(id).hidden=!visible;
  if(next==='home'){resetLobbyView();refreshContinueMenu()}
  if(next==='play')saveBattleCheckpoint();
- stick=null;pressed.clear();
+ stick=null;clearHudDrag();
 }
 function startBattleAudio(){
  try{sound??=new (window.AudioContext||window.webkitAudioContext)();sound.resume().catch(()=>{});gunAudio.load(sound)}catch{}
@@ -293,26 +295,61 @@ function back(){
  else if(mode==='end')show('home');
  return true;
 }
-window.gameBack=back;$('pause').onclick=pause;$('equip').onclick=applyUpgrade;$('cards').onclick=e=>{let b=e.target.closest('.card');if(b)choose(+b.dataset.i)};$('party').onclick=e=>{let b=e.target.closest('.operator');if(b)switchLead(+b.dataset.i)};
+window.gameBack=back;$('pause').onclick=pause;$('equip').onclick=applyUpgrade;$('cards').onclick=e=>{let b=e.target.closest('.card');if(b)choose(+b.dataset.i)};
 $('resume').onclick=()=>mode==='end'?start(run.stage):show('play');$('homebtn').onclick=()=>show('home');
-$('cast').onclick=activateSquadSkill;
+
 $('talent-reroll').onclick=rerollUpgrade;
 $('talent-reroll').addEventListener('keydown',event=>{
  if(event.code==='Enter' || event.code==='Space')event.stopPropagation();
 });
-addEventListener('keydown',e=>{if(['Tab','F5','F12'].includes(e.key))return;if(e.code==='Escape'){if(!e.repeat)back();return}if(mode==='home')return;if(/^Arrow|^Space$/.test(e.code))e.preventDefault();if(e.repeat)return;if(mode==='upgrade'){if(e.code==='Enter'){applyUpgrade();return}if(e.code==='ArrowRight')choose(Math.min(offers.length-1,selected+1));if(e.code==='ArrowLeft')choose(Math.max(0,selected-1))}
- if(e.code==='Space' && mode==='play'){activateSquadSkill();return}
- if(/^[1-3]$/.test(e.key)){const slot=Number(e.key)-1;if(mode==='upgrade')choose(slot);else if(mode==='play')switchLead(run.lineup[slot])}pressed.add(e.code)});
-addEventListener('keyup',e=>{
- // Space already casts on keydown. A focused HUD button must not click again on keyup.
- if(e.code==='Space' && mode==='play')e.preventDefault();
- pressed.delete(e.code);
+addEventListener('keydown',e=>{
+ if(e.code==='Escape' && !e.repeat){back();return}
+ if(mode==='play' && (e.code==='Space'||e.code.startsWith('Arrow'))){e.preventDefault();return}
+ if(mode!=='upgrade'||e.repeat||e.target.closest('button'))return;
+ if(e.code==='Enter'){e.preventDefault();applyUpgrade()}
+ if(e.code==='ArrowRight'){e.preventDefault();choose(Math.min(offers.length-1,selected+1))}
+ if(e.code==='ArrowLeft'){e.preventDefault();choose(Math.max(0,selected-1))}
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden && ['play','pause','upgrade'].includes(mode))show('home')});addEventListener('blur',pause);
-$('party').addEventListener('pointerdown',e=>{const b=e.target.closest('.operator');if(b&&e.pointerType==='touch'){e.preventDefault();switchLead(+b.dataset.i)}});
-cv.onpointerdown=e=>{if(mode!=='play'||stick)return;cv.setPointerCapture(e.pointerId);stick={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0}};
+
+let hudDrag=null;
+const hudActionSelector='.operator,#cast';
+function clearHudDrag(){
+ hudDrag?.button.classList.remove('drag-ready');hudDrag=null;
+}
+function useHudAction(button){
+ if(!button||button.disabled||mode!=='play')return;
+ if(button.id==='cast')activateSquadSkill();
+ else switchLead(Number(button.dataset.i));
+}
+$('hud').addEventListener('pointerdown',e=>{
+ const button=e.target.closest(hudActionSelector);
+ if(!button||button.disabled||hudDrag||e.button!==0)return;
+ e.preventDefault();button.setPointerCapture(e.pointerId);
+ hudDrag={id:e.pointerId,button,x:e.clientX,y:e.clientY,ready:false};
+});
+$('hud').addEventListener('pointermove',e=>{
+ if(e.pointerId!==hudDrag?.id)return;
+ hudDrag.ready=Math.hypot(e.clientX-hudDrag.x,e.clientY-hudDrag.y)>=12;
+ hudDrag.button.classList.toggle('drag-ready',hudDrag.ready);
+});
+function endHudDrag(e){
+ if(e.pointerId!==hudDrag?.id)return;
+ const {button,x,y}=hudDrag;
+ const activate=e.type==='pointerup' && Math.hypot(e.clientX-x,e.clientY-y)>=12;
+ clearHudDrag();if(activate)useHudAction(button);
+}
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('hud').addEventListener(type,endHudDrag);
+// Assistive technology can activate a focused control without a pointing device.
+$('hud').addEventListener('click',e=>{if(e.detail===0)useHudAction(e.target.closest(hudActionSelector))});
+cv.onpointerdown=e=>{if(mode!=='play'||stick||e.button!==0)return;cv.setPointerCapture(e.pointerId);stick={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0}};
 cv.onpointermove=e=>{if(stick?.id===e.pointerId){const r=Math.max(25,innerHeight*.091);stick.dx=(e.clientX-stick.x)/r;stick.dy=(e.clientY-stick.y)/r}};
-cv.onpointerup=cv.onpointercancel=cv.onlostpointercapture=e=>{if(stick?.id===e.pointerId)stick=null};
+cv.onpointerup=cv.onpointercancel=cv.onlostpointercapture=e=>{
+ if(stick?.id!==e.pointerId)return;
+ const moved=Math.hypot(e.clientX-stick.x,e.clientY-stick.y)>=12;
+ stick=null;
+ if(e.type==='pointerup' && moved)useHudAction(document.elementFromPoint(e.clientX,e.clientY)?.closest(hudActionSelector));
+};
 function combatCue(kind,x,y,duration,id=0,angle=0,size=1){
  const cue={kind,x,y,duration,id,angle,size,age:0};
  run.cues.push(cue);
@@ -438,8 +475,7 @@ function collectCrystals(dt,pulse=false){
 function update(dt){
  let nav=routes[run.floor];
  run.t+=dt;run.swap=Math.max(0,run.swap-dt);run.shield-=dt;
- let dx=(stick?.dx||0)+Number(pressed.has('KeyD')||pressed.has('ArrowRight'))-Number(pressed.has('KeyA')||pressed.has('ArrowLeft'));
- let dy=(stick?.dy||0)+Number(pressed.has('KeyS')||pressed.has('ArrowDown'))-Number(pressed.has('KeyW')||pressed.has('ArrowUp'));
+ const dx=stick?.dx||0,dy=stick?.dy||0;
  let l=squadSkillLocked()?0:Math.hypot(dx,dy);if(l>.05){run.dx=dx/l;run.dy=dy/l;let scale=105*run.squad[run.lead].gear.movement*(1+run.talents.moveBonus)*dt/Math.max(l,1);nav.slide(run,dx*scale,dy*scale,10);run.walk+=dt*9}run.moving=l>.05;
  if(run.moving){
    const desired=Math.atan2(run.dy,run.dx),delta=desired-run.heading;

@@ -24,12 +24,12 @@ async function exerciseFormation(page) {
     Object.assign(run,{x:1257,y:1004,heading:0,enemies:[],remaining:999,spawn:999});
     squad.forEach((m,i)=>Object.assign(m,{x:run.x+formationSlots[i][0],y:run.y+formationSlots[i][1],cool:999}));
     const phases=squad.map(()=>new Set());
-    pressed.add('KeyD');
+    stick={x:0,y:0,dx:1,dy:0};
     for(let t=0;t<65;t++){
       update(1/60);
       squad.forEach((m,i)=>{if(m.moving)phases[i].add(crewStrideFrame(m))});
     }
-    pressed.delete('KeyD');
+    stick=null;
     for(let t=0;t<90;t++)update(1/60);
     return squad.map((m,i)=>({id:m.id,frames:phases[i].size,stopped:!m.moving}));
   });
@@ -120,7 +120,7 @@ async function exerciseFormation(page) {
         let painted=false;
         ctx.save();ctx.setTransform(1,0,0,1,0,0);
         ctx.drawImage=function(image,...args){
-          if(image===art.cctField72 && Math.abs(Math.abs(this.getTransform().a)-summonScale)<1e-5)painted=true;
+          if(image===art.cctRecruitstand||image===art.cctRecruitfield||image===art.cctRecruitstride)painted=true;
           return draw.call(this,image,...args);
         };
         try{cctRadioSprite(support)}finally{ctx.drawImage=draw;ctx.restore()}

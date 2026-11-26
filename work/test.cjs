@@ -1,9 +1,10 @@
+const dragControl=require('./drag-control.cjs');
 const {chromium}=require('playwright');
 const path=require('path'), {pathToFileURL}=require('url');
 (async()=>{const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--no-sandbox','--disable-gpu','--disable-crash-reporter']});try{
 const page=await browser.newPage({viewport:{width:1000,height:560}});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 await page.goto(pathToFileURL(path.resolve('game/index.html')).href);await page.locator('#start:enabled').waitFor();
-await page.screenshot({path:'work/lobby-preview.png'});await require('./select-test-squad.cjs')(page);const startX=await page.evaluate(()=>run.x);await page.keyboard.down('KeyD');await page.waitForTimeout(400);await page.keyboard.up('KeyD');await page.keyboard.press('2');if(await page.evaluate(x=>run.lead!==1||run.x<=x,startX))throw Error('move or leader');
+await page.screenshot({path:'work/lobby-preview.png'});await require('./select-test-squad.cjs')(page);const startX=await page.evaluate(()=>run.x);await page.mouse.move(200,280);await page.mouse.down();await page.mouse.move(280,280);await page.waitForTimeout(400);await page.mouse.up();await dragControl(page,page.locator('#party .operator').nth(1));if(await page.evaluate(x=>run.lead!==1||run.x<=x,startX))throw Error('move or leader');
 await page.screenshot({path:'work/play-preview.png'});await page.click('#pause');await page.click('#resume');
 const state=await page.evaluate(()=>{for(let i=0;i<2400&&mode==='play';i++){const gems=run.crystals.slice().sort((a,b)=>dist(run,a)-dist(run,b));if(gems.length){const g=gems[0],l=dist(run,g)||1;stick={dx:(g.x-run.x)/l,dy:(g.y-run.y)/l,x:0,y:0}}update(1/60)}return {mode,level:run.level,kills:run.kills,xp:run.xp}});console.log('Natural level-up',state);
 if(state.mode!=='upgrade')throw Error('no upgrade');

@@ -143,10 +143,15 @@ function decodeBattle(text){
 }
 
 function refreshContinueMenu(){
-  $('continue-run').hidden=!savedBattle;
   const locked=selectedStartStage>highestPlayableStage();
-  $('start').disabled=!lobbyReady||locked;
-  $('start').textContent=locked?'이전 스테이지 클리어 필요':savedBattle?'새 작전':'플레이';
+  $('start').disabled=!lobbyReady||(locked && !savedBattle);
+  $('start').textContent='플레이';
+  $('start').title=locked && !savedBattle?'이전 스테이지 클리어 필요':'';
+  $('ask-replace').disabled=locked;
+  if($('replace-run').open){
+    if(!savedBattle)$('replace-run').close();
+    else if($('replace-confirm').hidden)showContinueChoice();
+  }
 }
 function persistentBattle(owner=localStorage.getItem(activeCheckpointKey)){
   // Before writer slots were introduced the root key held the entire v1 graph.
@@ -272,9 +277,26 @@ function resumeBattle(){
   else show('play');
   updateHud();
 }
-$('continue-run').onclick=resumeBattle;
+function showContinueChoice(replace=false){
+  const state=decodeBattle(savedBattle).state;
+  $('replace-title').textContent=replace?'새 작전을 시작할까요?':'진행 중인 작전';
+  $('saved-sortie').textContent=replace?'새 작전을 시작하면 현재 진행 기록을 교체합니다.':
+    '스테이지 '+state.stage+' · '+stages[state.stage-1].name+' · '+clock(state.t);
+  $('continue-run').hidden=replace;$('ask-replace').hidden=replace;
+  $('replace-confirm').hidden=!replace;$('replace-cancel').textContent=replace?'돌아가기':'닫기';
+}
+function openSortie(){
+  readBattleCheckpoint();refreshContinueMenu();
+  if(!savedBattle){if(!$('start').disabled)start();return}
+  showContinueChoice();$('replace-run').showModal();$('continue-run').focus();
+}
+$('continue-run').onclick=()=>{$('replace-run').close();resumeBattle()};
+$('ask-replace').onclick=()=>{showContinueChoice(true);$('replace-cancel').focus()};
 $('replace-confirm').onclick=()=>{$('replace-run').close();start()};
-$('replace-cancel').onclick=()=>$('replace-run').close();
+$('replace-cancel').onclick=()=>{
+  if($('replace-confirm').hidden)$('replace-run').close();
+  else{showContinueChoice();$('continue-run').focus()}
+};
 $('upgrade-home').onclick=()=>show('home');
 addEventListener('pagehide',saveBattleCheckpoint);
 restoreBossRewards();

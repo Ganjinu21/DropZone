@@ -113,10 +113,8 @@
         <nav aria-label="메인 메뉴">
           <button id="start" data-field-control="primary" class="menu-start" type="button" disabled>불러오는 중</button>
         </nav>
-        <button id="continue-run" data-field-control="secondary" type="button" hidden>이어하기</button>
         <div class="controlhint">
-          <div class="hint-touch"><span>드래그로 이동</span><i></i><span>대원 탭으로 교대</span><i></i><span>스킬 버튼으로 발동</span></div>
-          <div class="hint-keys"><kbd>WASD</kbd><span>이동</span><kbd>1–3</kbd><span>교대</span><kbd>Space</kbd><span>선두 스킬</span></div>
+          <div class="hint-touch"><span>화면을 드래그해 이동</span><i></i><span>대원이나 스킬 버튼을 밀어 사용</span></div>
         </div>
       </div>
     </section>
@@ -216,10 +214,15 @@
       <footer><button id="resume" data-field-control="primary" class="action"></button><button id="homebtn" data-field-control="secondary" class="secondary">타이틀로</button></footer>
     </div>
   </section>
-  <dialog id="replace-run" class="armory-popup" aria-labelledby="replace-title">
-    <h2 id="replace-title">새 작전을 시작할까요?</h2>
-    <p>진행 중인 작전의 전투 기록을 새 작전으로 교체합니다.</p>
-    <div class="popup-buttons"><button type="button" id="replace-cancel" data-field-control="secondary" autofocus>취소</button><button type="button" id="replace-confirm" data-field-control="primary">새 작전 시작</button></div>
+  <dialog id="replace-run" class="armory-popup" aria-labelledby="replace-title" aria-describedby="saved-sortie">
+    <h2 id="replace-title">진행 중인 작전</h2>
+    <p id="saved-sortie"></p>
+    <div class="popup-buttons">
+      <button type="button" id="continue-run" data-field-control="primary" autofocus>이어하기</button>
+      <button type="button" id="ask-replace" data-field-control="secondary">새 작전</button>
+      <button type="button" id="replace-confirm" data-field-control="primary" hidden>새 작전 시작</button>
+      <button type="button" id="replace-cancel" data-field-control="secondary">닫기</button>
+    </div>
   </dialog>
   <script src="images.js"></script>
   <script src="streets.js"></script>
@@ -271,6 +274,7 @@
   <script src="operator-cels.js"></script>
   <script src="art/armory/rank-crew/sights.js"></script>
   <script src="rank-field.js"></script>
+  <script src="recruit-cels.js"></script>
   <script src="rank-test.js"></script>
   <script src="render.js"></script>
 </body>

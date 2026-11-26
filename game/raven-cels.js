@@ -7,6 +7,7 @@ const ravenAtlasRows=Math.ceil((28+ravenBarrels.length)/8);
 const ravenCelArt={ravenEcho:ravenArtDir+'echo.png',ravenCels:ravenArtDir+'base.png',
   ravenFollow:ravenArtDir+'spin-follow.webp',ravenFollowEcho:ravenArtDir+'spin-follow-echo.webp',
   ravenFieldCels:ravenArtDir+'field.png',ravenField2x:ravenArtDir+'field-2x.webp'};
+for(let tier=0;tier<rankedTiers.length;tier++)ravenCelArt['ravenBarracks'+tier]=ravenArtDir+'barracks-'+tier+'.webp';
 for(const {rank} of rankedTiers){
   if(rank==='C')continue;
   const name=rank.replace('+','-plus');
@@ -99,6 +100,21 @@ function drawRavenBody(g,m,cel,skill){
   if(m.weapon.tier>0){
     const [x,y]=ravenFinishOrigins[cel.index],im=art['raven-finish'+m.weapon.rank];
     draw(im,(x-144)/4,(y-268)/4,im.width/32,im.height/(4*ravenAtlasRows));
+  }
+  g.restore();
+}
+
+
+function drawBarracksRaven(g,weapon,x,y){
+  const tier=armory.crewTiers[1],image=art['ravenBarracks'+tier];
+  const height=275,w=height*image.width/image.height,unit=crewHeight[1]/height;
+  g.save();g.translate(x,y);g.scale(unit,unit);g.translate(-w*.52,-height);
+  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+  g.drawImage(image,0,0,w,height);
+  if(weapon.tier){
+    const muzzles=[[99,136.7,33],[145.3,143.2,40]];
+    muzzles.forEach((tip,hand)=>drawRecruitFinish(g,image,[0,0,image.width,image.height],[w,height],
+      weaponSurface(tip,16,2.6),weapon.tier,'raven-stand-'+tier+'-'+hand));
   }
   g.restore();
 }

@@ -14,12 +14,16 @@ try {
 } catch {}
 function getSelectedSquad(){return validSquad(savedSquad)?savedSquad.slice():[0,1,2]}
 let lobbyReady=false;
+// Keep each district’s landmark inside the square map crop.
+const stagePreviewFocus=[50,28,52,48,52,25,51,55,50,55];
 function chooseStartStage(number) {
   if (!Number.isInteger(number) || number < 1 || number > stages.length) return;
   selectedStartStage = number;
   Battlefield.prepare(number);
   $('mission-location').textContent=stages[number-1].name;
   const rules = stages[number - 1];
+  $('stage-preview').style.setProperty('--stage-focus',stagePreviewFocus[number-1]+'%');
+  $('stage-preview-art').alt=rules.name+' 전장 미리보기';
   $('stage-preview-art').src = 'art/stages/stage-' + number + '.webp';
   $('stage-preview-name').textContent = rules.name;
   $('stage-brief').textContent = (seoulLayouts[number-1].axis?'특별 작전 · ':'')+'약 6분 · 웨이브 ' + rules.waves.length + ' · 보스 ' + rules.bossName;
@@ -115,12 +119,25 @@ $('barracks-page').addEventListener('click',async event=>{
     syncRankTest();
   }
 });
+// Keep the backing store at display density when the figure moves to the front or the phone rotates.
+const figureResolution=new ResizeObserver(entries=>{
+  for(const {target:canvas,contentRect} of entries){
+    if(!canvas.isConnected || !draftEquipment || !contentRect.width || !contentRect.height)continue;
+    const cssWidth=Math.min(contentRect.width,contentRect.height*16/17);
+    const width=Math.max(64,Math.min(1280,Math.ceil(cssWidth*Math.min(3,devicePixelRatio||1)/16)*16));
+    if(canvas.width===width)continue;
+    canvas.width=width;canvas.height=width*17/16;
+    const id=Number(canvas.closest('button').dataset.inspect);
+    drawCrewPreview(canvas,id,draftEquipment[id]);
+  }
+});
 function paintPrep(){
   if(!draftSquad.includes(editId))editId=draftSquad[0];
   if(editSlot==='shield' && editId!==0)editSlot='weapon';
   const order=[editId,...draftSquad.filter(id=>id!==editId)];
   paintPromotion($('prep-promotion'),editId);
-  $('crew-figures').innerHTML=order.map((id,index)=>'<button type="button" class="figure figure-'+index+'" data-inspect="'+id+'" aria-pressed="'+(index===0)+'" aria-label="'+names[id]+' 장비 편집"><canvas aria-hidden="true" width="336" height="256"></canvas><small>'+(id===draftSquad[0]?'선두 · ':'')+names[id]+'</small></button>').join('');
+  figureResolution.disconnect();
+  $('crew-figures').innerHTML=order.map((id,index)=>'<button type="button" class="figure figure-'+index+'" data-inspect="'+id+'" aria-pressed="'+(index===0)+'" aria-label="'+names[id]+' 장비 편집"><canvas aria-hidden="true" width="384" height="408"></canvas><small>'+(id===draftSquad[0]?'선두 · ':'')+names[id]+'</small></button>').join('');
   $('crew-name').textContent=crewLabel(editId);
   $('make-leader').disabled=editId===draftSquad[0];$('make-leader').textContent=editId===draftSquad[0]?'출발 선두':'선두 지정';
   $('slots-left').innerHTML=(editId===0?['weapon','shield','gloves','boots']:['weapon','gloves','boots']).map(slotButton).join('');
@@ -128,6 +145,7 @@ function paintPrep(){
   for(const canvas of $('crew-figures').querySelectorAll('canvas')){
     const id=Number(canvas.closest('button').dataset.inspect);
     drawCrewPreview(canvas,id,draftEquipment[id]);
+    figureResolution.observe(canvas);
   }
   paintInventory();
 }
@@ -226,7 +244,7 @@ $('prep-screen').onclick=e=>{
 };
 $('gear-rank').onchange=$('gear-sort').onchange=paintInventory;
 $('make-leader').onclick=()=>{draftSquad=[editId,...draftSquad.filter(id=>id!==editId)];paintPrep()};
-$('start').onclick=()=>{if(savedBattle)$('replace-run').showModal();else start()};
+$('start').onclick=()=>openSortie();
 $('change-crew').onclick=openSquadSelection;
 $('roster-back').onclick=closeSquadSelection;
 $('prep-back').onclick=()=>{detailKey=null;closeSquadSelection()};

@@ -26,15 +26,18 @@ function usesFieldUniform(m){
 }
 
 const uniformCell=192,uniformScale=72/uniformCell;
+// Helmet-to-sole measurements in the three packed A, S and S+ walking columns.
+const uniformRestHeight=[[160,159,160],null,[138,160,136],[159,159,157],[162,161,161]];
+function uniformBodyScale(m){return crewHeight[m.id]/uniformRestHeight[m.id][outfitTier(m)-2]}
 function uniformAimRow(pitch){
   return pitch<-.45?0:pitch>.45?2:1;
 }
 function uniformSocket(m,col,pitch){
   const role=rankRoleNames[m.id],column=uniformColumn[outfitTier(m)];
   const socket=rankSightlines[role][column][uniformAimRow(pitch)];
-  const hand=col===3 && socket.length===5?3:0;
-  return {x:Math.round(m.x)+(m.flip||1)*(socket[hand]-96)*uniformScale,
-    y:Math.round(m.y)+(socket[hand+1]-182)*uniformScale,angle:m.aimAngle};
+  const hand=col===3 && socket.length===5?3:0,unit=uniformBodyScale(m);
+  return {x:Math.round(m.x)+(m.flip||1)*(socket[hand]-96)*unit,
+    y:Math.round(m.y)+(socket[hand+1]-182)*unit,angle:m.aimAngle};
 }
 
 function drawFieldUniform(g,m,age,moving){
@@ -44,7 +47,7 @@ function drawFieldUniform(g,m,age,moving){
   const draw=(action,row)=>g.drawImage(art[action+role],
     column*uniformCell,row*uniformCell,uniformCell,uniformCell,-36,-182*uniformScale,72,72);
   g.save();
-  g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
+  g.translate(Math.round(m.x),Math.round(m.y));const size=uniformBodyScale(m)/uniformScale;g.scale((m.flip||1)*size,size);
   g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
   const walk=()=>draw('uniformWalk',step);
   const aim=()=>draw('uniformAim',uniformAimRow(m.uniformElevation??m.aimPitch??0));

@@ -1,3 +1,4 @@
+const dragControl=require('./drag-control.cjs');
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
@@ -20,11 +21,11 @@ const launchSquad=require('./select-test-squad.cjs');
     await launchSquad(page,[4,0,1]);
     await page.evaluate(()=>{Object.assign(run.talents,{cctSkill:true,bulkSkill:true,ravenSkill:true});updateHud()});
     assert.equal(await page.locator('#cast-name').innerText(),'A-10 공중지원');
-    await page.locator('#cast').tap();
+    await dragControl(page,page.locator('#cast'));
     assert.ok(await page.evaluate(()=>run.cobra.awakened && run.cobra.duration===11 && !run.activeSkill));
-    await page.locator('#party [data-i="0"]').tap();
+    await dragControl(page,page.locator('#party [data-i="0"]'));
     assert.equal(await page.locator('#cast-name').innerText(),'미니건 메카');
-    await page.locator('#cast').tap();
+    await dragControl(page,page.locator('#cast'));
     const result=await page.evaluate(()=>{
       const pilot=run.squad[0],wing=run.squad[1],mech=run.activeSkill,craft=run.cobra;
       const start={x:run.x,y:run.y};
@@ -35,13 +36,13 @@ const launchSquad=require('./select-test-squad.cjs');
       const exposed=wing.hp<wing.max && mech.hp===mech.maxHp;
       hitSquadMember(boss,pilot,routes[run.floor],5);
       const armored=pilot.hp===pilot.max && mech.hp===mech.maxHp-5;
-      pressed.add('KeyD');
+      stick={x:0,y:0,dx:1,dy:0};
       let traced=false;
       for(let i=0;i<95;i++){
         update(1/60);
         for(const e of run.effects)if(e.clip==='support_tracer' && e.awakened)traced=true;
       }
-      pressed.clear();
+      stick=null;
       switchLead(1);
       render();
       return {sameMech:run.activeSkill===mech && run.lead===0 && !deployedBunker(),
@@ -52,7 +53,7 @@ const launchSquad=require('./select-test-squad.cjs');
     assert.ok(result.sameMech && result.attached && result.airFire && result.alive && result.exposed && result.armored);
     assert.ok(result.movement>45 && result.shots>8);
     await page.locator('#pause').tap();await page.locator('#homebtn').tap();
-    await page.reload();await page.locator('#start:enabled').waitFor();await page.locator('#continue-run').tap();
+    await page.reload();await page.locator('#start:enabled').waitFor();await page.locator('#start').tap();await page.locator('#continue-run').tap();
     assert.deepEqual(await page.evaluate(()=>[run.activeSkill.awakened,run.cobra.awakened,run.activeSkill.hp,run.cobra.age]),
       [true,true,result.mechHp,result.airAge]);
     const ended=await page.evaluate(()=>{
