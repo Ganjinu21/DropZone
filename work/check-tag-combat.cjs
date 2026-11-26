@@ -4,7 +4,7 @@ const {pathToFileURL} = require('node:url');
 const {chromium} = require('playwright');
 
 (async () => {
-  const browser = await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+  const browser = await chromium.launch({executablePath:process.env.CHROME_PATH||undefined,headless:true});
   try {
     const page = await browser.newPage({viewport:{width:914,height:412},isMobile:true,hasTouch:true});
     const errors=[];
@@ -17,15 +17,16 @@ const {chromium} = require('playwright');
     });
     await page.goto(pathToFileURL(path.resolve('game/index.html')).href);
     await require('./select-test-squad.cjs')(page);
-    await page.waitForFunction(()=>gunAudio.buffers.size===7);
+    await page.waitForFunction(()=>gunAudio.buffers.has('rocket-launch') && Object.keys(COMBAT_SOUNDS).every(name=>gunAudio.buffers.has(name)));
     const results = await page.evaluate(()=>{
       // Run controlled encounters on the actual street, with the same actor,
       // projectile, wall, animation socket, and audio code as a live update.
       mode='qa';
       run.t=5;run.floor='surface';run.marks=[];run.cues=[];run.effects=[];
-      run.squad.forEach(m=>Object.assign(m,{x:1280,y:1004,flip:1,moving:false}));
+      run.squad.forEach(m=>Object.assign(m,{x:1155,y:950,flip:1,moving:false,aimSector:0}));
       for(const m of run.squad)Object.assign(m.gear,{critChance:0,evadeChance:0});
-      const foe=(dx,type=0)=>({type,x:1280+dx,y:1004+enemyChest[type]-18,
+      const barrelY=combatMuzzle(run.squad[2],1).y;
+      const foe=(dx,type=0)=>({type,x:1155+dx,y:barrelY+enemyChest[type],
         hp:120,max:120,phase:0,hit:0,flip:-1,speed:0});
       const setTargets=(...enemies)=>{run.enemies=enemies;run.marks=[]};
       const [bulk,raven,lynx]=run.squad;
@@ -60,10 +61,10 @@ const {chromium} = require('playwright');
       }
       setLeader(0);run.heading=0;run.shield=1;
       const initial=bulk.hp;
-      absorbContact(foe(11),bulk,routes.surface);
+      absorbContact({...foe(11),y:bulk.y},bulk,routes.surface);
       const front=initial-bulk.hp;
       const before=bulk.hp;
-      absorbContact(foe(-11),bulk,routes.surface);
+      absorbContact({...foe(-11),y:bulk.y},bulk,routes.surface);
       const rear=before-bulk.hp;
       setLeader(1);
       const close=foe(8);setTargets(close);shoot(raven);advanceRounds(.016);
@@ -98,7 +99,7 @@ const {chromium} = require('playwright');
         function volley(member,swapTo=null){
           // Each audio case starts with a fresh magazine.
           member.ammoKey=null;
-          const enemy={type:0,x:1365,y:1004,hp:120,max:120,phase:0,hit:0,flip:-1,speed:0};
+          const enemy={type:0,x:member.x+85,y:member.y,hp:120,max:120,phase:0,hit:0,flip:-1,speed:0};
           run.enemies=[enemy];run.marks=[];run.effects=[];
           played.length=0;gunAudio.lastImpact=-1;
           shoot(member);
@@ -155,6 +156,6 @@ const {chromium} = require('playwright');
     });
     assert.deepEqual(armorRolls,Array.from({length:5},()=>[[15,0,true,true],[10,10,false,false]]).flat());
     assert.deepEqual(errors,[]);
-    console.log('Raven cadence, moving rounds, Lynx priority/pierce, support roles, shield facing, point-blank shots, all seven audio buffers and leader-only fire/impact across tags passed.');
+    console.log('Raven cadence, moving rounds, Lynx priority/pierce, support roles, shield facing, point-blank shots, gun audio buffers and leader-only fire/impact across tags passed.');
   } finally {await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

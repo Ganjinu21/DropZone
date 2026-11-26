@@ -4,7 +4,7 @@ const path = require('path');
 
 (async () => {
   const browser = await chromium.launch({
-    executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe', headless:true
+    executablePath:process.env.CHROME_PATH || undefined, headless:true
   });
   try {
     const page = await browser.newPage({viewport:{width:960,height:540}});
@@ -14,27 +14,27 @@ const path = require('path');
     await require('./select-test-squad.cjs')(page);
     const results = await page.evaluate(()=>{
       const expect=(ok,message)=>{if(!ok)throw Error(message)};
-      const len=TransitKit.stairLength, report=[];
-      for(const [i,e] of SURFACE.exits.entries()){
+      const len=TransitKit.stairLength*sceneryScale,half=TransitKit.halfWidth*sceneryScale,report=[];
+      for(const e of cityMaps.surface.exits){
         start();
         // The frame counts below walk the stairs at base speed, independent of equipped boots.
         run.squad[run.lead].gear.movement=1;
         run.enemies=[];run.spawn=999;run.remaining=999;
-        const stone={x:SURFACE.spawn.x,y:SURFACE.spawn.y,val:4};
+        const stone={...cityMaps.surface.spawn,val:4};
         run.crystals=[stone];
         const top=TransitKit.stairPoint(e,-18),foot=TransitKit.stairPoint(e,len+15);
         const downhill=TransitKit.stairPoint(e,1);
         const dx=downhill.x-e.x,dy=downhill.y-e.y;
         expect(!routes.surface.blocked(top.x,top.y,10),'blocked street approach '+e.number);
         expect(!routes.metro.blocked(foot.x,foot.y,10),'blocked station approach '+e.number);
-        const lane=TransitKit.stairRect(e,4,len-4,-TransitKit.halfWidth,TransitKit.halfWidth);
+        const lane=TransitKit.stairRect(e,4,len-4,-half,half);
         for(const floor of Object.values(cityMaps)){
           const overlap=floor.solids.some(b=>b.x<lane.x+lane.w&&b.x+b.w>lane.x&&b.y<lane.y+lane.h&&b.y+b.h>lane.y);
           expect(!overlap,'obstacle extends into stair lane '+e.number);
         }
-        routes.surface.aimAt(SURFACE.spawn.x,SURFACE.spawn.y);
+        routes.surface.aimAt(stone.x,stone.y);
         expect(routes.surface.distance[routes.surface.node(top.x,top.y)]>=0,'unreachable street entrance '+e.number);
-        routes.metro.aimAt(650,1100);
+        routes.metro.aimAt(510,790);
         expect(routes.metro.distance[routes.metro.node(foot.x,foot.y)]>=0,'isolated station landing '+e.number);
         Object.assign(run,top);Object.assign(run.camera,top);
         for(const m of run.squad)Object.assign(m,top);
