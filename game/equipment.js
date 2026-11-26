@@ -32,16 +32,16 @@ const rankedNames={
 };
 // Keep the original C, B, A and S save IDs. S+ has its own ID and drop policy.
 const rankedTiers=[
-  {rank:'C',variant:0,bonus:0}, {rank:'B',variant:1,bonus:60},
-  {rank:'A',variant:3,bonus:150}, {rank:'S',variant:5,bonus:450},
-  {rank:'S+',variant:6,bonus:1100}
+  {rank:'C',variant:0,bonus:0,itemLevel:10}, {rank:'B',variant:1,bonus:60,itemLevel:20},
+  {rank:'A',variant:3,bonus:150,itemLevel:30}, {rank:'S',variant:5,bonus:450,itemLevel:40},
+  {rank:'S+',variant:6,bonus:1100,itemLevel:50}
 ];
 const shieldGuard=[0,5,9,14,18];
 const equipmentCatalog=Object.keys(itemFamilies).flatMap(family=>
-  rankedTiers.map(({rank,variant,bonus},tier)=>{
+  rankedTiers.map(({rank,variant,bonus,itemLevel},tier)=>{
     const weapon=weaponFamilies.includes(family);
     const power=weapon?bonus:family==='shield'?shieldGuard[tier]:armorStats[family].values[tier];
-    return {key:family+'-'+variant,family,label:rankedNames[family][tier],rank,tier,power,weapon,
+    return {key:family+'-'+variant,family,label:rankedNames[family][tier],rank,tier,power,weapon,itemLevel,
       asset:'art/armory/catalog/'+family+'/'+(rank==='S+'?'S-plus':rank)};
   })
 );
@@ -53,23 +53,37 @@ const weaponMagazines={
   rocket:  {rounds:[1,1,2,2,3],seconds:[3.00,2.80,2.70,2.50,2.30]},
   ar:      {rounds:[20,24,28,30,36],seconds:[1.85,1.75,1.65,1.55,1.45]}
 };
-const canEnhance=i=>i?.weapon && (['B','A','S'].includes(i.rank));
+function enhancementLimit(item){
+  if(item?.rank==='S')return 3;
+  return item?.weapon && ['B','A'].includes(item.rank)?5:0;
+}
+const canEnhance=item=>enhancementLimit(item)>0;
 const levelKey=(base,level)=>level?base+'@'+level:base;
 const gradeLabel=i=>i.level?i.rank+'+'+i.level:i.rank;
-for(const item of equipmentCatalog.filter(i=>i.weapon)){
-  const magazine=weaponMagazines[item.family];
-  Object.assign(item,{artKey:item.key,level:0,capacity:magazine.rounds[item.tier],reload:magazine.seconds[item.tier]});
-  if(!canEnhance(item))continue;
-  for(let level=1;level<=5;level++){
+for(const item of equipmentCatalog){
+  item.artKey=item.key;
+  item.level=0;
+  if(item.weapon){
+    const magazine=weaponMagazines[item.family];
+    item.capacity=magazine.rounds[item.tier];
+    item.reload=magazine.seconds[item.tier];
+  }
+  const limit=enhancementLimit(item);
+  // Previously saved S +4 and +5 weapons remain usable at their original power.
+  const lastLevel=item.weapon && item.rank==='S'?5:limit;
+  for(let level=1;level<=lastLevel;level++){
     const key=levelKey(item.key,level);
-    gearByKey.set(key,{...item,key,level,power:item.power+level*(item.rank==='B'?15:item.rank==='A'?35:80)});
+    const bonus=item.weapon?level*({B:15,A:35,S:80}[item.rank]):
+      Math.round(level*((item.family==='shield'?shieldGuard:armorStats[item.family].values)[item.tier+1]-item.power)/(limit+1));
+    gearByKey.set(key,{...item,key,level,itemLevel:item.itemLevel+level,power:item.power+bonus});
   }
 }
 function fusionRecipe(item){
-  if(!canEnhance(item))return null;
-  const base=item.artKey;
-  const material=item.level===5?item.key:base;
-  const output=item.level===5?item.family+'-'+rankedTiers[item.tier+1].variant:levelKey(base,item.level+1);
+  const limit=enhancementLimit(item);
+  if(!limit)return null;
+  const promote=item.level>=limit;
+  const material=item.key;
+  const output=promote?item.family+'-'+rankedTiers[item.tier+1].variant:levelKey(item.artKey,item.level+1);
   return {material,output};
 }
 function canonicalGearKey(key){
@@ -79,6 +93,9 @@ function canonicalGearKey(key){
 }
 const starterKeys=equipmentCatalog.filter(item=>item.tier===0).map(item=>item.key);
 const itemImage=i=>i.asset+'.png';
+function inventoryImage(item){
+  return item.weapon?'art/augments/'+item.family+'.webp':itemImage(item);
+}
 const defaultItem=(id,slot)=>(slot==='weapon'?weaponFamilies[id]:slot)+'-0';
 function gearSlots(id){return Object.keys(equipmentSlots).filter(slot=>slot!=='shield'||id===0)}
 function canEquip(id,slot,item){
@@ -134,15 +151,26 @@ function restoredArmory(raw){
       if(canEquip(id,slot,gearByKey.get(key)) && !key.endsWith('-0'))counts[key]=1;
     }
   }
+  // Earlier developer saves treated the whole catalog as owned. Honor equipped S+ pieces.
+  if(developerMode && !raw?.crewTiers){
+    const rows=readLocal(equipmentKey)??readLocal('dropzone.equipment.v2');
+    if(Array.isArray(rows))for(const row of rows)for(const key of Object.values(row||{})){
+      if(gearByKey.get(key)?.rank==='S+')counts[key]=Math.max(1,counts[key]||0);
+    }
+  }
   for(const key of starterKeys)counts[key]=Math.max(1,counts[key]||0);
   const bossTokens=developerMode && !Object.hasOwn(raw??{},'bossTokens')?8:safeCount(raw?.bossTokens);
-  return {diamonds:!raw && developerMode?3000:safeCount(raw?.diamonds),counts,...restoredSupply(raw),
+  const crewTiers=weaponFamilies.map((_,id)=>{
+    const tier=raw?.crewTiers?.[id];
+    return Number.isInteger(tier) && rankedTiers[tier]?tier:0;
+  });
+  return {crewTiers,diamonds:!raw && developerMode?3000:safeCount(raw?.diamonds),counts,...restoredSupply(raw),
     bossTokens,talentRanks:TalentTree.restoreRanks(raw?.talentRanks),bossClaims:restoredBossClaims(raw?.bossClaims)};
 }
 let armory=restoredArmory(readLocal(armoryKey)),sessionStorageOnly=false;
 function owns(key){
   const item=gearByKey.get(key);
-  return !!armory.counts[key] || !!(developerMode && item?.asset && !item.level);
+  return !!armory.counts[key] || !!(developerMode && item?.asset && item.rank!=='S+' && !item.level);
 }
 function normalizedEquipment(data){
   return weaponFamilies.map((_,id)=>Object.fromEntries(gearSlots(id).map(slot=>{
@@ -169,11 +197,19 @@ function normalizedEquipment(data){
   })));
 }
 let savedEquipment=normalizedEquipment(readLocal(equipmentKey)??(developerMode?readLocal('dropzone.equipment.v2'):legacyGear));
-function changeArmory(edit){
+function changeArmory(edit,{requireSave=false}={}){
   const update=()=>{
     if(!sessionStorageOnly)armory=restoredArmory(readLocal(armoryKey)??armory);
-    const result=edit(armory);
-    try{localStorage.setItem(armoryKey,JSON.stringify(armory))}catch{sessionStorageOnly=true}
+    const state=requireSave?restoredArmory(armory):armory;
+    const result=edit(state);
+    try{
+      localStorage.setItem(armoryKey,JSON.stringify(state));
+      if(requireSave)sessionStorageOnly=false;
+    }catch(error){
+      if(requireSave)throw error;
+      sessionStorageOnly=true;
+    }
+    armory=state;
     updateDiamondDisplay();return result;
   };
   if(!navigator.locks)return Promise.resolve(update());
@@ -182,6 +218,30 @@ function changeArmory(edit){
     if(!entered && (error.name==='SecurityError'||error.name==='NotAllowedError'))return update();
     throw error;
   });
+}
+// Each of the three strongest slots can contribute at most one full step.
+function crewProgress(id,row,tier=armory.crewTiers[id]){
+  const equipped=gearSlots(id).map(slot=>gearByKey.get(row[slot]));
+  const average=equipped.reduce((sum,item)=>sum+item.itemLevel,0)/equipped.length;
+  const current=rankedTiers[tier],next=rankedTiers[tier+1];
+  if(!next)return {current,next,average,fill:1,qualified:3,ready:false};
+  const qualified=equipped.filter(item=>item.tier>tier).length;
+  const levels=equipped.map(item=>item.itemLevel).sort((a,b)=>b-a).slice(0,3);
+  const span=next.itemLevel-current.itemLevel;
+  const fill=levels.reduce((sum,level)=>sum+Math.max(0,Math.min(1,(level-current.itemLevel)/span)),0)/3;
+  return {current,next,average,qualified,fill,ready:qualified>=3};
+}
+function promoteCrew(id,expectedTier,row){
+  return changeArmory(state=>{
+    if(!Number.isInteger(id)||!Object.hasOwn(state.crewTiers,id)||state.crewTiers[id]!==expectedTier)return false;
+    for(const slot of gearSlots(id)){
+      const item=gearByKey.get(row[slot]);
+      if(!item || !canEquip(id,slot,item) || !owns(item.key))return false;
+    }
+    if(!crewProgress(id,row,expectedTier).ready)return false;
+    state.crewTiers[id]=expectedTier+1;
+    return true;
+  },{requireSave:true});
 }
 function awardDiamonds(value){
   return changeArmory(state=>{state.diamonds=Math.min(Number.MAX_SAFE_INTEGER,state.diamonds+safeCount(value))});
@@ -239,16 +299,15 @@ function openSupplyCrate(kind){
 }
 function readyToFuse(state,item,recipe){
   if(!recipe)return false;
-  const input=state.counts[item.key]||0,material=state.counts[recipe.material]||0;
-  return item.key===recipe.material?input>=2:input>=1 && material>=1;
+  return (state.counts[item.key]||0)>=2;
 }
-function fuseWeapon(key){
+function fuseGear(key){
   return changeArmory(state=>{
     const item=gearByKey.get(key),recipe=fusionRecipe(item);
     if(!readyToFuse(state,item,recipe))return null;
-    state.counts[key]--;state.counts[recipe.material]--;
+    state.counts[key]-=2;
     state.counts[recipe.output]=(state.counts[recipe.output]||0)+1;
-    return {item:gearByKey.get(recipe.output),consumed:[key,recipe.material].filter(k=>!state.counts[k])};
+    return {item:gearByKey.get(recipe.output),consumed:state.counts[key]?[]:[key]};
   });
 }
 function gearStats(id,loadout=savedEquipment){
@@ -273,7 +332,11 @@ addEventListener('storage',event=>{
     updateDiamondDisplay();
     dispatchEvent(new Event('talents-changed'));
     if(mode==='home' && lobbyReady)refreshContinueMenu();
-    if(!$('prep-screen').hidden){draftEquipment=normalizedEquipment(draftEquipment);paintPrep()}
+    if(draftEquipment){
+      draftEquipment=normalizedEquipment(draftEquipment);
+      if(!$('prep-screen').hidden)paintPrep();
+      if(!$('roster-screen').hidden)updateSquadSelection();
+    }
   }
   if(event.key===equipmentKey)savedEquipment=normalizedEquipment(readLocal(equipmentKey));
 });

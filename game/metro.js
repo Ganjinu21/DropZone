@@ -27,7 +27,7 @@ const METRO = (() => {
   fixture('mop',492,537,27,28);
   fixture('mop',1620,356,27,28,1);
   fixture('fallenMachine',1848,876,76,42);
-  function paint(g, visibleProps=props) {
+  function paint(g, visibleProps=props, fixturesOnly=false) {
     g.imageSmoothingEnabled=false;
     let seed=9141;
     function rand() { seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }
@@ -111,6 +111,7 @@ const METRO = (() => {
       r(x+5,y+6,19,2,palette[2]);r(x+5,y+10,12,1,palette[2]);r(x+6,y+35,19,1,palette[2]);
     }
 
+    if(fixturesOnly){paintFixtures();fixtureLighting();return}
     // Dark ceiling cutaway, with pipe runs on the central utility wing.
     r(0,0,bounds.w,bounds.h,'#202b2e');
     for(let sy=0;sy<bounds.h;sy+=40)for(let sx=0;sx<bounds.w;sx+=68){
@@ -286,59 +287,61 @@ const METRO = (() => {
       r(x+1,y+5,20,12,'#443f39');r(x+2,y+2,17,12,'#856957');
       r(x+6,y,7,3,'#434c46');r(x+5,y+2,2,11,'#baa682');r(x+14,y+2,2,11,'#baa682');
     }
-    for(const item of visibleProps){
-      const {type,x,y,w,h,style}=item;
-      r(x+4,y+h-3,w,9,'#273a3677');
-      if(type==='gate'){
-        r(x+3,y+2,w-3,h,'#39484a');r(x,y,w-2,h-4,'#808e87');
-        r(x+2,y+2,w-6,h-9,'#a2aba0');r(x+4,y+4,9,11,'#405158');r(x+5,y+5,7,3,style===2?'#ce8766':'#9fd1b0');
-        r(x+3,y+h-8,w-7,3,'#536864');r(x+5,y+22,8,7,'#626f68');
-      }else if(type==='bench'){
-        r(x+5,y+12,5,14,'#394442');r(x+w-9,y+12,5,14,'#394442');
-        for(let s=0;s<3;s++){
-          const sx=x+s*(w/3);r(sx,y,w/3-2,11,'#82928d');r(sx+1,y,w/3-4,3,'#b1b8a9');
-          r(sx,y+12,w/3-2,8,'#929d93');r(sx,y+16,w/3-2,2,'#64756e');
-        }
-      }else if(type==='tickets'||type==='vending'){
-        r(x,y,w,h,'#35413f');r(x+2,y+2,w-4,h-4,style?'#875e4f':'#7b8e86');
-        if(type==='tickets'){
-          for(let j=0;j<2;j++){
-            const xx=x+j*36;r(xx+5,y+5,27,17,'#364a4e');r(xx+8,y+8,20,10,'#6e9c9c');
-            r(xx+6,y+25,18,3,'#46504a');r(xx+23,y+27,6,7,'#435249');
+    function paintFixtures(){
+      for(const item of visibleProps){
+        const {type,x,y,w,h,style}=item;
+        r(x+4,y+h-3,w,9,'#273a3677');
+        if(type==='gate'){
+          r(x+3,y+2,w-3,h,'#39484a');r(x,y,w-2,h-4,'#808e87');
+          r(x+2,y+2,w-6,h-9,'#a2aba0');r(x+4,y+4,9,11,'#405158');r(x+5,y+5,7,3,style===2?'#ce8766':'#9fd1b0');
+          r(x+3,y+h-8,w-7,3,'#536864');r(x+5,y+22,8,7,'#626f68');
+        }else if(type==='bench'){
+          r(x+5,y+12,5,14,'#394442');r(x+w-9,y+12,5,14,'#394442');
+          for(let s=0;s<3;s++){
+            const sx=x+s*(w/3);r(sx,y,w/3-2,11,'#82928d');r(sx+1,y,w/3-4,3,'#b1b8a9');
+            r(sx,y+12,w/3-2,8,'#929d93');r(sx,y+16,w/3-2,2,'#64756e');
           }
+        }else if(type==='tickets'||type==='vending'){
+          r(x,y,w,h,'#35413f');r(x+2,y+2,w-4,h-4,style?'#875e4f':'#7b8e86');
+          if(type==='tickets'){
+            for(let j=0;j<2;j++){
+              const xx=x+j*36;r(xx+5,y+5,27,17,'#364a4e');r(xx+8,y+8,20,10,'#6e9c9c');
+              r(xx+6,y+25,18,3,'#46504a');r(xx+23,y+27,6,7,'#435249');
+            }
+          }else{
+            r(x+4,y+4,w-15,26,'#394d52');
+            for(let i=0;i<5;i++)for(let j=0;j<2;j++)r(x+7+i*6,y+7+j*10,3,6,choose(['#d2b177','#bd8270','#91b5aa']));
+            r(x+6,y+33,w-20,5,'#35443f');r(x+w-8,y+13,3,7,'#ddc486');
+          }
+        }else if(type==='lockers'){
+          r(x,y,w,h,'#384947');
+          for(let j=0;j<5;j++)for(let i=0;i<2;i++){
+            const sx=x+2+j*15,sy=y+2+i*21;r(sx,sy,13,19,'#82958d');r(sx+2,sy+4,9,1,'#55675f');r(sx+9,sy+10,2,3,'#c5bfa1');
+          }
+        }else if(type==='map'){
+          r(x+5,y+9,4,20,'#444f4c');r(x+w-10,y+9,4,20,'#444f4c');
+          r(x,y,w,22,'#667970');r(x+2,y+2,w-4,18,'#b8bba5');
+          wire([[x+7,y+13],[x+20,y+13],[x+27,y+7],[x+52,y+7]],'#507464',2);
+          wire([[x+34,y+4],[x+34,y+15],[x+43,y+18]],'#ae775b',2);
+        }else if(type==='fallenMachine'){
+          // The red drink cabinet fell onto its face; cans trace its slide.
+          g.save();g.translate(x+3,y+2);g.rotate(.06);
+          r(0,1,72,38,'#34403e');r(2,0,68,32,'#916a57');
+          r(3,2,64,3,'#bb8970');r(4,6,42,21,'#404e4e');
+          wire([[6,7],[24,11],[15,17],[36,20],[30,25]],'#94a496',2);
+          r(48,5,14,22,'#aa7b62');for(let j=0;j<4;j++)r(50,9+j*3,9,1,'#695444');
+          r(8,30,48,2,'#b48670');g.restore();
+          for(const [ox,oy] of [[0,39],[-13,45],[-19,32],[-31,51],[-52,57],[-58,40],[7,55]]){
+            r(x+ox,y+oy+3,8,2,'#434d45');r(x+ox,y+oy,7,4,'#ad7c60');r(x+ox+1,y+oy,2,4,'#b5b7a1');
+          }
+          scraps(x-7,y+42,13,24);
         }else{
-          r(x+4,y+4,w-15,26,'#394d52');
-          for(let i=0;i<5;i++)for(let j=0;j<2;j++)r(x+7+i*6,y+7+j*10,3,6,choose(['#d2b177','#bd8270','#91b5aa']));
-          r(x+6,y+33,w-20,5,'#35443f');r(x+w-8,y+13,3,7,'#ddc486');
+          r(x+2,y+10,21,16,style?'#7b7256':'#9b895d');r(x+5,y+13,16,2,'#cfbb80');
+          r(x+15,y-5,3,19,'#9d9780');r(x+20,y+1,2,13,'#778777');r(x+5,y+25,4,4,'#3b4642');r(x+18,y+25,4,4,'#3b4642');
         }
-      }else if(type==='lockers'){
-        r(x,y,w,h,'#384947');
-        for(let j=0;j<5;j++)for(let i=0;i<2;i++){
-          const sx=x+2+j*15,sy=y+2+i*21;r(sx,sy,13,19,'#82958d');r(sx+2,sy+4,9,1,'#55675f');r(sx+9,sy+10,2,3,'#c5bfa1');
-        }
-      }else if(type==='map'){
-        r(x+5,y+9,4,20,'#444f4c');r(x+w-10,y+9,4,20,'#444f4c');
-        r(x,y,w,22,'#667970');r(x+2,y+2,w-4,18,'#b8bba5');
-        wire([[x+7,y+13],[x+20,y+13],[x+27,y+7],[x+52,y+7]],'#507464',2);
-        wire([[x+34,y+4],[x+34,y+15],[x+43,y+18]],'#ae775b',2);
-      }else if(type==='fallenMachine'){
-        // The red drink cabinet fell onto its face; cans trace its slide.
-        g.save();g.translate(x+3,y+2);g.rotate(.06);
-        r(0,1,72,38,'#34403e');r(2,0,68,32,'#916a57');
-        r(3,2,64,3,'#bb8970');r(4,6,42,21,'#404e4e');
-        wire([[6,7],[24,11],[15,17],[36,20],[30,25]],'#94a496',2);
-        r(48,5,14,22,'#aa7b62');for(let j=0;j<4;j++)r(50,9+j*3,9,1,'#695444');
-        r(8,30,48,2,'#b48670');g.restore();
-        for(const [ox,oy] of [[0,39],[-13,45],[-19,32],[-31,51],[-52,57],[-58,40],[7,55]]){
-          r(x+ox,y+oy+3,8,2,'#434d45');r(x+ox,y+oy,7,4,'#ad7c60');r(x+ox+1,y+oy,2,4,'#b5b7a1');
-        }
-        scraps(x-7,y+42,13,24);
-      }else{
-        r(x+2,y+10,21,16,style?'#7b7256':'#9b895d');r(x+5,y+13,16,2,'#cfbb80');
-        r(x+15,y-5,3,19,'#9d9780');r(x+20,y+1,2,13,'#778777');r(x+5,y+25,4,4,'#3b4642');r(x+18,y+25,4,4,'#3b4642');
       }
     }
-
+    paintFixtures();
     // Damage gathers around its source; most of the walking lanes stay quiet.
     const damage=[[727,377],[1126,362],[1371,505],[581,823],[1520,977],[272,622],[1840,853],[1394,978]];
     for(const [x,y] of damage){
@@ -352,30 +355,33 @@ const METRO = (() => {
     txt('운행 중단',-41,3,12,'#cd9c65');r(17,-7,18,2,'#806746');r(20,0,13,1,'#79674b');
     wire([[16,-10],[11,-2],[19,-3],[12,7]],'#98a394',1);g.restore();
     wire([[1513,487],[1525,493],[1533,484],[1539,490],[1544,488]],'#35453f',2);scraps(1498,488,17);
-    // Patches of cool fluorescent light and shadows anchor floor materials to the walls.
-    for(const [x,y] of [[270,300],[1680,316],[831,362],[1313,360],[794,824],[1346,820]]){
-      const a=g.createRadialGradient(x,y,8,x,y,149);
-      a.addColorStop(0,'#c1d6b915');a.addColorStop(1,'#a4cfc100');g.fillStyle=a;g.fillRect(x-150,y-150,300,300);
-    }
-    // Lit stair wells throw cool pools across the concourse. A damaged circuit at
-    // the market end leaves a local shadow rather than tinting the whole map.
-    function pool(x,y,rx,ry,color) {
-      g.save();g.translate(x,y);g.scale(rx,ry);
-      const light=g.createRadialGradient(0,0,0,0,0,1);
-      light.addColorStop(0,color);light.addColorStop(1,'#00000000');
-      g.fillStyle=light;g.fillRect(-1,-1,2,2);g.restore();
-    }
-    pool(128,762,332,209,'#10252b66');pool(1930,649,318,289,'#10242c80');
-    pool(1200,503,253,119,'#142b344d');pool(1140,1000,352,149,'#142d3455');
-    pool(1497,407,211,122,'#182e3450');pool(835,363,180,92,'#cce1ab39');
-    pool(1022,786,228,88,'#cce3b22d');pool(215,256,157,112,'#d6e9c03f');
-    pool(1866,240,129,99,'#c7dfbb3f');pool(1599,1005,160,126,'#bfc5a12d');
-    // Soot collects beneath the ceiling lip and beneath the shuttered shops.
-    for (const [x,y,w,height] of [[west,north,left-west,62],[right,north,east-right,62],
-      [left,arcadeTop,right-left,53],[left,platformTop,right-left,44]]) {
-      const shade=g.createLinearGradient(0,y,0,y+height);
-      shade.addColorStop(0,'#14202763');shade.addColorStop(.32,'#20313529');
-      shade.addColorStop(1,'#20313500');g.fillStyle=shade;g.fillRect(x,y,w,height);
+    fixtureLighting();
+    function fixtureLighting(){
+      // Patches of cool fluorescent light and shadows anchor floor materials to the walls.
+      for(const [x,y] of [[270,300],[1680,316],[831,362],[1313,360],[794,824],[1346,820]]){
+        const a=g.createRadialGradient(x,y,8,x,y,149);
+        a.addColorStop(0,'#c1d6b915');a.addColorStop(1,'#a4cfc100');g.fillStyle=a;g.fillRect(x-150,y-150,300,300);
+      }
+      // Lit stair wells throw cool pools across the concourse. A damaged circuit at
+      // the market end leaves a local shadow rather than tinting the whole map.
+      function pool(x,y,rx,ry,color) {
+        g.save();g.translate(x,y);g.scale(rx,ry);
+        const light=g.createRadialGradient(0,0,0,0,0,1);
+        light.addColorStop(0,color);light.addColorStop(1,'#00000000');
+        g.fillStyle=light;g.fillRect(-1,-1,2,2);g.restore();
+      }
+      pool(128,762,332,209,'#10252b66');pool(1930,649,318,289,'#10242c80');
+      pool(1200,503,253,119,'#142b344d');pool(1140,1000,352,149,'#142d3455');
+      pool(1497,407,211,122,'#182e3450');pool(835,363,180,92,'#cce1ab39');
+      pool(1022,786,228,88,'#cce3b22d');pool(215,256,157,112,'#d6e9c03f');
+      pool(1866,240,129,99,'#c7dfbb3f');pool(1599,1005,160,126,'#bfc5a12d');
+      // Soot collects beneath the ceiling lip and beneath the shuttered shops.
+      for (const [x,y,w,height] of [[west,north,left-west,62],[right,north,east-right,62],
+        [left,arcadeTop,right-left,53],[left,platformTop,right-left,44]]) {
+        const shade=g.createLinearGradient(0,y,0,y+height);
+        shade.addColorStop(0,'#14202763');shade.addColorStop(.32,'#20313529');
+        shade.addColorStop(1,'#20313500');g.fillStyle=shade;g.fillRect(x,y,w,height);
+      }
     }
     g.save();
     g.fillStyle=g.createPattern(art.stationPatina,'repeat');

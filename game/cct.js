@@ -97,7 +97,7 @@ function updateRadioSupport(dt){
     const firing=ally.cool<=0 && magazineReady(ally,chief.weapon);
     if(firing)pose.lastShot=run.t;
     combatAim(pose,(enemy.x-x)/summonScale,(chestY(enemy)-y)/summonScale,1);
-    ally.flip=pose.flip;ally.aimPitch=pose.aimPitch;ally.operatorAngle=pose.operatorAngle;
+    ally.flip=pose.flip;ally.uniformElevation=pose.uniformElevation;ally.aimPitch=pose.aimPitch;ally.operatorAngle=pose.operatorAngle;
     if(firing){
       spendRound(ally,chief.weapon);
       const barrel=combatMuzzle(pose,1,false);

@@ -138,7 +138,7 @@ function upgradeCard(key){
  if(key<fieldKit){
    const id=key/2,member=run.squad[id],rank=weaponRank(id);
    const family=itemFamilies[member.weapon.family];
-   return {operator:id, owner:names[id], portrait:fieldPortrait(id), icon:itemImage(member.weapon),
+   return {operator:id, owner:names[id], grade:member.weapon.rank, portrait:fieldPortrait(id), icon:inventoryImage(member.weapon),
      badge:'무기 '+(rank+1)+'/3',name:family+' 강화',
      description:gradeLabel(member.weapon)+' '+member.weapon.label+'의 이번 작전 피해가 증가합니다.',
      stat:'무기 피해',value:'+'+(rank*20)+'% → +'+((rank+1)*20)+'%'};
@@ -153,8 +153,8 @@ function upgradeCard(key){
    case vitality:Object.assign(card,{icon:'squad-vitality',badge:'지속',name:'추가 체력',description:'분대와 지원병의 작전 시작 최대 체력을 기준으로 누적됩니다.',stat:'최대 체력',value:'+'+((run.up[key]+1)*30)+'%'});break;
    case magnet:Object.assign(card,{icon:'xp-magnet',name:'경험치 자석',description:'주변 조각을 즉시 모으고 10초간 수집 범위를 넓힙니다.',stat:'수집 반경',value:'30 m'});break;
  }
- card.icon='art/armory/'+card.icon+'.png';
- card.portrait=card.icon;
+ card.icon='art/augments/'+card.icon+'.webp';
+ card.portrait='art/hub/nav-barracks.webp';
  return card;
 }
 function openUpgrade(restoredOffers,restoredChoice=0){
@@ -167,9 +167,9 @@ function openUpgrade(restoredOffers,restoredChoice=0){
  $('buildstat').textContent='생존 '+clock(run.t)+'　·　처치 '+run.kills;
  $('cards').innerHTML=offers.map((key,index)=>{
    const card=upgradeCard(key);
-   return `<button class="card" data-i="${index}" data-operator="${card.operator}">
+   return `<button class="card" data-i="${index}" data-operator="${card.operator}" data-grade="${card.grade||''}">
      <span class="who"><img src="${card.portrait}" alt="">${card.owner}<em>${card.badge}</em></span>
-     <span class="item"><img src="${card.icon}" alt=""></span>
+     <span class="item"><img src="${card.icon}" alt="">${card.grade?'<small class="card-grade">'+card.grade+'</small>':''}</span>
      <strong>${card.name}</strong><p>${card.description}</p>
      <span class="num"><span>${card.stat}</span><b>${card.value}</b></span>
    </button>`;

@@ -117,15 +117,15 @@ function weaponMount(m,col,recoil=0){
 function combatAim(m,tx,ty,col){
   const facing=tx-Math.round(m.x);
   if(facing)m.flip=Math.sign(facing);
-  if(art['rankAim'+rankRoleNames[m.id]]){
-    m.aimPitch=Math.atan2(ty-(m.y-31),Math.abs(tx-m.x));
-    for(let i=0;i<3;i++){
-      const b=rankedBarrel(m,col,true);
-      m.aimPitch=clamp(Math.atan2(ty-b.y,(tx-b.x)*m.flip),-Math.PI/2,Math.PI/2);
-    }
-    m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
+  if(usesFieldUniform(m)){
+    const pitch=Math.atan2(ty-(m.y-35),Math.abs(tx-m.x));
+    const tip=uniformSocket(m,col,pitch);
+    m.uniformElevation=pitch;
+    m.aimAngle=Math.atan2(ty-tip.y,tx-tip.x);
+    m.aimPitch=Math.atan2(Math.sin(m.aimAngle),m.flip*Math.cos(m.aimAngle));
     m.operatorAngle=m.aimAngle;
-    m.ravenSector=(Math.round(m.aimAngle*8/TAU)+8)%8;return;
+    m.ravenSector=(Math.round(m.aimAngle*8/TAU)+8)%8;
+    return;
   }
   if(m.id===1 && m.weapon.family==='smg'){
     const angle=Math.atan2(ty-(m.y-32),tx-m.x);
@@ -154,8 +154,7 @@ function combatAim(m,tx,ty,col){
   m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
 }
 function combatMuzzle(m,col,lead,pitch=m.aimPitch??0,recoil=m.weapon.family==='smg' && !reduceMotion.matches?4:2){
-  const ranked=rankedBarrel(m,col);
-  if(ranked)return ranked;
+  if(usesFieldUniform(m))return uniformSocket(m,col,m.uniformElevation??m.aimPitch??0);
   if(operatorRoles[m.id])return operatorTip(m,operatorCel(m,run.t-(m.lastShot??-Infinity)));
   if(m.id===1 && m.weapon.family==='smg'){
     return ravenBarrel(m,ravenShotCel(m,run.t-(m.lastShot??-Infinity)),col===3);
@@ -244,7 +243,7 @@ const ravenFirePoses=[
   [.94,.09,.94,-.04],[.98,.03,.97,0],[1,-.04,.99,.02],[1,-.02,1,.01],[1,0,1,0]
 ].map(([width,lean,height,nod])=>({width,lean,height,nod}));
 function drawMemberGear(g,m,age,moving=false){
-  if(m.boarding==null && !(m.id===4 && run && run.t-(m.signalAt??-Infinity)<.83) && drawRankedMember(g,m,age,moving))return;
+  if(usesFieldUniform(m)){drawFieldUniform(g,m,age,moving);return}
   if(operatorRoles[m.id]){drawOperatorGear(g,m,age,moving);return}
   if(m.id===1 && m.weapon.family==='smg'){drawRavenCels(g,m,age);return}
   const id=m.id,dy=crewTorsoY(m),glove=fieldGear(m.loadout,'gloves');
@@ -738,7 +737,8 @@ function flashTint(image) {
 }
 
 async function loadGame() {
-  const assets = Object.entries({ ...ART, ...rankArt, ...tagArt, ...skillArt, ...awakenedArt });
+  const loadingArt = $('loading-art');
+  const assets = Object.entries({ ...ART, lobby: loadingArt.currentSrc || loadingArt.src, ...rankArt, ...tagArt, ...skillArt, ...awakenedArt });
   const meter = $('loading-progress');
   meter.max = assets.length + 1;
   meter.value = 0;

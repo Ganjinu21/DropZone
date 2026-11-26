@@ -5,7 +5,11 @@ const talentScreen = (() => {
     bulk:'#cfb47d', cct:'#83b6ac', raven:'#bd969c', rocket:'#c7967b',
     lynx:'#95abbc', classified:'#828f88', command:'#dcc596', shared:'#bfba98'
   };
-  const portraits = {bulk:ART.face0, cct:ART.face4, raven:ART.face1, rocket:ART.face3, lynx:ART.face2};
+  const operators = {bulk:0, cct:4, raven:1, rocket:3, lynx:2};
+  function routePortrait(route){
+    const id=operators[route];
+    return id===undefined ? null : wornPortrait(id);
+  }
   const routeGlyph = {bulk:'heart',cct:'radio',raven:'burst',rocket:'blast',lynx:'rounds',classified:'lock',shared:'link'};
   const kindName = {stat:'기본 능력',perk:'보스 특전',capstone:'최종 특전',bridge:'연계 특전',sealed:'미공개'};
   const currencyName = {diamonds:'다이아', bossTokens:'보스 토큰'};
@@ -96,12 +100,19 @@ const talentScreen = (() => {
       svg('polygon',{points:hex(rad+3.5),class:'talent-node-ring'},g);
       svg('polygon',{points:hex(rad),class:'talent-node-shell'},g);
       if(n.kind==='capstone'){
-        svg('image',{href:portraits[n.route],x:-16.4,y:-16.4,width:32.8,height:32.8,'clip-path':'url(#talent-face-clip)'},g);
+        svg('image',{x:-16.4,y:-16.4,width:32.8,height:32.8,'clip-path':'url(#talent-face-clip)'},g);
       }else glyph(g,stageGlyph(n),isEnd?15:n.kind==='bridge'?10:12);
       if(isEnd || n.depth===1 && n.route!=='classified'){
-        const route=routes.get(n.route), label=svg('text',{x:0,y:y<0?-25:32,'text-anchor':'middle',class:'talent-route-name'},g);
-        if(n.depth===1){label.setAttribute('class','talent-route-name early-route');label.setAttribute('x',x>5?15:x< -5?-15:0);label.setAttribute('y',Math.abs(x)>5?1:-17);label.setAttribute('text-anchor',x>5?'start':x< -5?'end':'middle');}
-        label.textContent=n.kind==='sealed'?'미공개':route.shortName+' · '+route.theme;
+        const route=routes.get(n.route);
+        const early=n.depth===1, lateral=early && Math.abs(x)>5;
+        const labelX=lateral?Math.sign(x)*16:0;
+        const labelY=lateral?-1:y<0?(early?-32:-25):28;
+        const label=svg('text',{x:labelX,y:labelY,'text-anchor':lateral?(x>0?'start':'end'):'middle',
+          class:early?'talent-route-name early-route':'talent-route-name'},g);
+        if(early){
+          svg('tspan',{x:labelX},label).textContent=route.shortName;
+          svg('tspan',{x:labelX,dy:10,class:'route-theme'},label).textContent=route.theme;
+        }else label.textContent=n.kind==='sealed'?'미공개':route.shortName+' · '+route.theme;
       }
       views.set(n.id,g);
     }
@@ -221,6 +232,10 @@ const talentScreen = (() => {
     for(const [id,g] of views){
       const node=nodes.get(id), state=TalentTree.status(id);
       g.style.display=TalentTree.visible(id)?'':'none';
+      if(node.kind==='capstone'){
+        const photo=g.querySelector('image'), src=routePortrait(node.route);
+        if(photo.getAttribute('href')!==src)photo.setAttribute('href',src);
+      }
       const early=g.querySelector('.early-route');if(early)early.style.display=TalentTree.visible(node.route+'-2')?'none':'';
 
       g.classList.toggle('is-bought',state.rank>0);
@@ -235,7 +250,7 @@ const talentScreen = (() => {
       edge.stroke.style.setProperty('--route-color',palette[edge.node.route]);
       edge.stroke.classList.toggle('is-lit',edge.parent?TalentTree.status(edge.parent.id).rank>0:edge.node.kind!=='sealed');
     }
-    const portrait=portraits[n.route];
+    const portrait=routePortrait(n.route);
     el('image').innerHTML=portrait?'<img src="'+portrait+'" alt="">':icon(stageGlyph(n));
     el('type').textContent=labelForKind(n);
     el('name').textContent=n.name;

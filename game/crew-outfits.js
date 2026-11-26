@@ -7,10 +7,11 @@ const radioVest={vest:[34,39,48,43],cloth:[34,45,45,39,54,42,59,48,75,47,82,52,8
 const ravenVest={vest:[49,28,30,32],cloth:[60,29,66,33,72,36,77,43,72,49,66,56,55,56,52,52,58,48,55,43,57,37]};
 const crewFits=[assaultVest,ravenVest,radioVest,assaultVest,radioVest];
 const portraitRoles=['bulk','raven','lynx','hammer','cct'];
-function fieldPortrait(id){return wornPortrait(id,run?.squad[id]?.loadout)}
-function wornPortrait(id,row){
-  const tier=memberTier({id,loadout:row});
-  return 'art/armory/rank-crew/'+portraitRoles[id]+'-face-'+tier+'.webp';
+function fieldPortrait(id){return uniformPortrait(id,outfitTier(run.squad[id]))}
+function wornPortrait(id){return uniformPortrait(id,armory.crewTiers[id])}
+function uniformPortrait(id,tier){
+  if(id===1)return tier===0?'art/armory/raven-cels/portrait-C.png':'art/armory/raven-cels/uniform-face-'+tier+'.webp';
+  return 'art/armory/rank-crew/'+portraitRoles[id]+'-face-'+uniformColumn[tier]+'.webp';
 }
 const crewOutfits=[];
 const wornSlots=['helmet','top','pants','boots'];

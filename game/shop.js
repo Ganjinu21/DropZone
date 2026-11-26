@@ -11,7 +11,7 @@ function mountShop() {
   for (const [kind, name] of Object.entries(supplyNames)) {
     const card = $('supply-template').content.firstElementChild.cloneNode(true);
     card.dataset.supplyKind = kind;
-    card.querySelector('[data-crate-art]').src = 'art/armory/shop/' + kind + '.png';
+    card.querySelector('[data-crate-art]').src = 'art/hub/' + kind + '.webp';
     const title = card.querySelector('[data-crate-name]');
     title.textContent = name;
     title.id = 'supply-title-' + kind;
@@ -32,7 +32,7 @@ function mountShop() {
     button.type = 'button';
     button.dataset.offer = pack.id;
     button.innerHTML = '<img alt=""><strong></strong><span></span>';
-    button.querySelector('img').src = 'art/armory/shop/gems-' + (index + 1) + '.png';
+    button.querySelector('img').src = 'art/hub/gems-' + (index + 1) + '.webp';
     button.querySelector('strong').textContent = pack.diamonds.toLocaleString('ko-KR') + '개';
     button.addEventListener('click', () => confirmPack(pack));
     packButtons.set(pack.id, button);
@@ -136,7 +136,7 @@ async function drawSupply(kind) {
       return;
     }
     output.innerHTML = '<img alt=""><span><small></small><b></b></span>';
-    output.querySelector('img').src = itemImage(item);
+    output.querySelector('img').src = inventoryImage(item);
     output.querySelector('small').textContent = (result.guaranteed ? '확정 보급' : '보급 완료') + ' · 보유 ' + armory.counts[item.key] + '개';
     output.querySelector('b').textContent = item.rank + ' · ' + item.label;
   } catch {

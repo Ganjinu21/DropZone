@@ -20,11 +20,13 @@ function testLineup(base){
 function syncRankTest(){
   rankTestPanel.hidden=!developerMode || !lobbyReady || !['home','play','pause'].includes(mode);
   if(rankTestPanel.hidden)return;
+  const dock=mode==='home'?$('hub-nav'):document.body;
+  if(rankTestPanel.parentElement!==dock)dock.append(rankTestPanel);
   const battle=mode!=='home',id=battle?run.lead:testLead??getSelectedSquad()[0];
   $('test-crew').value=id;
   $('test-rank').value=(battle?run.squad[id].testTier:testGrades[id])??'';
-  const row=battle?run.squad[id].loadout:testRow(id,savedEquipment[id]);
-  $('test-current').textContent=names[id]+' · '+rankedTiers[memberTier({id,loadout:row})].rank;
+  const tier=battle?outfitTier(run.squad[id]):testGrades[id]??armory.crewTiers[id];
+  $('test-current').textContent=names[id]+' · '+rankedTiers[tier].rank;
 }
 function applyTestLoadout(m){
   m.testOriginal??={...m.loadout};

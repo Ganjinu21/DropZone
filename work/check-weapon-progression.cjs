@@ -70,7 +70,7 @@ assert.equal(rules.progress(740).nextLevelAt,null);
       let checks=0;
       for(const member of run.squad)member.gear.critChance=0;
       for(const w of gearByKey.values()){
-        if(!w.level)continue;
+        if(!w.weapon || !w.level)continue;
         const id=Math.max(0,weaponFamilies.indexOf(w.family)),m=run.squad[id];
         Object.assign(m,{weapon:w,deployed:true,hp:100,x:1280,y:1004,flip:1});
         run.lead=id;run.effects=[];run.marks=[];
@@ -81,7 +81,7 @@ assert.equal(rules.progress(740).nextLevelAt,null);
       }
       return checks;
     });
-    assert.equal(enhancedHits,75); // Five families, three enhanceable ranks, five levels each.
+    assert.equal(enhancedHits,75); // Includes previously saved S +4 and +5 weapons.
     const tagged=await page.evaluate(()=>{
       const m=run.squad[1],w=gearByKey.get('smg-3@1');
       m.weapon=w;run.lead=1;magazineReady(m,w);m.ammo=1;
@@ -171,20 +171,20 @@ assert.equal(rules.progress(740).nextLevelAt,null);
 
     const result=await page.evaluate(async()=>{
       const base='ar-3',makeS='ar-5',apex='ar-6';
-      await changeArmory(s=>{s.counts[base]=144});
-      const wrong=await fuseWeapon('smg-3');
+      await changeArmory(s=>{s.counts[base]=1024});
+      const wrong=await fuseGear('smg-3');
       if(wrong)throw Error('Used a different model as material');
-      async function promote(key){
-        for(let copy=0;copy<2;copy++){
-          for(let level=0;level<5;level++){
-            if(!await fuseWeapon(levelKey(key,level)))throw Error('Unexpected missing material '+key);
+      async function fuseBatch(key,limit,copies){
+        for(let level=0;level<=limit;level++){
+          copies/=2;
+          for(let n=0;n<copies;n++){
+            if(!await fuseGear(levelKey(key,level)))throw Error('Missing pair '+key+' +'+level);
           }
         }
-        if(!await fuseWeapon(levelKey(key,5)))throw Error('Promotion failed');
       }
-      for(let i=0;i<12;i++)await promote(base);
-      if(armory.counts[base] || armory.counts[makeS]!==12)throw Error('A ingredient accounting');
-      await promote(makeS);
+      await fuseBatch(base,5,1024);
+      if(armory.counts[base] || armory.counts[makeS]!==16)throw Error('A ingredient accounting');
+      await fuseBatch(makeS,3,16);
       const orphan=normalizedEquipment([null,null,null,null,{weapon:'ar-5@5'}])[4].weapon;
       return [armory.counts[apex],owns(makeS),owns(base),orphan,armory.diamonds];
     });
@@ -194,6 +194,6 @@ assert.equal(rules.progress(740).nextLevelAt,null);
     await page.locator('#profile-mode').tap();await page.locator('#select-team:enabled').tap();
     assert.deepEqual(await page.evaluate(()=>[developerMode,armory.diamonds,armory.counts['smg-3@1'],savedEquipment[1].weapon]),[true,3000,1,'smg-3@1']);
     assert.deepEqual(errors,[]);
-    console.log('25 magazines, saved loadouts, profiles, all 20 loot tables, independent crates, save migration, exact A guarantees, concurrent spending and 144 A → S+ verified.');
+    console.log('25 magazines, saved loadouts, profiles, all 20 loot tables, independent crates, save migration, exact A guarantees, concurrent spending and 1,024 A → S+ verified.');
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

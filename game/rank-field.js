@@ -2,11 +2,14 @@
 
 const rankRoleNames=['bulk','raven','lynx','hammer','cct'];
 const rankBase='art/armory/rank-crew/';
+// Packed sheets use red, yellow, white in their last three columns.
+const uniformColumn=[0,1,3,2,4];
 const rankArt={};
-for(const role of rankRoleNames){
-  for(const tier of [2,3,4])rankArt['rankSkill'+role+tier]=rankBase+role+'-skill-'+tier+'.webp';
-  rankArt['rankWalk'+role]=rankBase+role+'.webp';
-  rankArt['rankAim'+role]=rankBase+role+'-aim.webp';
+for(const role of rankRoleNames.filter(name=>name!=='raven')){
+  rankArt['uniformWalk'+role]=rankBase+role+'.webp';
+  rankArt['uniformSteps'+role]=rankBase+role+'-steps.webp';
+  rankArt['uniformAim'+role]=rankBase+role+'-aim.webp';
+  for(const tier of [2,3,4])rankArt['rankSkill'+role+tier]=rankBase+role+'-skill-'+uniformColumn[tier]+'.webp';
 }
 
 function memberTier(m){
@@ -14,43 +17,47 @@ function memberTier(m){
   return m.id===0?Math.min(gun,gearByKey.get(m.shieldItem??m.loadout?.shield)?.tier??0):gun;
 }
 
-const poseSize=192, fieldPoseScale=72/poseSize;
-function aimRow(angle){
-  return angle<-.45?0:angle>.45?2:1;
+function outfitTier(m){
+  return (developerMode?m.testTier:null)??armory.crewTiers[m.id];
 }
-function rankPose(m,age,moving){
-  const firing=age>=0 && age<.21;
-  const tier=memberTier(m),role=rankRoleNames[m.id];
-  const pitch=m.aimPitch||0;
-  const row=firing?aimRow(pitch):(moving&&!reduceMotion.matches?crewStrideFrame(m)>>1:0);
-  const base=firing?rankSightlines[role][tier][row]:null;
-  const angle=base?clamp(pitch-base[2]*Math.PI/180,-.48,.48):0;
-  const kick=firing&&!reduceMotion.matches?Math.sin(Math.PI*clamp(age/.14,0,1))*1.6:0;
-  return {tier,role,row,base,angle,kick,firing};
+function usesFieldUniform(m){
+  return m.id!==1 && outfitTier(m)>=2 && m.boarding==null &&
+    !(m.id===4 && run && run.t-(m.signalAt??-Infinity)<.83);
 }
-function rankedBarrel(m,col,aiming=false){
-  const p=rankPose(m,aiming?0:Math.max(0,run.t-(m.lastShot??run.t)),false);
-  if(!p.base)return null;
-  const [x,y]=col===3&&p.base.length>3?p.base.slice(3):p.base;
-  const u=(x-96)*fieldPoseScale,v=(y-99)*fieldPoseScale;
-  const c=Math.cos(p.angle),s=Math.sin(p.angle),flip=m.flip||1;
-  return {x:Math.round(m.x)+flip*(u*c-v*s-p.kick),y:Math.round(m.y)+(99-182)*fieldPoseScale+u*s+v*c,
-    angle:Math.atan2(Math.sin(m.aimPitch),flip*Math.cos(m.aimPitch))};
+
+const uniformCell=192,uniformScale=72/uniformCell;
+function uniformAimRow(pitch){
+  return pitch<-.45?0:pitch>.45?2:1;
 }
-function drawRankedMember(g,m,age,moving){
-  const p=rankPose(m,age,moving);
-  const im=art[(p.firing?'rankAim':'rankWalk')+p.role];
-  if(!im)return false;
-  const feet=(182-99)*fieldPoseScale;
-  g.save();g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+function uniformSocket(m,col,pitch){
+  const role=rankRoleNames[m.id],column=uniformColumn[outfitTier(m)];
+  const socket=rankSightlines[role][column][uniformAimRow(pitch)];
+  const hand=col===3 && socket.length===5?3:0;
+  return {x:Math.round(m.x)+(m.flip||1)*(socket[hand]-96)*uniformScale,
+    y:Math.round(m.y)+(socket[hand+1]-182)*uniformScale,angle:m.aimAngle};
+}
+
+function drawFieldUniform(g,m,age,moving){
+  const role=rankRoleNames[m.id],column=uniformColumn[outfitTier(m)];
+  const step=moving?crewStrideFrame(m)>>1:0;
+  const aiming=(age>=0 && age<.21) || m.aimTarget?.hp>0;
+  const draw=(action,row)=>g.drawImage(art[action+role],
+    column*uniformCell,row*uniformCell,uniformCell,uniformCell,-36,-182*uniformScale,72,72);
+  g.save();
   g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
-  if(p.firing){g.translate(-p.kick,-feet);g.rotate(p.angle);g.translate(0,feet)}
-  else if(!moving && !reduceMotion.matches){
-    const t=(run?.t??0)*3+m.id;
-    g.scale(1,1+.007*Math.sin(t));
-  }
-  g.drawImage(im,p.tier*poseSize,p.row*poseSize,poseSize,poseSize,-36,-182*fieldPoseScale,72,72);
-  g.restore();return true;
+  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+  const walk=()=>draw('uniformWalk',step);
+  const aim=()=>draw('uniformAim',uniformAimRow(m.uniformElevation??m.aimPitch??0));
+  if(aiming && moving){
+    const row=uniformAimRow(m.uniformElevation??m.aimPitch??0);
+    const knee=133,strip=uniformCell-knee;
+    g.drawImage(art['uniformAim'+role],column*uniformCell,row*uniformCell,uniformCell,knee,
+      -36,-182*uniformScale,72,knee*uniformScale);
+    g.drawImage(art['uniformSteps'+role],crewStrideFrame(m)*uniformCell,
+      ((outfitTier(m)-2)*3+row)*strip,uniformCell,strip,-36,(knee-182)*uniformScale,72,strip*uniformScale);
+  }else if(aiming)aim();
+  else walk();
+  g.restore();
 }
 
 // Effects are stamped onto each shot at launch, including rounds still in flight

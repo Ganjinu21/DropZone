@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#101b22">
   <title>Drop Zone Squad</title>
-  <link rel="preload" as="image" href="art/title/squad.webp" fetchpriority="high">
+  <link rel="preload" as="image" href="art/hub/operations.webp" media="(orientation: portrait)" fetchpriority="high">
+  <link rel="preload" as="image" href="art/hub/operations-wide.webp" media="(orientation: landscape)" fetchpriority="high">
   <link rel="stylesheet" href="type.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="arcade.css">
@@ -17,10 +18,14 @@
   <link rel="stylesheet" href="lobby-pages.css">
   <link rel="stylesheet" href="talent-screen.css">
   <link rel="stylesheet" href="rank-test.css">
+  <link rel="stylesheet" href="squad-interface.css">
 </head>
 <body>
   <section id="loading-screen" aria-labelledby="loading-title">
-    <img id="loading-art" src="art/title/squad.webp" alt="" fetchpriority="high" width="1440" height="810">
+    <picture>
+      <source media="(orientation: landscape)" srcset="art/hub/operations-wide.webp">
+      <img id="loading-art" src="art/hub/operations.webp" alt="" fetchpriority="high" width="1024" height="1536">
+    </picture>
     <div class="loading-panel">
       <h1 id="loading-title">DROP ZONE<br><span>SQUAD</span><i aria-hidden="true"></i></h1>
       <p id="loading-status" role="status">게임 불러오는 중</p>
@@ -28,22 +33,23 @@
       <button type="button" id="loading-retry" hidden>다시 불러오기</button>
     </div>
   </section>
-  <details id="rank-test" hidden><summary>대원 테스트</summary><div class="rank-options">
+  <details id="rank-test" hidden><summary aria-label="대원 테스트" title="대원 테스트"><span>대원 테스트</span></summary><div class="rank-options">
     <label>조작 대원<select id="test-crew"></select></label>
-    <label>무기 등급<select id="test-rank"><option value="">장착 등급</option></select></label>
+    <label>테스트 등급<select id="test-rank"><option value="">대원 등급</option></select></label>
     <output id="test-current"></output></div></details>
   <canvas id="world" aria-label="을지로 전투 지역"></canvas>
   <main id="home" class="overlay" hidden>
     <div id="lobby-hub">
       <div id="lobby-pages">
     <section id="barracks-page" aria-label="생활관" hidden>
+    <p class="promotion-notice" id="promotion-notice" role="status"></p>
     <section id="prep-screen" aria-labelledby="prep-title" hidden>
       <div class="prep-shell">
         <header class="prep-head"><button id="prep-back" data-field-control="secondary" type="button" aria-label="메인 메뉴로 돌아가기">뒤로</button><h2 id="prep-title">생활관</h2>
           <div class="prep-nav"><button type="button" id="change-crew" data-field-control="secondary">크루 변경</button><button type="button" id="prep-save" data-field-control="primary">저장</button></div>
         </header>
         <div class="dressing"><div class="slot-column" id="slots-left"></div>
-          <div class="formation"><div id="crew-figures" role="group" aria-label="장비를 편집할 대원"></div>
+          <div class="formation"><div class="promotion-panel" id="prep-promotion"></div><div id="crew-figures" role="group" aria-label="장비를 편집할 대원"></div>
             <div class="crew-caption"><h3 id="crew-name"></h3><button type="button" id="make-leader" data-field-control="secondary">선두 지정</button></div>
           </div><div class="slot-column" id="slots-right"></div></div>
         <section class="locker" aria-label="공용 장비 보관함">
@@ -169,10 +175,10 @@
   </section>
       </div>
       <nav id="hub-nav" aria-label="기지 페이지">
-        <button type="button" id="select-team" data-page="barracks" aria-controls="barracks-page" disabled>생활관</button>
-        <button type="button" id="hub-home" data-page="operations" aria-controls="main-menu" aria-current="page"><span class="hub-icon operations-icon" aria-hidden="true"></span>작전</button>
-        <button type="button" id="hub-talents" data-page="talents" aria-controls="talent-page"><span class="hub-icon network-icon" aria-hidden="true">⬡</span>스킬트리</button>
-        <button type="button" id="shop" data-page="shop" aria-controls="shop-page" disabled><img class="hub-icon" src="art/armory/crate.png" alt="">상점</button>
+        <button type="button" id="select-team" data-page="barracks" aria-controls="barracks-page" disabled><img class="hub-icon" src="art/hub/nav-barracks.webp" alt="">생활관</button>
+        <button type="button" id="hub-home" data-page="operations" aria-controls="main-menu" aria-current="page"><img class="hub-icon" src="art/hub/nav-operations.webp" alt="">작전</button>
+        <button type="button" id="hub-talents" data-page="talents" aria-controls="talent-page"><img class="hub-icon" src="art/hub/nav-talents.webp" alt="">스킬트리</button>
+        <button type="button" id="shop" data-page="shop" aria-controls="shop-page" disabled><img class="hub-icon" src="art/hub/nav-shop.webp" alt="">상점</button>
       </nav>
     </div>
 
@@ -197,8 +203,8 @@
     <button id="cast" data-field-control="secondary" type="button"><span id="cast-name"></span><small id="cast-status"></small></button>
   </section>
 
-  <section id="upgrade" class="overlay sheet" aria-labelledby="levelcaption" hidden>
-    <header><div><small id="levelcaption"></small></div><button type="button" id="upgrade-home" data-field-control="secondary">저장 후 나가기</button></header>
+  <section id="upgrade" class="overlay sheet" aria-labelledby="augment-title" aria-describedby="levelcaption" hidden>
+    <header><div><small id="levelcaption"></small><h2 id="augment-title">전투 증강 선택</h2></div><button type="button" id="upgrade-home" data-field-control="secondary">저장 후 나가기</button></header>
     <div id="cards" role="group" aria-label="증강 후보"></div>
     <footer><span id="buildstat"></span><button id="talent-reroll" type="button" data-field-control="secondary" hidden>증강 리롤 1회</button><button id="equip" data-field-control="primary" class="action">증강 적용</button></footer>
   </section>

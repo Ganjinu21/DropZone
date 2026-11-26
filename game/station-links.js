@@ -2,6 +2,7 @@
 
 // Station artwork is registered under the street in world coordinates. Each passage
 // starts at the same physical XY stair as its entrance; only elevation changes.
+let paintedStation;
 function makeUnderground(exits,bounds=SURFACE.bounds) {
   const offset={x:240,y:725};
   const worldBox=b=>({x:b.x+offset.x,y:b.y+offset.y,w:b.w,h:b.h});
@@ -114,13 +115,13 @@ function makeUnderground(exits,bounds=SURFACE.bounds) {
     g.fillText(String(e.number),p.x,p.y+3);
   }
   const density=1.25;
-  let sheet;
-  function bake(){
+  let sheet,usesPainting=false;
+  function bake(painted){
     const c=document.createElement('canvas');c.width=Math.ceil(bounds.w*density);c.height=Math.ceil(bounds.h*density);
-    const g=c.getContext('2d',{alpha:false});g.scale(density,density);g.imageSmoothingEnabled=true;
-    g.fillStyle='#202b2e';g.fillRect(0,0,c.width,c.height);
+    const g=c.getContext('2d',{alpha:painted});g.scale(density,density);g.imageSmoothingEnabled=true;
+    if(!painted){g.fillStyle='#202b2e';g.fillRect(0,0,c.width,c.height)}
     g.save();g.translate(offset.x,offset.y);
-    METRO.paint(g,props);g.restore();
+    METRO.paint(g,props,painted);g.restore();
     // Draw passages only in the unoccupied ceiling space; the historic halls,
     // shops and platform retain their original tiles and furniture.
     g.save();g.beginPath();
@@ -148,9 +149,24 @@ function makeUnderground(exits,bounds=SURFACE.bounds) {
     for(const e of exits)paintStairs(g,e);
     return c;
   }
-  function prepare(){sheet??=bake()}
+  function prepare(){
+    if(!paintedStation){
+      paintedStation=new Image();
+      paintedStation.decoding='async';
+      paintedStation.src='art/battlefields/metro-painted.webp';
+    }
+    const ready=paintedStation.complete && paintedStation.naturalWidth>0;
+    if(!sheet||usesPainting!==ready){sheet=bake(ready);usesPainting=ready}
+  }
   function draw(g,v){
-    prepare();g.drawImage(sheet,v.x*density,v.y*density,v.w*density,v.h*density,v.x,v.y,v.w,v.h);
+    prepare();
+    if(usesPainting){
+      g.fillStyle='#202b2e';g.fillRect(v.x,v.y,v.w,v.h);
+      const x=Math.max(v.x,offset.x),y=Math.max(v.y,offset.y);
+      const w=Math.min(v.x+v.w,offset.x+2120)-x,h=Math.min(v.y+v.h,offset.y+1280)-y;
+      if(w>0&&h>0)g.drawImage(paintedStation,(x-offset.x)*2,(y-offset.y)*2,w*2,h*2,x,y,w,h);
+    }
+    g.drawImage(sheet,v.x*density,v.y*density,v.w*density,v.h*density,v.x,v.y,v.w,v.h);
   }
   return {bounds,exits,solids,offset,draw,prepare};
 }

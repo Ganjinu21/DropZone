@@ -1,6 +1,6 @@
 'use strict';
 ART.riverMotion='art/battlefields/water-8.png';
-function drawRiver(g,image,map,view,t,still){
+function drawRiver(g,image,map,view,t,still,read=(x,y,w,h,dx,dy)=>g.drawImage(image,x,y,w,h,dx,dy,w,h)){
   if(!map.water.length||!art.riverMotion)return;
   const phase=Math.floor(t*(still?2:8))%8,w=128,h=64;
   for(const r of map.water){
@@ -12,7 +12,7 @@ function drawRiver(g,image,map,view,t,still){
       const sourceY=Math.max(0,row),height=Math.min(9,map.bounds.h-sourceY);
       const shift=Math.round(1.8*Math.sin(phase*Math.PI/4+row*.034));
       const xx=Math.max(2,x),end=Math.min(right,map.bounds.w-2);
-      if(end>xx)g.drawImage(image,xx+shift,sourceY,end-xx,height,xx,sourceY,end-xx,height);
+      if(end>xx)read(xx+shift,sourceY,end-xx,height,xx,sourceY);
     }
     for(let yy=Math.floor(y/h)*h;yy<bottom;yy+=h){
       for(let xx=Math.floor(x/w)*w;xx<right;xx+=w){

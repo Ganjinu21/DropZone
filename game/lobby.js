@@ -47,7 +47,7 @@ const prepRoles=roles;
 const crewLabel=id=>id===4?'CCT-공중통제사':names[id]+' - '+roles[id];
 function slotButton(slot){
   const item=gearByKey.get(draftEquipment[editId][slot]);
-  return '<button type="button" class="gear-slot" data-slot="'+slot+'" aria-pressed="'+(slot===editSlot)+'" aria-label="'+equipmentSlots[slot]+', '+item.label+'"><img alt="" src="'+itemImage(item)+'"><em class="tier tier-'+item.rank+'">'+gradeLabel(item)+'</em></button>';
+  return '<button type="button" class="gear-slot" data-slot="'+slot+'" aria-pressed="'+(slot===editSlot)+'" aria-label="'+equipmentSlots[slot]+', '+item.label+', 아이템 레벨 '+item.itemLevel+'"><img alt="" src="'+inventoryImage(item)+'"><em class="tier tier-'+item.rank+'">'+gradeLabel(item)+'</em></button>';
 }
 function paintInventory(){
   const rank=$('gear-rank').value, sort=$('gear-sort').value;
@@ -57,7 +57,7 @@ function paintInventory(){
     if(!canEnhance(i))return i;
     if(selectedItem?.artKey===i.key)return selectedItem;
     if(equippedItem.artKey===i.key)return equippedItem;
-    for(let level=5;level>0;level--){
+    for(let level=i.weapon && i.rank==='S'?5:enhancementLimit(i);level>0;level--){
       const key=levelKey(i.key,level);
       if(owns(key))return gearByKey.get(key);
     }
@@ -75,22 +75,58 @@ function paintInventory(){
   $('gear-inventory').innerHTML=list.map(i=>{
     const owned=owns(i.key),equipped=draftEquipment[editId][editSlot]===i.key;
     const status=equipped?'장착 중':owned?'보유':'미보유';
-    return '<button type="button" class="gear-tile" aria-label="'+i.label+', '+i.rank+'랭크, '+status+'" aria-pressed="'+(detailKey===i.key)+'" aria-controls="gear-detail" data-owned="'+owned+'" data-equipped="'+equipped+'" data-item="'+i.key+'"><img alt="" src="'+itemImage(i)+'"><em class="tier tier-'+i.rank+'">'+gradeLabel(i)+'</em></button>';
+    return '<button type="button" class="gear-tile" aria-label="'+i.label+', '+i.rank+'랭크, 아이템 레벨 '+i.itemLevel+', '+status+'" aria-pressed="'+(detailKey===i.key)+'" aria-controls="gear-detail" data-owned="'+owned+'" data-equipped="'+equipped+'" data-item="'+i.key+'"><img alt="" src="'+inventoryImage(i)+'"><em class="tier tier-'+i.rank+'">'+gradeLabel(i)+'</em></button>';
   }).join('') || '<p class="empty-inventory">해당 등급의 장비가 없습니다.</p>';
   paintGearDetail();
 }
+let promotingCrew=false;
+let promotionNoticeTimer;
+function paintPromotion(panel,id){
+  const tier=armory.crewTiers[id],p=crewProgress(id,draftEquipment[id],tier);
+  const count=Math.min(3,p.qualified), rank=p.current.rank;
+  const requirement=p.next?p.next.rank+' 이상 '+count+'/3':'최고 등급';
+  const average=Number(p.average.toFixed(1));
+  panel.innerHTML='<div class="promotion-line"><strong class="tier tier-'+rank+'">'+rank+' 등급</strong>'+
+    '<span>평균 Lv.'+average+'</span></div><progress max="1" value="'+p.fill+'" aria-label="'+names[id]+
+    ' 종합 아이템 레벨, '+requirement+'"></progress><small>'+requirement+'</small>'+
+    (p.ready?'<button type="button" data-field-control="primary" data-promote="'+id+'" data-from="'+tier+
+      '" aria-label="'+names[id]+' '+p.next.rank+' 등급 영구 돌파"'+(promotingCrew?' disabled':'')+'>'+p.next.rank+' 영구 돌파 ↑</button>':'');
+}
+function promotionNotice(message){
+  clearTimeout(promotionNoticeTimer);
+  $('promotion-notice').textContent=message;
+  promotionNoticeTimer=setTimeout(()=>{$('promotion-notice').textContent=''},3500);
+}
+$('barracks-page').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-promote]');
+  if(!button || promotingCrew)return;
+  const id=Number(button.dataset.promote),tier=Number(button.dataset.from);
+  const row={...draftEquipment[id]};
+  promotingCrew=true;button.disabled=true;
+  try{
+    const promoted=await promoteCrew(id,tier,row);
+    promotionNotice(promoted?names[id]+' · '+rankedTiers[tier+1].rank+' 등급 돌파 완료':'장착 장비와 현재 등급을 확인해 주세요.');
+  }catch{
+    promotionNotice('돌파를 저장하지 못했습니다. 다시 시도해 주세요.');
+  }finally{
+    promotingCrew=false;
+    if(!$('prep-screen').hidden)paintPrep();
+    if(!$('roster-screen').hidden)updateSquadSelection();
+    syncRankTest();
+  }
+});
 function paintPrep(){
   if(!draftSquad.includes(editId))editId=draftSquad[0];
   if(editSlot==='shield' && editId!==0)editSlot='weapon';
   const order=[editId,...draftSquad.filter(id=>id!==editId)];
-  $('crew-figures').innerHTML=order.map((id,index)=>'<button type="button" class="figure figure-'+index+'" data-inspect="'+id+'" aria-pressed="'+(index===0)+'" aria-label="'+names[id]+' 장비 편집"><canvas aria-hidden="true" width="168" height="128"></canvas><small>'+(id===draftSquad[0]?'선두 · ':'')+names[id]+'</small></button>').join('');
+  paintPromotion($('prep-promotion'),editId);
+  $('crew-figures').innerHTML=order.map((id,index)=>'<button type="button" class="figure figure-'+index+'" data-inspect="'+id+'" aria-pressed="'+(index===0)+'" aria-label="'+names[id]+' 장비 편집"><canvas aria-hidden="true" width="336" height="256"></canvas><small>'+(id===draftSquad[0]?'선두 · ':'')+names[id]+'</small></button>').join('');
   $('crew-name').textContent=crewLabel(editId);
   $('make-leader').disabled=editId===draftSquad[0];$('make-leader').textContent=editId===draftSquad[0]?'출발 선두':'선두 지정';
   $('slots-left').innerHTML=(editId===0?['weapon','shield','gloves','boots']:['weapon','gloves','boots']).map(slotButton).join('');
   $('slots-right').innerHTML=['helmet','top','pants'].map(slotButton).join('');
   for(const canvas of $('crew-figures').querySelectorAll('canvas')){
     const id=Number(canvas.closest('button').dataset.inspect);
-    if(id===1){canvas.width=336;canvas.height=256}
     drawCrewPreview(canvas,id,draftEquipment[id]);
   }
   paintInventory();
@@ -141,7 +177,8 @@ function updateSquadSelection(){
   for(const card of $('operator-grid').querySelectorAll('[data-pick]')){
     const id=Number(card.dataset.pick),slot=pickerSquad.indexOf(id);
     const portrait=card.querySelector('.pick-portrait img');
-    const equipped=wornPortrait(id,draftEquipment[id]);
+    const equipped=wornPortrait(id);
+    paintPromotion(card.parentElement.querySelector('.promotion-panel'),id);
     if(portrait.getAttribute('src')!==equipped)portrait.src=equipped;
     const form=trainedSkillForm(gearByKey.get(draftEquipment[id].weapon),id,talents);
     const skill=form?skillDisplayName(id,form):'특수 스킬 잠금';
@@ -164,7 +201,7 @@ function applyPicker(){
   if(!validSquad(pickerSquad))return;
   draftSquad=pickerSquad.slice();closeSquadSelection();
 }
-$('operator-grid').innerHTML=names.map((name,id)=>'<button type="button" class="pick-operator" data-pick="'+id+'" data-operator="'+id+'"><span class="pick-portrait"><img alt="" src="'+ART['face'+id]+'"><span class="pick-mark"></span></span><span class="pick-info"><small>'+prepRoles[id]+'</small><strong>'+name+'</strong><span></span></span></button>').join('');
+$('operator-grid').innerHTML=names.map((name,id)=>'<div class="roster-entry"><div class="promotion-panel"></div><button type="button" class="pick-operator" data-pick="'+id+'" data-operator="'+id+'"><span class="pick-portrait"><img alt="" src="'+ART['face'+id]+'"><span class="pick-mark"></span></span><span class="pick-info"><small>'+prepRoles[id]+'</small><strong>'+name+'</strong><span></span></span></button></div>').join('');
 $('operator-grid').onclick=e=>{
   const btn=e.target.closest('[data-pick]');if(!btn||btn.disabled)return;
   const id=+btn.dataset.pick, index=pickerSquad.indexOf(id);
@@ -205,9 +242,9 @@ function paintGearDetail(){
   const talents=TalentTree.effects(armory.talentRanks);
   const form=item.weapon?trainedSkillForm(item,editId,talents):0;
   const ability=item.weapon?(form?' · '+(form===2?'각성 스킬 ':'특수 스킬 ')+skillDisplayName(editId,form):' · 스킬트리에서 해금'):'';
-  $('item-context').textContent=itemFamilies[item.family]+' · '+itemOwner(item)+ability;
+  $('item-context').textContent=itemFamilies[item.family]+' · 아이템 Lv.'+item.itemLevel+' · '+itemOwner(item)+ability;
   $('item-tier').className='tier tier-'+item.rank;$('item-tier').textContent=gradeLabel(item);
-  $('item-icon').src=itemImage(item);$('item-title').textContent=item.label;
+  $('item-icon').src=inventoryImage(item);$('item-title').textContent=item.label;
   $('item-detail').textContent=item.weapon?'1발 피해 '+equipmentDamage(item):gearEffect(editSlot,item)+' · 전투에는 능력치만 적용';
   const perHand=item.family==='smg';
   const reload=gearStats(editId,draftEquipment).reload/(1+talents.reloadBonus);
@@ -216,22 +253,24 @@ function paintGearDetail(){
   const recipe=fusionRecipe(item);
   $('enhancement').hidden=!recipe;
   if(recipe){
-    const variants=Array.from({length:6},(_,n)=>gearByKey.get(levelKey(item.artKey,n)));
+    const last=item.weapon && item.rank==='S'?5:enhancementLimit(item);
+    const variants=Array.from({length:last+1},(_,n)=>gearByKey.get(levelKey(item.artKey,n)))
+      .filter(v=>v.level<=enhancementLimit(item) || owns(v.key));
     $('item-level').innerHTML=variants.map(v=>'<option value="'+v.key+'">'+gradeLabel(v)+' · '+(armory.counts[v.key]||0)+'개</option>').join('');
     $('item-level').value=item.key;
-    const next=gearByKey.get(recipe.output),material=gearByKey.get(recipe.material);
-    $('fusion-preview').textContent=gradeLabel(item)+' + '+gradeLabel(material)+' → '+gradeLabel(next)+' '+next.label+' · 피해 '+equipmentDamage(item)+' → '+equipmentDamage(next);
+    const next=gearByKey.get(recipe.output);
+    $('fusion-preview').textContent=gradeLabel(item)+' '+item.label+' 2개 → '+gradeLabel(next)+' '+next.label+' · '+gearEffect(editSlot,next);
     const ready=readyToFuse(armory,item,recipe);
-    $('item-fuse').textContent=!ready?'재료 부족':item.level===5?'등급 승급':'합성 강화';
+    $('item-fuse').textContent=!ready?'재료 부족':item.level>=enhancementLimit(item)?'등급 승급':'합성 강화';
     $('item-fuse').disabled=fusionBusy || !ready;
   }
   let source = item.weapon ? '무기 보급상자에서 획득' : '장비 보급상자에서 획득';
-  if (item.level || (item.weapon && item.rank === 'S+')) {
-    source = '합성으로 획득';
+  if (item.rank === 'S+') {
+    source = '동일한 S +3 장비 2개 합성';
+  } else if (item.level) {
+    source = '같은 강화 단계 2개 합성';
   } else if (item.rank === 'S') {
     source = item.weapon ? '무기 보급상자 Lv.15부터 · 합성 가능' : '장비 보급상자 Lv.15부터';
-  } else if (item.rank === 'S+') {
-    source = item.family === 'shield' ? '유료 전용 · 미보유' : '개발자 모드에서 사용 가능';
   }
   $('item-action').textContent=same?'장착 중':owned?'교체하기':source;
   $('item-action').disabled=!owned || same || fusionBusy;
@@ -256,10 +295,11 @@ $('item-fuse').onclick=async()=>{
   const input=detailKey;
   fusionBusy=true;paintGearDetail();
   try{
-    const result=await fuseWeapon(input);
+    const result=await fuseGear(input);
     if(!result)return;
-    // If the last equipped copy was used up, follow it to the crafted weapon.
-    const follow=rows=>rows.map(row=>row && result.consumed.includes(row.weapon)?{...row,weapon:result.item.key}:row);
+    // Follow the last consumed copy in every saved or open loadout using that slot.
+    const slot=result.item.weapon?'weapon':result.item.family;
+    const follow=rows=>rows.map(row=>row && result.consumed.includes(row[slot])?{...row,[slot]:result.item.key}:row);
     const stored=readLocal(equipmentKey);
     savedEquipment=normalizedEquipment(follow(Array.isArray(stored)?stored:savedEquipment));
     if(!stored || JSON.stringify(stored)!==JSON.stringify(savedEquipment)){

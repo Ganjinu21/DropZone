@@ -40,11 +40,14 @@ const TransitKit = (() => {
     return [{x:box.x,y:box.y,w:box.w,h:y-box.y},{x:box.x,y:b,w:box.w,h:box.y+box.h-b},
       {x:box.x,y,w:x-box.x,h:b-y},{x:r,y,w:box.x+box.w-r,h:b-y}].filter(v=>v.w>0&&v.h>0);
   }
-  function drawEntrance(ctx,{x,y,facing,number}) {
+  function drawEntrance(ctx,{x,y,facing,number},painted) {
     const [dx,dy]=normals[facing], dir=directions.indexOf(facing);
     const cx=x-dx*45,cy=y-dy*45;
     const covered=[1,4,6,7].includes(number);
-    stamp(ctx,[dir*128,covered?128:0,128,128],cx-64,cy-65);
+    if(painted){
+      const {image,cells}=painted,cell=cells[(covered?4:0)+dir];
+      ctx.drawImage(image,...cell.source,cx-64+cell.x,cy-65+cell.y,cell.w,cell.h);
+    }else stamp(ctx,[dir*128,covered?128:0,128,128],cx-64,cy-65);
     // Keep numbering upright on a separate sign at the street-facing side.
     const poleX=cx+dx*22+dy*32, poleY=cy+dy*22-dx*32;
     ctx.save();

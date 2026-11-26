@@ -55,11 +55,11 @@ const DistrictMaps=(()=>{
     });
     if(!base)for(const e of exits)solids.push(...TransitKit.stairRails(e,false));
     const tile=rect(layout.tile,scale);
-    function paving(g,image,area){
+    function paving(g,image,area,read){
       g.save();g.beginPath();g.rect(area.x,area.y,area.w,area.h);g.clip();
       for(let y=Math.floor(area.y/tile.h)*tile.h;y<area.y+area.h;y+=tile.h)
         for(let x=Math.floor(area.x/tile.w)*tile.w;x<area.x+area.w;x+=tile.w)
-          g.drawImage(image,tile.x,tile.y,tile.w,tile.h,x,y,tile.w,tile.h);
+          read(tile.x,tile.y,tile.w,tile.h,x,y);
       g.restore();
     }
     return {bounds,scale,water:(layout.water||[]).map(region=>rect(region,scale)),spawn:world(layout.spawn||[200,150],scale),parts,solids,exits,paving,wrecks,layout};
