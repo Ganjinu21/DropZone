@@ -22,7 +22,16 @@ const {chromium}=require('playwright');
       await page.screenshot({path:path.join(process.env.PREVIEW_DIR,name+'.png')});
     };
     await screenshot('Start');
-    // Verify all 25 item images, their shared loadout rules, and a saved five-piece S+ kit in combat.
+    // This scenario equips the full catalog, including pieces normally earned by fusion.
+    await page.evaluate(()=>changeArmory(state=>{
+      for(const item of equipmentCatalog)state.counts[item.key]=Math.max(1,state.counts[item.key]||0);
+    }));
+    const iconPaths=await page.evaluate(async()=>Promise.all(equipmentCatalog.map(async item=>{
+      const img=new Image();img.src=inventoryImage(item);await img.decode();
+      if(Math.max(img.naturalWidth,img.naturalHeight)<300)throw Error(item.key+' inventory image too small');
+      return img.src;
+    })));
+    assert.equal(new Set(iconPaths).size,55);
     await page.locator('#select-team').tap();
     // A rank change must reach both the detail panel and the specific operator's equipped slot.
     for(const [id,family] of [[0,'pistol'],[1,'smg'],[2,'sniper']]){
@@ -34,7 +43,7 @@ const {chromium}=require('playwright');
         const key=family+'-'+variant;
         await page.locator('[data-item="'+key+'"]').tap();
         const detail=await page.locator('#item-icon').evaluate(async img=>{await img.decode();return img.src});
-        assert.ok(detail.endsWith('/catalog/'+family+'/'+file+'.png'),key+' detail art');
+        assert.ok(detail.endsWith('/catalog/'+family+'/'+file+'.webp'),key+' detail art');
         const equip=page.locator('#item-action');
         if(await equip.isEnabled())await equip.tap();
         assert.equal(await slot.locator('img').evaluate(img=>img.src),detail,key+' equipped art');
@@ -108,7 +117,7 @@ const {chromium}=require('playwright');
     await page.locator('#select-team').tap();await screenshot('Preparation');
     assert.deepEqual(await page.evaluate(()=>savedEquipment.map(i=>i.weapon)),['pistol-0','smg-0','sniper-0','rocket-0','ar-0']);
     assert.deepEqual(await page.evaluate(()=>Object.keys(armory.counts).filter(k=>gearByKey.get(k)?.weapon).sort()),['ar-0','pistol-0','rocket-0','smg-0','sniper-0']);
-    assert.deepEqual(await page.locator('[data-slot="weapon"]').evaluate(e=>[e.innerText,e.querySelector('img').src.split('/').pop()]),['C','C.png']);
+    assert.deepEqual(await page.locator('[data-slot="weapon"]').evaluate(e=>[e.innerText,e.querySelector('img').src.split('/').pop()]),['C','C.webp']);
     await page.locator('[data-slot="weapon"]').tap();
     await page.locator('#gear-detail').waitFor();
     assert.equal(await page.locator('#item-title').textContent(),'시작 권총');
@@ -160,9 +169,9 @@ const {chromium}=require('playwright');
     const actual=await page.evaluate(()=>{
       const seen=new Set(),original=ctx.drawImage;
       ctx.drawImage=function(img,...args){seen.add(img);return original.call(this,img,...args)};
-      const finish=art['bulkFinish'+run.squad[0].weapon.rank];
-      drawHero(run.squad[0]);const front=seen.has(finish);seen.clear();
-      setLeader(1);drawHero(run.squad[0]);const rear=seen.has(finish);
+      const finish=()=>gearDecals.get('bulk-stand-gun:'+run.squad[0].weapon.tier)?.canvas;
+      drawHero(run.squad[0]);const front=seen.has(finish());seen.clear();
+      setLeader(1);drawHero(run.squad[0]);const rear=seen.has(finish());
       ctx.drawImage=original;return [run.squad[0].weapon.key,front,rear];
     });
     assert.deepEqual(actual,[drop.key,true,true]);
@@ -180,9 +189,9 @@ const {chromium}=require('playwright');
           try{
             drawEquippedMember(member);
             const role=operatorRoles[id];
-            const base=role?[role+'Base',role+'Field72',role+'Field144']:['ravenCels','ravenFieldCels','ravenField2x'];
-            const finish=role?role+'Finish'+i.rank:'raven-finish'+i.rank;
-            if(!base.some(key=>seen.has(art[key])) || (i.tier && !seen.has(art[finish])))failures.push(i.key);
+            const base=role?[role+'Recruitstand']:['ravenCels','ravenFieldCels','ravenField2x'];
+            const finish=role?gearDecals.get(role+'-stand-gun:'+i.tier)?.canvas:art['raven-finish'+i.rank];
+            if(!base.some(key=>seen.has(art[key])) || (i.tier && !seen.has(finish)))failures.push(i.key);
           }
           finally{ctx.drawImage=original;member.weapon=before}
         }
@@ -191,8 +200,8 @@ const {chromium}=require('playwright');
         const drawn=[],original=ctx.drawImage;
         ctx.drawImage=function(img,...args){drawn.push(img);return original.call(this,img,...args)};
         try{drawEquippedMember({...run.squad[0],shieldItem:shield.key})}finally{ctx.drawImage=original}
-        const keys=shield.tier?['bulkFinish'+shield.rank]:['bulkBase','bulkField72','bulkField144'];
-        if(!keys.some(key=>drawn.includes(art[key])))failures.push(shield.key);
+        const worn=shield.tier?art[shield.artKey]:art.bulkRecruitstand;
+        if(!drawn.includes(worn))failures.push(shield.key);
       }
       return failures;
     });

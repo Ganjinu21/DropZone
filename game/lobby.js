@@ -263,7 +263,8 @@ function paintGearDetail(){
   $('item-context').textContent=itemFamilies[item.family]+' · 아이템 Lv.'+item.itemLevel+' · '+itemOwner(item)+ability;
   $('item-tier').className='tier tier-'+item.rank;$('item-tier').textContent=gradeLabel(item);
   $('item-icon').src=inventoryImage(item);$('item-title').textContent=item.label;
-  $('item-detail').textContent=item.weapon?'1발 피해 '+equipmentDamage(item):gearEffect(editSlot,item)+' · 전투에는 능력치만 적용';
+  $('item-detail').textContent=item.weapon?'1발 피해 '+equipmentDamage(item):
+    gearEffect(editSlot,item)+(item.family==='shield'?' · 벌크의 방패 외형에 적용':' · 전투에는 능력치만 적용');
   const perHand=item.family==='smg';
   const reload=gearStats(editId,draftEquipment).reload/(1+talents.reloadBonus);
   $('item-magazine').textContent=item.weapon?'탄창 '+(perHand?(item.capacity/2)+'발 × 2':item.capacity+'발')+' · 재장전 '+Number((item.reload*reload).toFixed(2))+'초':'';

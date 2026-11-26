@@ -188,7 +188,7 @@ kbd { background: #172430; border: 1px solid #687576; box-shadow: 0 2px #0a1116;
 .report h2::before { background: var(--result-color); box-shadow: none; }
 .report h2 { color: var(--result-color); }
 #loadout > div { min-width: 0; display: flex; flex-direction: column; padding: 1.45vh clamp(8px, 1.25vw, 21px); border: 1px solid #596769; border-top: 3px solid var(--role); background: linear-gradient(150deg, #293941, #1b292e); }
-#loadout canvas { width: 100%; height: clamp(38px, 15.4vh, 136px); object-fit: contain; margin-bottom: 1.2vh; }
+#loadout img { width: 100%; height: clamp(38px, 15.4vh, 136px); object-fit: contain; margin-bottom: 1.2vh; }
 #loadout strong { color: var(--paper); font-size: clamp(14px, 1.9vw, 25px); line-height: 1.4; }
 #loadout span, #loadout small { font-size: clamp(11px, 1.23vw, 15px); line-height: 1.55; color: #c4d0ca; }
 #loadout small { color: #9fb1ad; }

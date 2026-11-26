@@ -403,7 +403,7 @@
 #upgrade #equip {min-height:46px;min-width:136px;justify-content:center;font-weight:800;font-size:16px;}
 #upgrade #equip::before {display:none;}
 #upgrade #equip:focus-visible {outline-offset:-4px;}
-#prep-screen img[src*="art/augments/"], .supply-drop img[src*="art/augments/"] {image-rendering:auto;object-fit:contain;}
+#prep-screen :is(.gear-slot,.gear-tile,.gear-art) img, .supply-drop img {image-rendering:auto;object-fit:contain;}
 @media(orientation:portrait) and (max-width:650px) {
   #upgrade {padding-inline:max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right));}
   #upgrade #cards {grid-template-columns:1fr;gap:8px;}

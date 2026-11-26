@@ -66,11 +66,19 @@ function drawOperatorBody(g,m,index){
   const transform=g.getTransform(),scale=Math.hypot(transform.a,transform.b);
   const size=scale<=1?72:scale<=2?144:256;
   const image=art[role+(size===256?'Base':'Field'+size)];
+  const drawBody=()=>drawPaintedOperator(g,m,index,role,layers,image,size,ratio);
+  if(m.id===0){
+    const foreground=index===6 || index===14?[65,42,78,44,89,58,106,87,101,91,81,65,67,59]:null;
+    drawFittedShield(g,m,paintedShieldPoses[index],drawBody,{x:-36,y:-67.5,scale:ratio,foreground});
+  }else drawBody();
+  g.restore();
+}
+function drawPaintedOperator(g,m,index,role,layers,image,size,ratio){
   g.drawImage(image,index%8*size,Math.floor(index/8)*size,size,size,-36,-67.5,72,72);
   const tier=outfitTier(m),finish=art['rankSkill'+role+tier];
   if(finish){
     g.drawImage(finish,index%8*128,Math.floor(index/8)*128,128,128,-36,-67.5,72,72);
-    g.restore();return;
+    return;
   }
   for(let i=0;i<operatorSlots.length;i++){
     const slot=operatorSlots[i];
@@ -80,7 +88,6 @@ function drawOperatorBody(g,m,index){
     const [sx,sy,w,h,x,y]=layers[i];
     g.drawImage(art[role+'Finish'+rankedTiers[material].rank],sx,sy,w,h,x*ratio-36,y*ratio-67.5,w*ratio,h*ratio);
   }
-  g.restore();
 }
 // Both atlases register the feet at the origin. Keep the sight and shoulders
 // on the firing cel while the lower legs follow distance travelled.

@@ -94,7 +94,7 @@ function canonicalGearKey(key){
 const starterKeys=equipmentCatalog.filter(item=>item.tier===0).map(item=>item.key);
 const itemImage=i=>i.asset+'.png';
 function inventoryImage(item){
-  return item.weapon?'art/augments/'+item.family+'.webp':itemImage(item);
+  return item.asset+'.webp';
 }
 const defaultItem=(id,slot)=>(slot==='weapon'?weaponFamilies[id]:slot)+'-0';
 function gearSlots(id){return Object.keys(equipmentSlots).filter(slot=>slot!=='shield'||id===0)}

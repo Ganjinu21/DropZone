@@ -49,17 +49,23 @@ function drawFieldUniform(g,m,age,moving){
   g.save();
   g.translate(Math.round(m.x),Math.round(m.y));const size=uniformBodyScale(m)/uniformScale;g.scale((m.flip||1)*size,size);
   g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-  const walk=()=>draw('uniformWalk',step);
-  const aim=()=>draw('uniformAim',uniformAimRow(m.uniformElevation??m.aimPitch??0));
-  if(aiming && moving){
-    const row=uniformAimRow(m.uniformElevation??m.aimPitch??0);
+  const row=uniformAimRow(m.uniformElevation??m.aimPitch??0);
+  const drawBody=()=>{
+    if(!aiming || !moving){
+      draw(aiming?'uniformAim':'uniformWalk',aiming?row:step);
+      return;
+    }
     const knee=133,strip=uniformCell-knee;
     g.drawImage(art['uniformAim'+role],column*uniformCell,row*uniformCell,uniformCell,knee,
       -36,-182*uniformScale,72,knee*uniformScale);
     g.drawImage(art['uniformSteps'+role],crewStrideFrame(m)*uniformCell,
       ((outfitTier(m)-2)*3+row)*strip,uniformCell,strip,-36,(knee-182)*uniformScale,72,strip*uniformScale);
-  }else if(aiming)aim();
-  else walk();
+  };
+  if(m.id===0){
+    const tier=outfitTier(m),box=uniformShieldPoses[tier-2][aiming?4+row:step];
+    const forward=aiming && row===2?[92,68,111,72,123,90,161,124,162,130,153,134,120,105,99,90]:null;
+    drawFittedShield(g,m,box,drawBody,{x:-36,y:-182*uniformScale,scale:uniformScale,foreground:forward});
+  }else drawBody();
   g.restore();
 }
 

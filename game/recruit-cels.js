@@ -20,7 +20,7 @@ const recruitTips={
 };
 // Hero art is measured at 275 units tall. Align the hips rather than the end of the weapon.
 const recruitStand={
-  bulk:{hip:.47,tip:[79,80,2],shield:[107,94,134,89,134,205,102,207]},
+  bulk:{hip:.47,tip:[79,80,2]},
   lynx:{hip:.43,tip:[196,126,29]},hammer:{hip:.46,tip:[122,62,-20]},cct:{hip:.48,tip:[129,115,27]}
 };
 const finishColors=[null,'#7496a9','#efb847','#cf494a','#80e3ed'];
@@ -78,9 +78,10 @@ function drawRecruit(g,m,age,moving){
     const breath=run && !reduceMotion.matches?1+.0025*Math.sin(now*3+m.id):1;
     g.scale(unit,unit*breath);g.translate(-w*standing.hip,-275);
     const source=[0,0,image.width,image.height],box=[w,275];
-    g.drawImage(image,0,0,...box);
+    const drawBody=()=>g.drawImage(image,0,0,...box);
+    if(shieldTier)drawFittedShield(g,m,recruitShieldStand,drawBody);
+    else drawBody();
     if(weaponTier)drawRecruitFinish(g,image,source,box,weaponSurface(standing.tip,[15,0,39,34,24][m.id],m.id===3?5:2.2),weaponTier,role+'-stand-gun');
-    if(shieldTier)drawRecruitFinish(g,image,source,box,standing.shield,shieldTier,role+'-stand-shield');
   }else{
     let cel;
     if(working)cel=m.boarding!=null?(m.boarding>.45?15:14):(now-m.signalAt<.55?14:15);
@@ -89,21 +90,22 @@ function drawRecruit(g,m,age,moving){
     const unit=recruitUnit(m),image=art[role+'Recruitfield'];
     const source=[cel%4*288,(cel>>2)*288,288,288];
     g.scale(unit,unit);g.translate(-80,-272/1.8);
-    if(moving && !working){
+    const drawBody=()=>{
+      if(!moving || working){
+        g.drawImage(image,...source,0,0,160,160);
+        return;
+      }
       const knee=204,strip=288-knee;
       g.drawImage(image,source[0],source[1],288,knee,0,0,160,knee/1.8);
       const row=aim?cel-8:m.walkRow===6?6:m.walkRow===7?7:5;
       const step=!aim && row>=6?stride-stride%2:stride;
       g.drawImage(art[role+'Recruitstride'],step*288,row*strip,288,strip,0,knee/1.8,160,strip/1.8);
-    }else g.drawImage(image,...source,0,0,160,160);
+    };
+    if(shieldTier)drawFittedShield(g,m,recruitShieldPoses[cel],drawBody,{foreground:recruitShieldHands[cel]});
+    else drawBody();
     if(weaponTier){
       const tip=recruitTips[role][cel],length=[6,0,18,14,12][m.id];
       drawRecruitFinish(g,image,source,[160,160],weaponSurface(tip,length,m.id===3?2.1:1.15),weaponTier,role+cel+'-gun');
-    }
-    // The shield recognition stripe sits below the viewport on front-facing poses.
-    if(shieldTier && (cel<6 || cel>=8)){
-      const center=[96,97,97,97,98,98,0,0,94,92,91,90,92,91,96,96][cel],h=cel>=14?110:92;
-      drawRecruitFinish(g,image,source,[160,160],[center-4,h+2,center+3,h-1,center+3,h+2,center-4,h+5],shieldTier,'bulk'+cel+'-shield');
     }
   }
   g.restore();

@@ -47,7 +47,7 @@ const tagArt = {
   ...operatorCelArt,
   ...recruitArt,
   ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon || i.family==='shield').flatMap(i=>{
-    if(i.family==='shield')return [[i.key,i.asset+'-field.png']];
+    if(i.family==='shield')return [[i.key,inventoryImage(i)]];
     if(i.family==='smg')return [[i.key,i.asset+'-near.png'],[i.key+'-far',i.asset+'-far.png'],[i.key+'-pair',itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     return [[i.key,itemImage(i)]];
@@ -258,7 +258,7 @@ function drawMemberGear(g,m,age,moving=false){
   const pitch=(m.aimPitch||0)*aim,offset=torsoOffset(jointY,torsoSlope(pitch));
   const firePose=id===1 && age<.20?ravenFirePoses[Math.min(7,Math.floor(Math.max(0,age)*40))]:null;
   drawCrewBody(g,m,moving,pitch,firePose);
-  if(id===0)drawBulkGuard(g,m,offset,dy,glove,moving,art[m.shieldItem||'shield-0']);
+  if(id===0)drawBulkGuard(g,m,offset,dy,glove,moving,art[gearByKey.get(m.shieldItem)?.artKey||'shield-0']);
   g.save();g.translate(offset.x,jointY+dy+offset.y);
   g.rotate(pitch+rest*(1-aim));
   for(const col of (family==='smg'?[3,1]:[1])){

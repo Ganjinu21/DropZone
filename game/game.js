@@ -266,15 +266,8 @@ function showLoadout(){
    const enhancements='무기 강화 '+weaponRank(i)+'/3 · '+skill;
    const hp=Math.max(0,Math.ceil(member.hp));
    const weapon = gradeLabel(member.weapon)+' '+member.weapon.label+(i===0?' · '+gearByKey.get(member.shieldItem).label:'');
-   return `<div data-operator="${i}"><canvas aria-hidden="true"></canvas><strong>${names[i]}</strong><span>${weapon}</span><small>${enhancements}</small><span class="hp">HP ${hp}/${member.max}</span></div>`;
+   return `<div data-operator="${i}"><img alt="" src="${inventoryImage(member.weapon)}"><strong>${names[i]}</strong><span>${weapon}</span><small>${enhancements}</small><span class="hp">HP ${hp}/${member.max}</span></div>`;
  }).join('');
- panel.querySelectorAll('canvas').forEach((canvas,slot)=>{
-   const i=run.lineup[slot];
-   const weapon=run.squad[i].weapon;
-   const icon=art[weapon.family==='smg'?weapon.artKey+'-pair':weapon.artKey];canvas.width=64;canvas.height=40;
-   const g=canvas.getContext('2d'),scale=Math.min(58/icon.width,32/icon.height);
-   g.imageSmoothingEnabled=false;g.drawImage(icon,(64-icon.width*scale)/2,(40-icon.height*scale)/2,icon.width*scale,icon.height*scale);
- });
 }
 function pause(){if(mode!=='play')return;$('resume').hidden=false;show('pause');$('homebtn').textContent='저장 후 나가기';$('dialog').dataset.state='pause';showLoadout();$('dialogtitle').textContent='일시 정지';$('summary').textContent='생존 '+clock(run.t)+'　·　처치 '+run.kills;$('resume').textContent='계속하기'}
 function end(won){

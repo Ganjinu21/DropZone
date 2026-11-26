@@ -1,0 +1,80 @@
+Drop Zone Squad · equipment inventory masters
+
+Create a premium transparent inventory SPRITE ATLAS, a square contact sheet, exactly 2 columns by 3 rows, each cell same size with a single centered icon grouping. There are exactly FIVE icons. Read row-major: C in row1 left, B row1 right, A row2 left, S row2 right, S+ row3 left, row3 right MUST be completely blank transparent. Identical camera and subject scale within a family. Fully contained artwork with clear margins on all sides and a transparent gap between cells. No background, no floor, no shadow cast onto canvas, no card frame, text, logos, numbers or visual UI, no people. Crisp high-definition semi-realistic painterly 2.5D special-operations mobile game equipment illustration, physically plausible materials, strong crisp outer silhouette and a soft highlight tracing the surfaces. Upper-left neutral key light, small tactile edge wear, cloth stitching, brushed metal. Readable at 50px. Each higher rank introduces new identifiable physical forms as well as stronger rank materials, gold-yellow on black A, deep crimson and black S, elegant pearl white, graphite structure and small luminous cyan accents S+. Render exterior props only.
+
+pistol
+SUBJECT: Bulk’s sidearm; one single compact pistol per cell, barrel to the right
+CELL CONTENTS IN READING ORDER:
+C: simple battered duty pistol with plain brown grip
+B: field service pistol with ridged grip and steel slide
+A: angular tactical pistol with a bronze-yellow slide and black grip
+S: elite crimson framed pistol with bold black grip and a larger futuristic slide
+S+: pearl-and-graphite compact pulse sidearm with an integrated cyan light strip
+
+smg
+SUBJECT: Raven’s paired SMGs; EACH silhouette is exactly two matching compact submachine pistols staggered one above the other, both muzzles facing right, visually united as one inventory icon
+CELL CONTENTS IN READING ORDER:
+C: two small humble blackened-steel machine pistols with plain brown grip accents
+B: two compact olive tactical SMGs with distinct short bodies
+A: two fast-hitting golden-yellow / graphite compact SMGs with angular runners
+S: two assertive crimson-black crossfire SMGs with stepped housing
+S+: two pearl lacquer / black twin goblin SMGs with cyan windows
+
+Lynx and Hammer use the existing game/art/augments paintings. The five finishes are exported by inventory-finishes.cjs.
+
+ar
+SUBJECT: CCT’s signature automatic rifle, closed exterior, broadside with muzzle to the right
+CELL CONTENTS IN READING ORDER:
+C: weathered dark steel Callsign patrol rifle, warm polymer furniture, plain sights
+B: olive-green Relay field rifle, compact optic
+A: Beacon assault rifle with black and hazard-yellow plates and distinctive sight housing
+S: Nightlink assault rifle in crimson/black, heavier framed slim optic
+S+: advanced black-hawk pearl/graphite rifle with a luminous teal receiver accent
+
+shield
+Produce a square transparent-background sprite atlas of FIVE DISTINCT TACTICAL SHIELD MODELS for a detailed semi-realistic special-operations videogame inventory. Two columns, three rows of equal cells; one complete freestanding shield centered in its own cell, sixth (bottom right) totally empty/transparent. No floor, backdrop, cast shadows, gradients, lettering, labels, people or UI. Clean alpha around the exact contours. Same soft upper-left studio light, front three-quarter, readable steel/ceramic weave surface. IMPORTANT art direction: these five shapes are immediately distinguishable even filled in solid black, increasingly departing from the original four-sided outline. 1 top left BASIC: simple heavy worn charcoal rectangular patrol shield, flat four corners, clear rectangular vision slit. 2 top right FIELD: olive green small agile curved breacher shield with large chamfered upper shoulders and bottom corners, central smoked viewport and offset shoulder scallop. Its outline resembles a narrow vertical octagon. 3 middle left TACTICAL: bold yellow and graphite sweep-wing shield: broad splayed shoulders flanking a dropped central crown, curved side bites and tapered wedge bottom like a V. Emphasize different outer shape, modern plausible armor; single inset glass viewport. 4 middle right ELITE: deep red-black articulated shield, broad three-panel silhouette, two attached side wings distinctly angled out and scalloped at different heights like a mantlet, narrow split visor and strongly notched bottom edges. 5 bottom left APEX: brilliant pearl-white and graphite multi-faceted Haetae futuristic defense shield built around a luminous translucent cyan hexagonal core, swept spearhead shoulders rising at the sides, clipped prism panels flowing to a central kite point. Strong elegant fox-head-inspired contour, clean materials, large readable cyan shield face; sophisticated functional game prop. DISTINCT overall silhouettes, not five re-colors of one shape. Absolutely no rectangle behind the top-rank units. Cut out each shield with empty space all around; do not connect adjacent designs.
+
+helmet
+SUBJECT: standalone headgear cutouts, front three-quarter view, completely hollow beneath, NO head face or mannequin
+CELL CONTENTS IN READING ORDER:
+C: soft tan stitched canvas baseball cap with curved brim, no helmet or armor
+B: olive vintage steel field helmet with simple leather strap
+A: graphite ballistic entry helmet with yellow armor sections
+S: red and black heavy full protective assault helmet, reinforced brow
+S+: pearl white modern helmet with attached four luminous cyan night vision lenses in a row; four small distinct lenses clear
+
+gloves
+SUBJECT: a single right-hand glove in every cell, back of hand visible slightly curled downwards, cuff empty, no body or underlying hand
+CELL CONTENTS IN READING ORDER:
+C: weathered tan fingerless fabric glove with short hollow finger openings, entirely unoccupied
+B: full-finger olive-brown leather field glove with heavy stitching
+A: black entry glove with hard yellow segmented knuckle guard
+S: black gauntlet with crimson assault knuckle armor and wrist protection
+S+: pearl-white core gauntlet with cyan wrist cell and advanced black underlayer
+
+top
+SUBJECT: a standalone torso clothing item, shown worn by an invisible form, OPEN NECK, NO person, NO arms/head/body, front 3/4 view
+CELL CONTENTS IN READING ORDER:
+C: brown lightly quilted civilian sleeveless vest, soft fabric and plain zip, no tactical pouches
+B: olive field ammo vest, unmistakable grouped brown green canvas pouches
+A: black plate carrier with yellow entry plates and woven tactical webbing
+S: crimson-black assault cuirass with overlapping chest plates
+S+: reactor breastplate of pearl-white composite shells, graphite joints and a contained cyan chest core
+
+pants
+SUBJECT: one complete pair of standalone full-length trousers per cell, invisible wearer, front three-quarter silhouette legs separated slightly, waistband and BOTH hems visible, no boots or feet
+CELL CONTENTS IN READING ORDER:
+C: plain tan work trousers, simple seams and utility denim
+B: olive-green ripstop cargo pants with large side pockets
+A: black tactical trousers with substantial hazard-yellow knee plates and webbing
+S: crimson black stealth assault trousers with reinforced dark segmented thigh armor
+S+: advanced servo combat trousers with pearl-white panels, dark flexible joints and cyan strips
+
+boots
+SUBJECT: one single right boot/shoe per cell, ankle and toe visible in same right facing 3/4 product view; no foot or leg
+CELL CONTENTS IN READING ORDER:
+C: simple worn low-cut beige canvas sneaker with laces and flat sole, clearly a sneaker not a combat boot
+B: classic brown-olive leather lace-up field boot
+A: black-soled tactical boot with yellow toe armor and heel plates
+S: crimson and black night assault boot with higher shin guard
+S+: pearl white magnetic mobility boot with technical graphite soles and inset cyan heel module
