@@ -229,7 +229,9 @@
 #prep-screen .crew-caption {background:linear-gradient(90deg,transparent,#101a20e6 18% 82%,transparent);}
 #crew-figures::before {background:radial-gradient(ellipse,#92c1c12c,transparent 68%);border:0;}
 #prep-screen .figure canvas, #prep-screen .figure img {image-rendering:auto;filter:drop-shadow(1px 4px 3px #0b0c0de6);}
-#prep-screen :is(.figure-1,.figure-2) :is(canvas,img) {filter:brightness(.88) drop-shadow(1px 3px 2px #0b0d0e);}
+#prep-screen .figure[aria-pressed="false"] canvas {
+  filter:blur(1.25px) brightness(.83) saturate(.85) drop-shadow(1px 3px 2px #0b0d0e);
+}
 #prep-screen .figure small {border:1px solid #67777b9e;border-radius:2px;background:#14212ae6;padding:2px 6px;}
 #prep-screen .figure[aria-pressed=true] small {border-color:#e2b16c;color:#ffd392;}
 #prep-screen .locker {border-top:2px solid #bd9b68;}
