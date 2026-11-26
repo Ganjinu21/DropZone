@@ -24,7 +24,7 @@ const gameDirectory=path.join(__dirname,'../game');
       const canvas=(w,h)=>Object.assign(document.createElement('canvas'),{width:w,height:h});
       const shot=canvas(192,204),g=shot.getContext('2d',{willReadFrequently:true});
       const columns=[1,2,3,4,0];
-      const plates=exportProofs?Array.from({length:1+Object.keys(crewMotion).length*6},()=>canvas(shot.width*5,shot.height*5)):null;
+      const plates=exportProofs?Array.from({length:1+Object.keys(crewMotion).length*8},()=>canvas(shot.width*5,shot.height*5)):null;
       const colours=new Map();
       function clear(){g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,shot.width,shot.height)}
       function checkUniform(id,pose,tier){
@@ -47,7 +47,7 @@ const gameDirectory=path.join(__dirname,'../game');
           clear();drawCrewPreview(shot,id,row);checkUniform(id,'barracks',tier);
           const promoted={...row,weapon:weaponFamilies[id]+'-'+rank.variant,shield:'shield-'+rank.variant};
           const set=frameSet(m);
-          check(set.frames.height===2560 && crewFrameAnchors[set.role][tier].length===55,'unexpected field atlas layout');
+          check(set.frames.height===3072 && crewFrameAnchors[set.role][tier].length===67,'unexpected field atlas layout');
           for(const moving of [false,true]){
             for(const sign of [-1,1]){
               const vertical=recruitAimCel(m,moving,sign*Math.PI/2);
@@ -77,42 +77,59 @@ const gameDirectory=path.join(__dirname,'../game');
           function drawStep(member){
             clear();g.save();g.scale(3,3);drawMemberGear(g,member,.07,true);g.restore();
           }
-          for(let step=0;step<6;step++){
-            m.gait=(step+.1)*crewStrideLength/6;
+          for(let step=0;step<8;step++){
+            m.gait=(step+.1)*crewStrideLength/8;
             drawStep(m);
             checkUniform(id,'aim'+step,tier);
             const rgba=g.getImageData(0,0,shot.width,shot.height).data;
             crown.push(Math.floor((rgba.findIndex((v,i)=>i%4===3 && v>180)/4)/shot.width));
             feet.add(shot.toDataURL());
           }
-          check(feet.size===6,'missing painted firing frame '+id+'/'+rank.rank);
+          check(feet.size===8,'missing painted firing frame '+id+'/'+rank.rank);
           check(Math.max(...crown)-Math.min(...crown)<=18,'excessive head travel '+id+'/'+rank.rank+' '+crown);
           for(const [name,action] of Object.entries(crewMotion)){
             if(id===1 && name==='skill'){
               if(plates)for(let step=0;step<6;step++){
                 clear();g.save();g.scale(3,3);g.translate(m.x,m.y);
                 drawRavenBody(g,{...m,weapon:gearByKey.get(promoted.weapon)},{index:48+step*3,facing:1},{phase:'spin',follow:3});
-                g.restore();plates[1+action*6+step].getContext('2d').drawImage(shot,x,y);
+                g.restore();plates[1+action*8+step].getContext('2d').drawImage(shot,x,y);
               }
               continue;
             }
             const frames=new Set(),set=frameSet(m);
+            const upper=new Set(),boots=new Set(),detail=canvas(190,64);
+            const detailContext=detail.getContext('2d');
             const original=g.drawImage;
-            for(let step=0;step<6;step++){
-              const cel=action*6+step,draws=[];
+            const gait=action>=crewMotion.travel && action<=crewMotion.down;
+            const count=gait?8:6;
+            for(let step=0;step<count;step++){
+              const cel=gait?crewStrideCel(action,step):action*6+step,draws=[];
+              if(gait){
+                m.gait=(step+.1)*crewStrideLength/8;
+                const selected=action<=crewMotion.away?
+                  recruitWalkCel({...m,walkRow:[1,6,7][action-1]}):
+                  recruitAimCel(m,true,(action-crewMotion.level)*Math.PI/4);
+                check(selected===cel,'wrong foot at '+id+'/'+rank.rank+'/'+name+'/'+step);
+                for(const [seen,top] of [[upper,88],[boots,185]]){
+                  detailContext.clearRect(0,0,190,64);
+                  detailContext.drawImage(set.frames,cel%6*256+32,Math.floor(cel/6)*256+top,190,64,0,0,190,64);
+                  seen.add(detail.toDataURL());
+                }
+              }
               g.drawImage=function(img,...coords){draws.push({img,coords});return original.call(this,img,...coords)};
               clear();g.save();g.scale(3,3);
               try{drawRecruit(g,m,Infinity,false,cel)}finally{g.restore();g.drawImage=original}
               check(draws.length===1 && draws[0].img===set.frames,'body was assembled from pieces '+name);
-              check(draws[0].coords[0]===step*256 && draws[0].coords[1]===action*256,'wrong frame '+name);
+              check(draws[0].coords[0]===cel%6*256 && draws[0].coords[1]===Math.floor(cel/6)*256,'wrong frame '+name);
               frames.add(shot.toDataURL());
               if(plates){
                 clear();g.save();g.scale(3,3);
                 drawRecruit(g,{...m,weapon:gearByKey.get(promoted.weapon),shieldItem:promoted.shield},Infinity,false,cel);
-                g.restore();plates[1+cel].getContext('2d').drawImage(shot,x,y);
+                g.restore();plates[1+action*8+step].getContext('2d').drawImage(shot,x,y);
               }
             }
-            check(frames.size===6,'duplicate full-body frame '+id+'/'+rank.rank+'/'+name);
+            check(frames.size===count,'duplicate full-body frame '+id+'/'+rank.rank+'/'+name);
+            if(gait)check(upper.size===8 && boots.size===8,'reused torso or legs '+id+'/'+rank.rank+'/'+name);
           }
           {
             for(const angle of [-Math.PI/2,-Math.PI/4,0,Math.PI/4,Math.PI/2]){
@@ -143,10 +160,12 @@ const gameDirectory=path.join(__dirname,'../game');
       fs.mkdirSync(process.env.PREVIEW_DIR,{recursive:true});
       const moves=await page.evaluate(()=>Object.keys(crewMotion));
       proofs.forEach((encoded,i)=>{
-        const file=i?moves[Math.floor((i-1)/6)]+'-'+(i-1)%6+'.webp':'barracks.webp';
+        const move=moves[Math.floor((i-1)/8)],phase=(i-1)%8;
+        if(i && (move==='guard'||move==='skill') && phase>=6)return;
+        const file=i?move+'-'+phase+'.webp':'barracks.webp';
         fs.writeFileSync(path.join(process.env.PREVIEW_DIR,file),Buffer.from(encoded,'base64'));
       });
     }
-    console.log('Verified all 25 barracks and combat uniforms, individual full-body cells, six-step moving fire, portraits, stale loads and saved grades after relaunch.');
+    console.log('Verified all 25 barracks and combat uniforms, individual full-body cells, eight-step walking and moving fire, portraits, stale loads and saved grades after relaunch.');
   }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

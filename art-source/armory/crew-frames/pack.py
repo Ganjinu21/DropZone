@@ -184,20 +184,32 @@ def pack():
         data[role]=[]
         for rank in RANKS:
             actions=ACTIONS
-            sheet=Image.new('RGBA',(6*TILE,(len(actions)+2)*TILE));marks=[]
+            gait_marks=json.loads((HERE/role/rank/'gait'/'anchors.json').read_text())
+            sheet=Image.new('RGBA',(6*TILE,12*TILE));marks=[None]*67
             for i,action in enumerate(actions):
-                source='travel' if role=='bulk' and action=='away' else action
-                for step in range(6):
-                    im=Image.open(HERE/role/rank/f'{source}-{step+1}.webp').convert('RGBA')
-                    points=pose_points(im,source,role)
-                    authored=barrel_marks[role][rank].get(source)
-                    if authored:
-                        points[:2]=authored[step][:2]
-                        if role=='raven':points[3:5]=authored[step][2:4]
-                    if role=='bulk':
-                        im,points=register_shield(im,shields[rank][source][step],shields[rank]['size'],points,SOLE)
-                    sheet.paste(im,(step*TILE,i*TILE))
-                    marks.append(points)
+                source=action
+                gait=1<=i<=6
+                strip=None
+                if gait:
+                    strip=Image.open(HERE/role/rank/'gait'/f'{source}.webp').convert('RGBA')
+                    if strip.size!=(8*TILE,TILE) or len(gait_marks[source])!=8:
+                        raise ValueError(f'Expected eight full-body cels for {role}/{rank}/{source}')
+                for step in range(8 if gait else 6):
+                    if gait:
+                        im=strip.crop((step*TILE,0,(step+1)*TILE,TILE))
+                        points=gait_marks[source][step]
+                    else:
+                        im=Image.open(HERE/role/rank/f'{source}-{step+1}.webp').convert('RGBA')
+                        points=pose_points(im,source,role)
+                        authored=barrel_marks[role][rank].get(source)
+                        if authored:
+                            points[:2]=authored[step][:2]
+                            if role=='raven':points[3:5]=authored[step][2:4]
+                        if role=='bulk':
+                            im,points=register_shield(im,shields[rank][source][step],shields[rank]['size'],points,SOLE)
+                    index=i*6+step if step<6 else 55+(i-1)*2+step-6
+                    sheet.paste(im,(index%6*TILE,index//6*TILE))
+                    marks[index]=points
             for i,action in enumerate(('travel','travel','travel','travel','up','level','down')):
                 index=len(actions)*6+i
                 im=Image.open(HERE/role/rank/f'key-{i+1}.webp').convert('RGBA')
@@ -205,7 +217,7 @@ def pack():
                 if role=='bulk':
                     im,points=register_shield(im,shields[rank]['key'][i],shields[rank]['size'],points,SOLE)
                 sheet.paste(im,(index%6*TILE,index//6*TILE))
-                marks.append(points)
+                marks[index]=points
             directory=DEST/role;directory.mkdir(parents=True,exist_ok=True)
             sheet.save(directory/f'{rank}.webp',quality=95,method=4)
             data[role].append(marks)

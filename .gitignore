@@ -53,3 +53,4 @@ node_modules/
 !/work/check-awakened-support.cjs
 !/work/test-combat-lab.cjs
 !/work/preview-operator-cels.cjs
+!/work/preview-crew.html

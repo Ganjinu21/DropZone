@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>인게임 대원 · 전신 보행</title>
+  <style>
+    * { box-sizing: border-box }
+    html { color-scheme: dark; font: 15px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; color: #e8efef; background: #10191f }
+    body { max-width: 660px; margin: auto; padding: 16px }
+    header, nav, .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 9px }
+    header { justify-content: space-between; margin-bottom: 14px }
+    h1 { font-size: 22px; margin: 0 }
+    a { color: #c2ddd8 }
+    button, select { font: inherit; color: inherit; border-radius: 6px; background: #203039; border: 1px solid #40545c; padding: 6px 10px; cursor: pointer }
+    button[aria-pressed=true] { color: #fff2d2; border-color: #dfb16d; background: #324444 }
+    .board { display: grid; grid-template-columns: minmax(0,1fr) 111px; align-items: center; padding: 0 9px; margin: 12px 0; border: 1px solid #394951; border-radius: 9px; background: radial-gradient(ellipse at 43% 78%, #35454b, #182429 78%) }
+    canvas { display: block; width: 100%; height: auto }
+    #actor { max-height: 285px; object-fit: contain }
+    #compass { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px }
+    #compass button { font-size: 17px; padding: 5px 0 }
+    #current { margin-right: auto }
+    .strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin: 10px 0 }
+    .strip button { padding: 0 0 3px; font-size: 12px }
+    #count { margin-left: auto; color: #b1c3c0; font-size: 13px }
+    @media(max-width: 390px) { body { padding: 10px } button, select { padding: 5px 7px; font-size: 13px } }
+  </style>
+</head>
+<body>
+  <header><h1>인게임 대원</h1><a href="../game/index.html">게임 열기</a></header>
+  <nav id="roles" aria-label="대원"></nav>
+  <nav id="ranks" aria-label="등급"></nav>
+  <section class="board">
+    <canvas id="actor" width="368" height="275" aria-label="선택한 대원의 전신 동작"></canvas>
+    <div id="compass" aria-label="조준 방향"></div>
+  </section>
+  <div class="controls">
+    <b id="current"></b>
+    <select id="motion" aria-label="동작">
+      <option value="aim">이동 사격</option><option value="static">정지 사격</option>
+      <option value="travel">측면 이동</option><option value="toward">전방 이동</option><option value="away">후방 이동</option>
+    </select>
+  </div>
+  <div class="strip" id="strip"></div>
+  <div class="controls">
+    <button id="prev" aria-label="이전 프레임">‹</button><button id="play"></button><button id="next" aria-label="다음 프레임">›</button>
+    <select id="speed" aria-label="재생 속도"><option value="135">1×</option><option value="270">0.5×</option><option value="-135">역재생</option></select>
+    <span id="count"></span>
+  </div>
+  <script src="../game/crew-stride.js"></script>
+  <script>
+    const el = id => document.getElementById(id);
+    const roles = ['raven', 'lynx', 'hammer', 'cct', 'bulk'];
+    const names = ['레이븐', '링스', '해머', 'CCT', '벌크'];
+    const heights = [170, 170, 176, 182, 194];
+    const ranks = ['C', 'B', 'A', 'S', 'S+'];
+    const directions = ['오른쪽', '오른쪽 아래', '아래', '왼쪽 아래', '왼쪽', '왼쪽 뒤', '뒤', '오른쪽 뒤'];
+    const arrows = ['→','↘','↓','↙','←','↖','↑','↗'];
+    const rows = [5,6,6,6,5,4,4,4];
+    const cache = new Map();
+    let role = 4, rank = 4, direction = 0, phase = 0, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let sprite, timer;
+    function button(parent, label, action) {
+      const item = document.createElement('button');
+      item.textContent = label;
+      item.onclick = action;
+      parent.append(item);
+      return item;
+    }
+    const roleButtons = names.map((name, i) => button(el('roles'), name, () => { role = i; refresh(); }));
+    const rankButtons = ranks.map((name, i) => button(el('ranks'), name, () => { rank = i; refresh(); }));
+    const bearings = [];
+    for (const i of [5,6,7,4,-1,0,3,2,1]) {
+      if (i < 0) { el('compass').append(document.createElement('span')); continue; }
+      bearings[i] = button(el('compass'), arrows[i], () => { direction = i; refresh(); });
+      bearings[i].setAttribute('aria-label', directions[i]);
+    }
+    const tiles = Array.from({length: 8}, (_, i) => {
+      const item = button(el('strip'), '', () => { playing = false; phase = i; refresh(); });
+      item.setAttribute('aria-label', (i+1)+'번 프레임');
+      const canvas = document.createElement('canvas');
+      canvas.width = 156; canvas.height = 128;
+      item.append(canvas, String(i+1));
+      return canvas;
+    });
+    function sequence() {
+      const mode = el('motion').value;
+      const action = crewMotion[mode] ?? rows[direction];
+      if (mode === 'static') return [fieldKeys.level + action - crewMotion.level];
+      return tiles.map((_, i) => crewStrideCel(action, i));
+    }
+    function paint(canvas, cel) {
+      const g = canvas.getContext('2d');
+      g.clearRect(0, 0, canvas.width, canvas.height);
+      if (!sprite?.naturalWidth) return;
+      const scale = canvas.height * .81 / crewFrameHeight * heights[role] / 194;
+      g.save();
+      g.translate(canvas.width * .50, canvas.height * .95);
+      g.scale(([3,4,5].includes(direction) ? -1 : 1) * scale, scale);
+      g.imageSmoothingQuality = 'high';
+      const s = crewFrameSize;
+      g.drawImage(sprite, cel%6*s, Math.floor(cel/6)*s, s,s, -crewFrameFoot[0],-crewFrameFoot[1],s,s);
+      g.restore();
+    }
+    function draw() {
+      const frames = sequence();
+      phase = (phase+frames.length)%frames.length;
+      paint(el('actor'), frames[phase]);
+      tiles.forEach((c, i) => {
+        c.parentElement.hidden = i >= frames.length;
+        if (i < frames.length) paint(c, frames[i]);
+        c.parentElement.setAttribute('aria-pressed', i === phase);
+      });
+      el('count').textContent = frames.length === 1 ? '정지' : (phase<4?'왼발 전진':'오른발 전진')+' · '+(phase+1)+' / 8';
+    }
+    function refresh() {
+      for (const [buttons, selected] of [[roleButtons,role],[rankButtons,rank],[bearings,direction]]) {
+        buttons.forEach((b, i) => b.setAttribute('aria-pressed', i === selected));
+      }
+      el('current').textContent = names[role]+' · '+ranks[rank]+' · '+directions[direction];
+      el('play').textContent = playing ? '일시정지' : '재생';
+      const key = roles[role]+'/'+ranks[rank].replace('+','-plus');
+      if (!cache.has(key)) {
+        const img = new Image();
+        img.onload = draw;
+        img.src = '../game/art/armory/crew-frames/'+key+'.webp?v=36';
+        cache.set(key, img);
+      }
+      sprite = cache.get(key);
+      draw();
+      clearInterval(timer);
+      const delay = Number(el('speed').value);
+      if (playing) timer = setInterval(() => { if (!document.hidden) { phase += Math.sign(delay); draw(); } }, Math.abs(delay));
+    }
+    el('motion').onchange = refresh;
+    el('speed').onchange = refresh;
+    el('play').onclick = () => { playing = !playing; refresh(); };
+    el('prev').onclick = () => { playing = false; phase--; refresh(); };
+    el('next').onclick = () => { playing = false; phase++; refresh(); };
+    refresh();
+  </script>
+</body>
+</html>
