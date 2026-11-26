@@ -45,6 +45,16 @@ const gameDirectory=path.join(__dirname,'../game');
             x:30,y:65,flip:1,walkRow:1,moving:true,aimTarget:{hp:100},operatorAngle:0,ravenSector:0};
           clear();drawCrewPreview(shot,id,row);checkUniform(id,'barracks',tier);
           const promoted={...row,weapon:weaponFamilies[id]+'-'+rank.variant,shield:'shield-'+rank.variant};
+          if(id===0){
+            const field=new Set(),barracks=new Set();
+            for(const {variant} of rankedTiers){
+              const shield='shield-'+variant;
+              clear();drawCrewPreview(shot,id,{...row,shield});barracks.add(shot.toDataURL());
+              clear();drawRecruit(g,{...m,shieldItem:shield},Infinity,false,crewMotion.level*6);
+              field.add(shot.toDataURL());
+            }
+            check(field.size===1 && barracks.size===1,'shield icon covered the painted shield at '+rank.rank);
+          }
           const x=col*shot.width,y=tier*shot.height;
           if(plates){
             clear();drawCrewPreview(shot,id,promoted);plates[0].getContext('2d').drawImage(shot,x,y);

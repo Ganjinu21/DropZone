@@ -44,8 +44,7 @@ const tagRoles = ['bulk', 'raven', 'lynx'];
 const tagArt = {
   ...ravenCelArt,
   ...recruitArt,
-  ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon || i.family==='shield').flatMap(i=>{
-    if(i.family==='shield')return [[i.key,inventoryImage(i)]];
+  ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon).flatMap(i=>{
     if(i.family==='smg')return [[i.key,i.asset+'-near.png'],[i.key+'-far',i.asset+'-far.png'],[i.key+'-pair',itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     return [[i.key,itemImage(i)]];

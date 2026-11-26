@@ -64,6 +64,14 @@ const {chromium}=require('playwright');
       return {preserved,awakened,restoredMech:current.activeSkill?.awakened===true};
     });
     assert.deepEqual(crossover,{preserved:true,awakened:true,restoredMech:true});
+    const legacySpin=await older.evaluate(()=>{
+      run.lead=1;run.activeSkill={id:1,age:2,duration:5.34,phase:'spin',beat:27,burstDirections:[],nextShot:2.1};
+      const restored=decodeBattle(encodeBattle()).state.activeSkill;
+      run.activeSkill.age=3.1;
+      const expired=decodeBattle(encodeBattle()).state.activeSkill;
+      return restored.duration===3 && restored.nextShot>=2 && restored.nextShot<2.1 && !expired;
+    });
+    assert.ok(legacySpin,'an old Raven cast failed to resume on the three-second timeline');
     // Release a v1 graph into the old public key, with one retired card between
     // two valid cards and an unconfirmed choice. Then navigate through the actual menu.
     const fixture=await older.evaluate(()=>{

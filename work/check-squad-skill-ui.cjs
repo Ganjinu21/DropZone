@@ -229,23 +229,27 @@ const {chromium} = require('playwright');
     }
     for(const id of [0,1,2,3,4]){
       await testPage.locator('#test-crew').selectOption(String(id));
-      await testPage.locator('#test-rank').selectOption('0');
-      const button=testPage.locator('#test-special');
-      assert.ok(await button.isEnabled());
-      await button.tap();
-      const cast=await testPage.evaluate(()=>{
-        const id=run.lead,skill=id===4?run.cobra:run.activeSkill;
-        for(let i=0;i<84;i++){
-          run.t+=1/60;tickSquadSkills(1/60);updateRadioSupport(1/60);
+      for(const tier of [0,4]){
+        await testPage.locator('#test-rank').selectOption(String(tier));
+        for(const awakened of [false,true]){
+          const button=testPage.locator(awakened?'#test-special':'#test-base');
+          assert.ok(await button.isEnabled());
+          await button.tap();
+          const cast=await testPage.evaluate(()=>{
+            const id=run.lead,skill=id===4?run.cobra:run.activeSkill;
+            for(let i=0;i<84;i++){
+              run.t+=1/60;moveFormation(1/60);tickSquadSkills(1/60);updateRadioSupport(1/60);
+            }
+            render();
+            const saved=decodeBattle(encodeBattle()).state;
+            const restored=id===4?saved.cobra:saved.activeSkill;
+            return {awakening:skill?.awakened,advanced:skill.age>0,
+              saved:restored?.awakened,rank:run.squad[id].weapon.rank,trained:!!run.talents[skillRoutes[id]+'Skill']};
+          });
+          assert.deepEqual(cast,{awakening:awakened,advanced:true,saved:awakened,rank:tier?'S+':'C',trained:false});
+          assert.ok(await button.isDisabled(),'a second tap must not restart the current preview');
         }
-        render();
-        const saved=decodeBattle(encodeBattle()).state;
-        const restored=id===4?saved.cobra:saved.activeSkill;
-        return {awakening:skill?.awakened,advanced:id===4?skill.age>1:skill.beat>0,
-          saved:!!restored?.awakened,rank:run.squad[id].weapon.rank,trained:!!run.talents[skillRoutes[id]+'Skill']};
-      });
-      assert.deepEqual(cast,{awakening:true,advanced:true,saved:true,rank:'C',trained:false});
-      assert.ok(await button.isDisabled(),'a second tap must not restart the active special');
+      }
       await testPage.evaluate(()=>{
         for(let i=0;i<720;i++){
           run.t+=1/60;tickSquadSkills(1/60);updateRadioSupport(1/60);
@@ -255,7 +259,7 @@ const {chromium} = require('playwright');
     }
     await testPage.close();
     assert.deepEqual(errors,[]);
-    console.log('Mobile drag casts, all five test HUD taps, and five untrained C-grade special previews with saved effects passed.');
+    console.log('Mobile drag casts, test HUD taps, and both saved skill previews for all five operators with C and S+ gear passed.');
   } finally {
     await browser.close();
   }

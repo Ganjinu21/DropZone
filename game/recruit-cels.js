@@ -122,17 +122,12 @@ function recruitSocket(m,cel=recruitAimCel(m),f=m.flip||1,footX=m.x,footY=m.y,fa
     y:footY+(mark[hand+1]-crewFrameFoot[1])*unit,angle:Math.atan2(Math.sin(rad),f*Math.cos(rad))};
 }
 function paintCrewEquipment(g,m,image,src,box,mark,key,standing=false){
-  const body=()=>g.drawImage(image,...src,0,0,...box);
-  const shield=m.id===0 && gearByKey.get(m.shieldItem??m.loadout?.shield);
+  g.drawImage(image,...src,0,0,...box);
   const bodyTier=standing?-1:outfitTier(m);
-  const fitShield=shield?.tier && shield.tier!==bodyTier;
-  const fitWeapon=m.weapon?.tier && m.weapon.tier!==bodyTier;
+  if(!m.weapon?.tier || m.weapon.tier===bodyTier)return;
   const length=(standing?[15,16,39,34,24]:[11,17,33,25,19])[m.id];
   const radius=m.id===3?3.5:1.8;
-  const barrel=fitShield || fitWeapon?weaponSurface(mark,length,radius):null;
-  if(fitShield)drawFittedShield(g,m,mark.slice(3,7),body,{foreground:barrel});
-  else body();
-  if(!fitWeapon)return;
+  const barrel=weaponSurface(mark,length,radius);
   drawRecruitFinish(g,image,src,box,barrel,m.weapon.tier,key);
   if(m.id===1)drawRecruitFinish(g,image,src,box,weaponSurface([mark[3],mark[4],mark[2]],length,radius),m.weapon.tier,key+'-far');
 }

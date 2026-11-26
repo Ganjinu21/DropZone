@@ -101,12 +101,13 @@ function decodeBattle(text){
   }
   const skill=state.activeSkill,craft=state.cobra;
   if(skill){
-    const member=state.squad[skill.id],form=developerMode && skill.testSpecial?2:skillForm(skill.id,state);
-    if(!member?.deployed || member.hp<=0 || member.id!==state.lead || !form || skill.awakened && form!==2){
+    const member=state.squad[skill.id],form=developerMode && skill.testSpecial?(skill.awakened?2:1):skillForm(skill.id,state);
+    if(!member?.deployed || member.hp<=0 || member.id!==state.lead || !form || skill.awakened && form!==2 ||
+       (skill.id===1 && skill.age>=ravenDuration)){
       state.activeSkill=null;
       if(member){member.shoot=0;member.burstIndex=0}
     }else if(data.version===1)skill.awakened=false;
-    if(state.activeSkill?.id===1 && !Array.isArray(skill.burstDirections)){
+    if(state.activeSkill?.id===1 && (skill.duration!==ravenDuration || !Array.isArray(skill.burstDirections))){
       // A saved cast from the previous choreography resumes at the matching beat.
       skill.phase='spin';skill.initialAngle=-Math.PI/2;skill.poseCel=60;skill.poseFacing=1;
       skill.duration=squadSkillDefs[1].duration;
@@ -118,7 +119,7 @@ function decodeBattle(text){
     }
   }
   if(craft){
-    const chief=state.squad[4],form=developerMode && craft.testSpecial?2:skillForm(4,state);
+    const chief=state.squad[4],form=developerMode && craft.testSpecial?(craft.awakened?2:1):skillForm(4,state);
     if(!chief.deployed || !form || craft.awakened && form!==2)state.cobra=null;
     else if(data.version===1)craft.awakened=false;
   }

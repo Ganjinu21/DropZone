@@ -248,8 +248,8 @@ function updateHud(){
    b.querySelector('i').style.width=Math.max(0,100*m.hp/m.max)+'%';
  }
  const active=run.activeSkill;
- const activePreview=active?.testSpecial || (run.lead===4 && run.cobra?.testSpecial);
- const form=activePreview?2:skillForm(run.lead);
+ const current=active || (run.lead===4 && run.cobra);
+ const form=current?.testSpecial?(current.awakened?2:1):skillForm(run.lead);
  const retracting=deployedBunker(active) && active.phase==='retract';
  const canRelease=run.lead===0 && deployedBunker(active) && !retracting && active.hp>0;
  const remaining=Math.ceil(squadSkillCooldown(run.lead));
@@ -259,9 +259,11 @@ function updateHud(){
    remaining>0?remaining+'초':form===2 && run.lead===1?(3-ravenPendingCharges().length)+'/3 충전':form===2?'각성 발동':'스킬 발동';
  $('cast').disabled=!canRelease && (!form || !!active || remaining>0);
  if(developerMode){
-   const special=$('test-special'),current=active || (run.lead===4 && run.cobra);
-   special.disabled=!!current || leader.hp<=0;
-   special.textContent=(current?.awakened?'스킬 사용 중':'특수스킬 발동')+' · '+skillDisplayName(run.lead,2);
+   for(const [id,tier] of [['test-base',1],['test-special',2]]){
+     const button=$(id),playing=!!current && !!current.awakened===(tier===2);
+     button.disabled=playing || leader.hp<=0;
+     button.textContent=(tier===1?'각성 전':'각성')+' · '+skillDisplayName(run.lead,tier)+(playing?' · 사용 중':'');
+   }
  }
 }
 function showLoadout(){

@@ -1,6 +1,6 @@
 'use strict';
 
-const ravenWindup=.30, ravenFiringTime=5.04;
+const ravenDuration=3, ravenWindup=.30, ravenFiringTime=ravenDuration-ravenWindup;
 // The feet start to deploy as the pilot is still dropping into cover.
 const bunkerPlantTime=.14, bunkerCrouchTime=.26;
 const bunkerFrameEnds=[.180,.217,.255,.294,.332,.370,.412,.450,.492,.530,
@@ -11,7 +11,7 @@ const bunkerLampAt=bunkerFrameEnds[17];
 const bunkerDeployTime=bunkerFrameEnds[18];
 const squadSkillDefs = [
   {name:'벙커 전개', awakenedName:'미니건 메카', cooldown:15, recallCooldown:10, durability:160},
-  {name:'쌍기관단총 난사', awakenedName:'삼중 난사', duration:ravenWindup+ravenFiringTime, cooldown:10},
+  {name:'쌍기관단총 난사', awakenedName:'삼중 난사', duration:ravenDuration, cooldown:10},
   {name:'관통 사격', awakenedName:'집중 레일건', duration:2.55, cooldown:11},
   {name:'박격포 포격', awakenedName:'다연장 공성포', duration:3.65, cooldown:13},
   {name:'코브라 공중지원',awakenedName:'A-10 공중지원',duration:7,cooldown:28}
@@ -120,13 +120,19 @@ function squadSkillLocked() {
   return deployedBunker() || run.activeSkill?.id===3;
 }
 
-function activateSquadSkill(testSpecial=false) {
+function activateSquadSkill(testForm=0) {
   if (mode!=='play') return false;
   const member=run.squad[run.lead], id=member.id, def=squadSkillDefs[id];
-  const preview=developerMode && testSpecial===true;
-  const form=preview?2:skillForm(id);
+  const preview=developerMode && (testForm===1 || testForm===2);
+  const form=preview?testForm:skillForm(id);
   if (member.hp<=0 || member.deployed===false || !form) return false;
-  if(preview && (run.activeSkill || (id===4 && run.cobra)))return false;
+  if(preview){
+    const current=run.activeSkill || (id===4 && run.cobra);
+    if(current){
+      if(!!current.awakened===(form===2))return false;
+      if(run.activeSkill)cancelSquadSkill();
+    }
+  }
   if (id===0 && deployedBunker() && run.activeSkill.hp>0) {
     const fort=run.activeSkill;
     if(fort.phase==='retract')return false;
@@ -160,13 +166,13 @@ function activateSquadSkill(testSpecial=false) {
     assignBunkerCover(skill);
   }
   if (id===3) skill.plantFacing=member.flip||1;
-  if (id===1 && run.talents.ravenCap)skill.duration+=1;
   run.activeSkill=skill;
+  const cooldown=skillCooldownDuration(def.cooldown-(id===1 && run.talents.ravenCap?1:0));
   if(id===1 && skill.awakened){
     const pending=ravenPendingCharges();
-    if(pending.length<3)pending.push((pending.at(-1)??run.t)+skillCooldownDuration(def.cooldown));
+    if(pending.length<3)pending.push((pending.at(-1)??run.t)+cooldown);
     member.burstRecharges=pending;
-  }else if (id!==0) member.skillReadyAt=run.t+skillCooldownDuration(def.cooldown);
+  }else if (id!==0) member.skillReadyAt=run.t+cooldown;
   member.burstIndex=0;
   if (squadSkillLocked()) run.squad.forEach(m=>{m.moving=false; m.moveSpeed=0});
   if (id===0 || id===2) skillAudio.play(id,'lock');
@@ -373,7 +379,7 @@ const ravenShotCount=ravenBodyTurns*ravenTurnBeats;
 const ravenPoseTime=3*ravenFiringTime/ravenShotCount;
 // A short three-shot burst followed by a held silhouette before the next pivot.
 function ravenShotAt(beat){
-  return ravenWindup+Math.floor(beat/3)*ravenPoseTime+(beat%3)*.041;
+  return ravenWindup+(Math.floor(beat/3)+(beat%3)*.26)*ravenPoseTime;
 }
 const ravenChoreography=[
   [0,66],[3,48],[6,52],[9,64],[12,53],[15,65],[18,56],[21,68],

@@ -199,9 +199,8 @@ const {chromium}=require('playwright');
       for(const shield of equipmentCatalog.filter(i=>i.family==='shield')){
         const drawn=[],original=ctx.drawImage;
         ctx.drawImage=function(img,...args){drawn.push(img);return original.call(this,img,...args)};
-        try{drawEquippedMember({...run.squad[0],shieldItem:shield.key})}finally{ctx.drawImage=original}
-        const worn=shield.tier?art[shield.artKey]:art.bulkRecruitframes;
-        if(!drawn.includes(worn))failures.push(shield.key);
+        try{drawEquippedMember({...run.squad[0],weapon:gearByKey.get('pistol-0'),shieldItem:shield.key})}finally{ctx.drawImage=original}
+        if(drawn.length!==1 || drawn[0]!==art.bulkRecruitframes)failures.push(shield.key);
       }
       return failures;
     });

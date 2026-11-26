@@ -4,5 +4,6 @@
 #rank-test label{display:grid;gap:2px;color:#c5d1ca}
 #rank-test select{font:inherit;background:#263937;color:#fff1cd;border:1px solid #71847c;padding:4px;border-radius:3px}
 #rank-test output{color:#ffe4a4;font-weight:bold}
-#test-special{min-height:44px;padding:5px 10px;border:1px solid #aa9561;border-radius:4px;background:#34413b;color:#ffe4a4;font:inherit;touch-action:manipulation}
-#test-special:disabled{opacity:.65}
+#test-skills:not([hidden]){display:grid;gap:5px}
+#test-skills button{min-height:44px;padding:5px 10px;border:1px solid #aa9561;border-radius:4px;background:#34413b;color:#ffe4a4;font:inherit;touch-action:manipulation}
+#test-skills button:disabled{opacity:.65}

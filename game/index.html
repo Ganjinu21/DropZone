@@ -37,7 +37,10 @@
     <label>조작 대원<select id="test-crew"></select></label>
     <label>테스트 등급<select id="test-rank"><option value="">대원 등급</option></select></label>
     <output id="test-current"></output>
-    <button type="button" id="test-special" hidden>특수스킬 발동</button></div></details>
+    <div id="test-skills" hidden>
+      <button type="button" id="test-base">각성 전 스킬</button>
+      <button type="button" id="test-special">각성 스킬</button>
+    </div></div></details>
   <canvas id="world" aria-label="을지로 전투 지역"></canvas>
   <main id="home" class="overlay" hidden>
     <div id="lobby-hub">
@@ -271,7 +274,6 @@
   <script src="crew-outfits.js"></script>
   <script src="art/armory/raven-cels/grips.js"></script>
   <script src="raven-cels.js"></script>
-  <script src="bulk-shield.js"></script>
   <script src="rank-field.js"></script>
   <script src="art/armory/crew-frames/anchors.js"></script>
   <script src="recruit-cels.js"></script>

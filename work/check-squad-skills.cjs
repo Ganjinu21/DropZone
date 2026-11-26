@@ -98,13 +98,25 @@ const {chromium} = require('playwright');
       result.raven.windup=run.activeSkill.beat===0 && run.marks.length===0 && run.enemies[0].hp===500 && run.activeSkill.poseCel===63;
       simulate(.06);
       const slowed=run.enemies[0],firstHp=slowed.hp;
-      simulate(.12);const beforeSecond=slowed.hp;
-      simulate(.07);result.raven.fastHits=slowed.hp<beforeSecond && firstHp===beforeSecond;
+      simulate(.04);const beforeSecond=slowed.hp;
+      simulate(.04);result.raven.fastHits=slowed.hp<beforeSecond && firstHp===beforeSecond;
       result.raven.slow=ravenMovementScale(slowed);
       result.raven.chances=[105,105.1,155.1,210.1,265.1,315,315.1].map(ravenHitChance);
       cancelSquadSkill();simulate(.85);
       result.raven.recovered=ravenMovementScale(slowed);
       result.raven.insideRingHit=run.enemies[0].hp<500;
+      for(const variant of [0,6]){
+        for(const cap of [false,true]){
+          startAt(1,foes(),variant);run.talents.ravenCap=cap;activateSquadSkill();
+          const spin=run.activeSkill,ready=spin.awakened?run.squad[1].burstRecharges[0]:run.squad[1].skillReadyAt;
+          if(Math.abs(ready-run.t-skillCooldownDuration(cap?9:10))>1e-6)throw Error('incorrect Raven recharge');
+          simulate(2.99);
+          if(spin.duration!==3 || run.activeSkill!==spin)throw Error('Raven ended before three seconds');
+          tickSquadSkills(3-spin.age);
+          if(run.activeSkill || spin.beat!==96)throw Error('Raven did not finish at three seconds');
+        }
+      }
+      run.talents.ravenCap=false;
       startAt(2,foes([1370,1004],[1410,1008],[1440,1011]));
       activateSquadSkill();
       const beams=new Set();
