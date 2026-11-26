@@ -63,7 +63,9 @@ function combatTargets(member, range, sniper) {
     const dx = enemy.x - member.x, dy = enemy.y - member.y;
     const distance = dx * dx + dy * dy;
     if (targetInSight(member,enemy,range,distance)) {
-      inRange.push({enemy, distance});
+      // Keep an acquired opponent when two targets are only a few pixels apart in range.
+      const priorityDistance=Math.sqrt(distance)-(enemy===member.aimTarget?7:0);
+      inRange.push({enemy,distance,priorityDistance});
     }
   }
   inRange.sort((a,b) => {
@@ -73,7 +75,7 @@ function combatTargets(member, range, sniper) {
       if (rank) return rank;
       if (a.enemy.hp !== b.enemy.hp) return b.enemy.hp - a.enemy.hp;
     }
-    return a.distance - b.distance;
+    return a.priorityDistance-b.priorityDistance;
   });
   return inRange;
 }
@@ -179,7 +181,7 @@ function shoot(member) {
   const nextTarget=targets[1]?.enemy??target;
   if (sniper) run.mark=target;
   member.lastShot=run.t;
-  combatAim(member,target.x,chestY(target),col,lead);
+  combatAim(member,target.x,chestY(target),col,target.y-member.y);
   const barrel=combatMuzzle(member,col,lead);
   member.aimAngle=Math.atan2(Math.sin(member.aimPitch),member.flip*Math.cos(member.aimPitch));
   member.lastShot=run.t; member.shotColumn=col; member.shoot=.22;

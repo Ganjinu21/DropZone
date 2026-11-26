@@ -78,7 +78,7 @@ const {chromium}=require('playwright');
             for(const m of run.marks)drawTracer(m);
           }
         }finally{ctx.drawImage=original;ctx.restore()}
-        if(id===0)check(painted.has(awakened?art.mech:art.bunker),'wrong Bulk art');
+        if(id===0)check(painted.has(awakened?art.mech:art.bunkerDeploy),'wrong Bulk art');
         if(id===4)check(painted.has(awakened?art.a10:art.cobra) && !painted.has(awakened?art.cobra:art.a10),'wrong air support');
         if(id===3)check(painted.has(art.rocketBank)===awakened,'wrong Hammer rig');
         const frame=newCanvas(w,h);frame.getContext('2d').drawImage(cv,0,0,w,h,0,0,w,h);return frame;

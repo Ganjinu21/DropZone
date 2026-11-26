@@ -248,7 +248,8 @@ function updateHud(){
    b.querySelector('i').style.width=Math.max(0,100*m.hp/m.max)+'%';
  }
  const active=run.activeSkill;
- const form=skillForm(run.lead);
+ const activePreview=active?.testSpecial || (run.lead===4 && run.cobra?.testSpecial);
+ const form=activePreview?2:skillForm(run.lead);
  const retracting=deployedBunker(active) && active.phase==='retract';
  const canRelease=run.lead===0 && deployedBunker(active) && !retracting && active.hp>0;
  const remaining=Math.ceil(squadSkillCooldown(run.lead));
@@ -257,6 +258,11 @@ function updateHud(){
    !form?'스킬트리 연구 필요':active?(active.awakened && active.id===0?'탑승 중':'사용 중'):
    remaining>0?remaining+'초':form===2 && run.lead===1?(3-ravenPendingCharges().length)+'/3 충전':form===2?'각성 발동':'스킬 발동';
  $('cast').disabled=!canRelease && (!form || !!active || remaining>0);
+ if(developerMode){
+   const special=$('test-special'),current=active || (run.lead===4 && run.cobra);
+   special.disabled=!!current || leader.hp<=0;
+   special.textContent=(current?.awakened?'스킬 사용 중':'특수스킬 발동')+' · '+skillDisplayName(run.lead,2);
+ }
 }
 function showLoadout(){
  const panel=$('loadout');
@@ -329,7 +335,8 @@ $('hud').addEventListener('pointermove',e=>{
 function endHudDrag(e){
  if(e.pointerId!==hudDrag?.id)return;
  const {button,x,y}=hudDrag;
- const activate=e.type==='pointerup' && Math.hypot(e.clientX-x,e.clientY-y)>=12;
+ const testTap=developerMode && button.id==='cast';
+ const activate=e.type==='pointerup' && (testTap || Math.hypot(e.clientX-x,e.clientY-y)>=12);
  clearHudDrag();if(activate)useHudAction(button);
 }
 for(const type of ['pointerup','pointercancel','lostpointercapture'])$('hud').addEventListener(type,endHudDrag);
@@ -396,14 +403,18 @@ const crewStrideLength=40;
 function updateCrewStride(m,dx,dy,dt,scale=1){
  const distance=Math.hypot(dx,dy);
  m.moveSpeed=dt>0?distance/dt:0;
- m.moving=m.moveSpeed>5;
+ m.moving=m.moveSpeed>(m.moving?3:7);
  if(!m.moving)return;
- if(m.shoot<=0 && !m.aimTarget && Math.abs(dx)>dt*8)m.flip=Math.sign(dx);
- const backing=dx*m.flip<0 && Math.abs(dx)>Math.abs(dy)*.5;
+ const aiming=!!m.aimTarget || m.shoot>0 || (m.aimHeldUntil??-Infinity)>run.t;
+ if(!aiming && m.shoot<=0 && Math.abs(dx)>Math.max(dt*8,distance*.27))m.flip=Math.sign(dx);
+ const aim=aiming && m.aimSector!=null?m.aimSector*Math.PI/4:null;
+ const forward=aim==null?dx*m.flip:dx*Math.cos(aim)+dy*Math.sin(aim);
+ if(Math.abs(forward)>distance*.32)m.backpedaling=forward<0;
+ const backing=aiming && m.backpedaling;
  const depth=Math.abs(dy)>Math.abs(dx)*(m.walkRow>=6?.88:1.18);
  m.walkRow=depth?(dy>0?6:7):backing?5:1;
- const advance=(backing && !depth?-distance:distance)/scale;
- m.gait=((m.gait+advance)%crewStrideLength+crewStrideLength)%crewStrideLength;
+ const advance=(backing?-distance:distance)/scale;
+ m.gait=(((m.gait||0)+advance)%crewStrideLength+crewStrideLength)%crewStrideLength;
 }
 function moveFormation(dt) {
  const nav=routes[run.floor];
@@ -440,10 +451,10 @@ function moveFormation(dt) {
      if(run.activeSkill && (deployedBunker() || run.activeSkill.id===m.id) ||
         !run.enemies.includes(target) || !targetInSight(m,target,range,dx*dx+dy*dy)){
        m.aimTarget=null;
-     }else if(dx)m.flip=Math.sign(dx);
+     }
    }
+   if(m.aimTarget)combatAim(m,m.aimTarget.x,chestY(m.aimTarget),m.shotColumn||1,m.aimTarget.y-m.y);
    updateCrewStride(m,m.x-bx,m.y-by,dt);
-   if(m.aimTarget)combatAim(m,m.aimTarget.x,chestY(m.aimTarget),m.shotColumn||1);
    if(m.cool<=0)shoot(m);
  }
 }

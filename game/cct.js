@@ -4,14 +4,15 @@ const summonScale=.8;
 const summonDamageRatio=.8;
 
 function cctRadioSprite(member){
-  ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(summonScale,summonScale);
+  ctx.save();ctx.translate(member.x,member.y);ctx.scale(summonScale,summonScale);
   drawMemberGear(ctx,{...member,id:4,x:0,y:0,testTier:run.squad[4].testTier,weapon:run.squad[4].weapon},run.t-(member.lastShot??-Infinity),member.moving);
   ctx.restore();
 }
-function callCobra(member){
-  const awakened=skillForm(4)===2;
+function callCobra(member,form,testSpecial){
+  const awakened=form===2;
   member.signalAt=run.t;
   run.cobra={awakened,age:0,duration:(awakened?11:squadSkillDefs[4].duration)+(run.talents.cctCap?3:0),shot:.5,flip:1,x:member.x,y:member.y-76};
+  if(testSpecial)run.cobra.testSpecial=true;
   member.skillReadyAt=run.t+skillCooldownDuration(squadSkillDefs[4].cooldown);
   updateHud();return true;
 }
@@ -82,7 +83,6 @@ function updateRadioSupport(dt){
     }
     const enemy=combatTargets(ally,188,false)[0]?.enemy;
     ally.aimTarget=enemy??null;
-    if(enemy && enemy.x!==ally.x)ally.flip=Math.sign(enemy.x-ally.x);
     moveRadioAlly(ally,enemy,nav,dt);
     ally.shoot-=dt;ally.cool-=dt;ally.grace-=dt;
     if(!enemy)continue;
@@ -93,10 +93,11 @@ function updateRadioSupport(dt){
     }
     // The small CCT replica tracks the opponent from its scaled shoulder.
     const pose={...ally,id:4,x:0,y:0,testTier:chief.testTier,weapon:chief.weapon};
-    const x=Math.round(ally.x),y=Math.round(ally.y);
+    const x=ally.x,y=ally.y;
     const firing=ally.cool<=0 && magazineReady(ally,chief.weapon);
     if(firing)pose.lastShot=run.t;
-    combatAim(pose,(enemy.x-x)/summonScale,(chestY(enemy)-y)/summonScale,1);
+    combatAim(pose,(enemy.x-x)/summonScale,(chestY(enemy)-y)/summonScale,1,(enemy.y-y)/summonScale);
+    ally.aimSector=pose.aimSector;ally.aimHeldUntil=pose.aimHeldUntil;
     ally.flip=pose.flip;ally.aimPitch=pose.aimPitch;ally.operatorAngle=pose.operatorAngle;
     if(firing){
       spendRound(ally,chief.weapon);

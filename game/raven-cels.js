@@ -62,7 +62,7 @@ function drawRavenBody(g,m,cel,skill){
   const set=frameSet(m),size=224;
   g.save();g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.scale(cel.facing,1);
   g.drawImage(set.special,index%8*size,Math.floor(index/8)*size,size,size,-36,-67,72,72);
-  if(m.weapon.tier>0){
+  if(m.weapon.tier>0 && m.weapon.tier!==set.tier){
     const [x,y]=ravenFinishOrigins[cel.index],im=art['raven-finish'+m.weapon.rank];
     const w=im.width/8,h=im.height/ravenAtlasRows;
     g.drawImage(im,cel.index%8*w,Math.floor(cel.index/8)*h,w,h,(x-144)/4,(y-268)/4,w/4,h/4);

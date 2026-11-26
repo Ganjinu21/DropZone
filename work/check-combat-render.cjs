@@ -22,7 +22,7 @@ const assert = require('assert/strict');
           for (const col of (m.id===1 && lead ? [1,3] : [1])) {
             for (let sector=0;sector<12;sector++) {
               const a=sector*Math.PI/6, x=m.x+Math.cos(a)*120, y=m.y-28+Math.sin(a)*120;
-              combatAim(m,x,y,col,lead);
+              combatAim(m,x,y,col);
               const tip=combatMuzzle(m,col,lead);
               const dx=x-tip.x, dy=y-tip.y;
               miss=Math.max(miss,Math.abs(dx*Math.sin(m.aimAngle)-dy*Math.cos(m.aimAngle)));
@@ -43,7 +43,7 @@ const assert = require('assert/strict');
         m.lastShot=run.t-.022;m.shotColumn=id===1?3:1;m.moving=true;m.moveSpeed=91;m.gait=8;
         const direction=id===1?-1:1, target={x:m.x+direction*148,y:m.y-[48,-28,90][id],type:2,hp:66,max:78,phase:1,hit:0,flip:-direction};
         run.enemies.push(target);
-        combatAim(m,target.x,target.y-25,m.shotColumn,true);
+        combatAim(m,target.x,target.y-25,m.shotColumn,target.y-m.y);
         const tip=combatMuzzle(m,m.shotColumn,true);
         const angle=m.aimAngle;
         run.effects.push({...tip,clip:['bulk_muzzle','raven_muzzle','lynx_muzzle'][id],lead:true,id,col:m.shotColumn,flip:m.flip,shotTime:m.lastShot,age:.022,duration:.15,angle});

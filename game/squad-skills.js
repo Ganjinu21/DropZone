@@ -21,7 +21,12 @@ function trainedSkillForm(item,id,talents){
   if(!talents[skillRoutes[id]+'Skill'])return 0;
   return item?.rank==='S+' || (id===0 && talents.bulkCap)?2:1;
 }
-function skillForm(id){return trainedSkillForm(run.squad[id].weapon,id,run.talents)}
+function skillForm(id,state=run){
+  const weapon=state.squad[id]?.weapon;
+  const trained=trainedSkillForm(weapon,id,state.talents);
+  if(trained || !developerMode)return trained;
+  return weapon?.rank==='S+'?2:1;
+}
 function skillCooldownDuration(seconds){return seconds*(1-run.talents.cooldownReduction)}
 function skillDisplayName(id,form){return form===2?squadSkillDefs[id].awakenedName:squadSkillDefs[id].name}
 
@@ -115,11 +120,13 @@ function squadSkillLocked() {
   return deployedBunker() || run.activeSkill?.id===3;
 }
 
-function activateSquadSkill() {
+function activateSquadSkill(testSpecial=false) {
   if (mode!=='play') return false;
   const member=run.squad[run.lead], id=member.id, def=squadSkillDefs[id];
-  const form=skillForm(id);
+  const preview=developerMode && testSpecial===true;
+  const form=preview?2:skillForm(id);
   if (member.hp<=0 || member.deployed===false || !form) return false;
+  if(preview && (run.activeSkill || (id===4 && run.cobra)))return false;
   if (id===0 && deployedBunker() && run.activeSkill.hp>0) {
     const fort=run.activeSkill;
     if(fort.phase==='retract')return false;
@@ -129,12 +136,13 @@ function activateSquadSkill() {
     updateHud();
     return true;
   }
-  if (run.activeSkill || squadSkillCooldown(id)>0) return false;
-  if(id===4)return callCobra(member);
+  if (run.activeSkill || (!preview && squadSkillCooldown(id)>0)) return false;
+  if(id===4)return callCobra(member,form,preview);
   const firstBeat=[bunkerDeployTime,ravenWindup,.42,.82][id];
   const phase=['deploy','spin','charge','deploy'][id];
   const skill={id,awakened:form===2,phase,x:member.x,y:member.y,floor:run.floor,age:0,duration:def.duration,
     angle:run.heading,initialAngle:run.heading,beat:0,nextShot:firstBeat,lastFire:-Infinity};
+  if(preview)skill.testSpecial=true;
   if(id===1)Object.assign(skill,{poseCel:60,angle:-1.05,initialAngle:-Math.PI/2,
     sprayTick:0,sprayDirections:[],burstDirections:[]});
   if(skill.awakened && id===2)skill.nextShot=1;
@@ -156,7 +164,7 @@ function activateSquadSkill() {
   run.activeSkill=skill;
   if(id===1 && skill.awakened){
     const pending=ravenPendingCharges();
-    pending.push((pending.at(-1)??run.t)+skillCooldownDuration(def.cooldown));
+    if(pending.length<3)pending.push((pending.at(-1)??run.t)+skillCooldownDuration(def.cooldown));
     member.burstRecharges=pending;
   }else if (id!==0) member.skillReadyAt=run.t+skillCooldownDuration(def.cooldown);
   member.burstIndex=0;

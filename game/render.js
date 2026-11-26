@@ -63,11 +63,17 @@ function tagCell(atlas, col, row, x, y) {
   ctx.drawImage(atlas, col * 96, row * 64, 96, 64, x, y, 96, 64);
 }
 
-function combatAim(m,tx,ty,col){
-  const dx=tx-Math.round(m.x);
-  if(dx)m.flip=Math.sign(dx);
-  m.operatorAngle=Math.atan2(ty-(m.y-32),tx-m.x);
-  m.ravenSector=(Math.round(m.operatorAngle*8/TAU)+8)%8;
+function combatAim(m,tx,ty,col,groundDy=ty-(m.y-32)){
+  const dx=tx-m.x,angle=Math.atan2(groundDy,dx),octant=Math.PI/4;
+  if(dx || groundDy){
+    const previous=m.aimSector,delta=angle-(previous??0)*octant;
+    if(previous==null || Math.abs(Math.atan2(Math.sin(delta),Math.cos(delta)))>octant*.63)
+      m.aimSector=(Math.round(angle/octant)+8)%8;
+    if(m.aimSector!==2 && m.aimSector!==6)m.flip=Math.cos(m.aimSector*octant)>0?1:-1;
+    m.operatorAngle=angle;
+    m.ravenSector=m.aimSector;
+    m.aimHeldUntil=run.t+.16;
+  }
   const tip=combatMuzzle(m,col);
   m.aimAngle=Math.atan2(ty-tip.y,tx-tip.x);
   m.aimPitch=Math.atan2(Math.sin(m.aimAngle),m.flip*Math.cos(m.aimAngle));
@@ -436,8 +442,8 @@ function drawStick() {
 function render() {
   if (!run || mode === 'home') return;
   const map=cityMaps[run.floor];
-  const cx = Math.round(clamp(run.camera.x - viewW / 2, 0, Math.max(0, map.bounds.w - viewW)));
-  const cy = Math.round(clamp(run.camera.y - viewH / 2, 0, Math.max(0, map.bounds.h - viewH)));
+  const cx = clamp(run.camera.x - viewW / 2, 0, Math.max(0, map.bounds.w - viewW));
+  const cy = clamp(run.camera.y - viewH / 2, 0, Math.max(0, map.bounds.h - viewH));
   const visible = (x, y, padding = 80) => x >= cx - padding && x <= cx + viewW + padding &&
     y >= cy - padding && y <= cy + viewH + padding;
   ctx.setTransform(renderScale, 0, 0, renderScale, -cx*renderScale, -cy*renderScale);

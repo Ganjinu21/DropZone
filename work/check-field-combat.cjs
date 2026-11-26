@@ -9,7 +9,7 @@ const {chromium} = require('playwright');
     const page = await browser.newPage({viewport:{width:393,height:852},isMobile:true,hasTouch:true});
     const errors = [];
     page.on('pageerror',e=>errors.push(e.message));
-    await page.addInitScript(()=>{window.requestAnimationFrame=()=>0;localStorage.setItem('dropzone.squad.v1','[0,4,3]')});
+    await page.addInitScript(()=>{window.requestAnimationFrame=()=>0;localStorage.setItem('dropzone.developer-mode','false');localStorage.setItem('dropzone.squad.v1','[0,4,3]')});
     await page.goto(pathToFileURL(path.resolve(__dirname,'../game/index.html')).href);
     await page.locator('#start:enabled').tap();
     await page.locator('#hud').waitFor();

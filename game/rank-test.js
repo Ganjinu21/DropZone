@@ -27,6 +27,7 @@ function syncRankTest(){
   $('test-rank').value=(battle?run.squad[id].testTier:testGrades[id])??'';
   const tier=battle?outfitTier(run.squad[id]):testGrades[id]??armory.crewTiers[id];
   $('test-current').textContent=names[id]+' · '+rankedTiers[tier].rank;
+  $('test-special').hidden=mode!=='play';
 }
 function applyTestLoadout(m){
   m.testOriginal??={...m.loadout};
@@ -58,6 +59,8 @@ function chooseTestLeader(id){
   saveBattleCheckpoint();
 }
 if(developerMode){
+  $('test-special').onclick=()=>activateSquadSkill(true);
+  $('combat-input-hint').textContent='대원은 밀어서 교대 · 스킬은 눌러 발동';
   for(const [id,name] of names.entries())$('test-crew').add(new Option(name,id));
   for(const [i,{rank}] of rankedTiers.entries())$('test-rank').add(new Option(rank,i));
   $('test-crew').onchange=e=>chooseTestLeader(Number(e.target.value));

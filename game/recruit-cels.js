@@ -75,18 +75,28 @@ function drawRecruitFinish(g,image,source,box,points,tier,key){
 // the next footfall, even when the shooting timer resets between those footfalls.
 const crewFrameSize=256,crewFrameHeight=164,crewFrameFoot=[109,243];
 const crewMotion={guard:0,travel:1,toward:2,away:3,zenith:4,up:5,level:6,down:7,nadir:8,skill:9};
+// The supplied sheets have four side strides and grounded up/level/down key poses.
+const fieldKeys={walk:60,up:64,level:65,down:66};
+function hasFieldKeys(m){return m.id!==3 && outfitTier(m)>=2}
 function crewFootfall(m){
   const beat=Math.floor((m.gait||0)*6/crewStrideLength);
   return (beat%6+6)%6;
 }
-function recruitAimCel(m,moving=m.moving,angle=m.operatorAngle??m.aimAngle??0){
+function recruitAimCel(m,moving=m.moving,angle){
+  angle??=m.aimSector!=null?m.aimSector*Math.PI/4:m.operatorAngle??m.aimAngle??0;
   const pitch=Math.atan2(Math.sin(angle),Math.abs(Math.cos(angle)));
   const action=crewMotion.level+Math.round(pitch/(Math.PI/4));
+  if(!moving && hasFieldKeys(m) && action>=crewMotion.up && action<=crewMotion.down)
+    return fieldKeys.level+action-crewMotion.level;
   const phase=moving?crewFootfall(m):0;
   return action*6+phase;
 }
 function recruitWalkCel(m){
   const action=m.walkRow===6?crewMotion.toward:m.walkRow===7?crewMotion.away:crewMotion.travel;
+  if(action===crewMotion.travel && hasFieldKeys(m)){
+    const step=Math.floor((m.gait||0)*4/crewStrideLength);
+    return fieldKeys.walk+(step%4+4)%4;
+  }
   return action*6+crewFootfall(m);
 }
 function recruitPose(m,age,moving){
@@ -94,8 +104,9 @@ function recruitPose(m,age,moving){
   if(m.id!==1 && m.boarding!=null)return crewMotion.skill*6+Math.min(5,Math.floor(clamp(m.boarding,0,1)*6));
   const radioAge=now-(m.signalAt??-Infinity);
   if(m.id===4 && radioAge>=0 && radioAge<.83)return crewMotion.skill*6+Math.min(5,Math.floor(radioAge*6/.83));
-  if((age>=0 && age<.20) || (moving && m.aimTarget?.hp>0))return recruitAimCel(m,moving);
+  if((age>=0 && age<.20) || m.aimTarget?.hp>0 || now<(m.aimHeldUntil??-Infinity))return recruitAimCel(m,moving);
   if(moving)return recruitWalkCel(m);
+  if(hasFieldKeys(m))return fieldKeys.level;
   return reduceMotion.matches?0:Math.floor(now*3)%6;
 }
 function frameSet(m){
@@ -107,25 +118,28 @@ function recruitSocket(m,cel=recruitAimCel(m),f=m.flip||1,footX=m.x,footY=m.y,fa
   const set=frameSet(m),mark=crewFrameAnchors[set.role][set.tier][cel];
   const unit=crewHeight[m.id]/crewFrameHeight,rad=mark[2]*Math.PI/180;
   const hand=far && m.id===1?3:0;
-  return {x:Math.round(footX)+f*(mark[hand]-crewFrameFoot[0])*unit,
-    y:Math.round(footY)+(mark[hand+1]-crewFrameFoot[1])*unit,angle:Math.atan2(Math.sin(rad),f*Math.cos(rad))};
+  return {x:footX+f*(mark[hand]-crewFrameFoot[0])*unit,
+    y:footY+(mark[hand+1]-crewFrameFoot[1])*unit,angle:Math.atan2(Math.sin(rad),f*Math.cos(rad))};
 }
 function paintCrewEquipment(g,m,image,src,box,mark,key,standing=false){
   const body=()=>g.drawImage(image,...src,0,0,...box);
   const shield=m.id===0 && gearByKey.get(m.shieldItem??m.loadout?.shield);
+  const bodyTier=standing?-1:outfitTier(m);
+  const fitShield=shield?.tier && shield.tier!==bodyTier;
+  const fitWeapon=m.weapon?.tier && m.weapon.tier!==bodyTier;
   const length=(standing?[15,16,39,34,24]:[11,17,33,25,19])[m.id];
   const radius=m.id===3?3.5:1.8;
-  const barrel=shield?.tier || m.weapon?.tier?weaponSurface(mark,length,radius):null;
-  if(shield?.tier)drawFittedShield(g,m,mark.slice(3,7),body,{foreground:barrel});
+  const barrel=fitShield || fitWeapon?weaponSurface(mark,length,radius):null;
+  if(fitShield)drawFittedShield(g,m,mark.slice(3,7),body,{foreground:barrel});
   else body();
-  if(!m.weapon?.tier)return;
+  if(!fitWeapon)return;
   drawRecruitFinish(g,image,src,box,barrel,m.weapon.tier,key);
   if(m.id===1)drawRecruitFinish(g,image,src,box,weaponSurface([mark[3],mark[4],mark[2]],length,radius),m.weapon.tier,key+'-far');
 }
 function drawRecruit(g,m,age,moving,pose=null){
   const set=frameSet(m),cel=pose??recruitPose(m,age,moving);
   const size=crewFrameSize,unit=crewHeight[m.id]/crewFrameHeight;
-  g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale((m.flip||1)*unit,unit);
+  g.save();g.translate(m.x,m.y);g.scale((m.flip||1)*unit,unit);
   g.translate(-crewFrameFoot[0],-crewFrameFoot[1]);
   g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
   const src=[cel%6*size,Math.floor(cel/6)*size,size,size];

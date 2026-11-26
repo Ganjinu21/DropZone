@@ -16,6 +16,7 @@ const {chromium} = require('playwright');
     // Drive the game's real update/render functions at a deterministic frame rate.
     await page.addInitScript(() => { window.requestAnimationFrame = () => 0; });
     await page.addInitScript(()=>{
+      localStorage.setItem('dropzone.developer-mode','false');
       const keys=['pistol-0','smg-0','sniper-0','rocket-3','ar-0'];
       localStorage.setItem('dropzone.armory.v1',JSON.stringify({diamonds:0,owned:keys}));
       localStorage.setItem('dropzone.equipment.v2',JSON.stringify(keys.map(weapon=>({weapon}))));
@@ -200,8 +201,61 @@ const {chromium} = require('playwright');
     assert.equal(crossing.floor,'metro');
     assert.equal(crossing.cast,null,'skill continued on a different floor');
     assert.ok(crossing.cooldown>0);
+    // A tap dispatches one cast in the test profile, including with no skill research.
+    // Normal profile training and its drag controls are exercised above.
+    const testPage=await browser.newPage({viewport:{width:402,height:874},isMobile:true,hasTouch:true});
+    testPage.on('pageerror',error=>errors.push(error.message));
+    await testPage.addInitScript(()=>{window.requestAnimationFrame=()=>0;localStorage.setItem('dropzone.developer-mode','true')});
+    await testPage.goto(pathToFileURL(path.join(__dirname,'../game/index.html')).href);
+    await testPage.locator('#start:enabled').tap();
+    await testPage.locator('#hud').waitFor();
+    await testPage.locator('#rank-test summary').tap();
+    for(const tier of [0,4]){
+      for(const id of [0,1,2,3,4]){
+        await testPage.locator('#test-crew').selectOption(String(id));
+        await testPage.locator('#test-rank').selectOption(String(tier));
+        await testPage.evaluate(()=>{run.t+=60;updateHud()});
+        const cast=testPage.locator('#cast');
+        assert.ok(await cast.isEnabled());
+        await cast.tap();
+        const active=await testPage.evaluate(()=>{
+          const id=run.lead,skill=id===4?run.cobra:run.activeSkill;
+          return {id,live:!!skill,awakened:!!skill?.awakened,phase:skill?.phase,
+            trained:!!run.talents[skillRoutes[id]+'Skill']};
+        });
+        assert.equal(active.id,id);assert.ok(active.live);assert.equal(active.awakened,tier===4);
+        assert.equal(active.trained,false);assert.notEqual(active.phase,'retract');
+      }
+    }
+    for(const id of [0,1,2,3,4]){
+      await testPage.locator('#test-crew').selectOption(String(id));
+      await testPage.locator('#test-rank').selectOption('0');
+      const button=testPage.locator('#test-special');
+      assert.ok(await button.isEnabled());
+      await button.tap();
+      const cast=await testPage.evaluate(()=>{
+        const id=run.lead,skill=id===4?run.cobra:run.activeSkill;
+        for(let i=0;i<84;i++){
+          run.t+=1/60;tickSquadSkills(1/60);updateRadioSupport(1/60);
+        }
+        render();
+        const saved=decodeBattle(encodeBattle()).state;
+        const restored=id===4?saved.cobra:saved.activeSkill;
+        return {awakening:skill?.awakened,advanced:id===4?skill.age>1:skill.beat>0,
+          saved:!!restored?.awakened,rank:run.squad[id].weapon.rank,trained:!!run.talents[skillRoutes[id]+'Skill']};
+      });
+      assert.deepEqual(cast,{awakening:true,advanced:true,saved:true,rank:'C',trained:false});
+      assert.ok(await button.isDisabled(),'a second tap must not restart the active special');
+      await testPage.evaluate(()=>{
+        for(let i=0;i<720;i++){
+          run.t+=1/60;tickSquadSkills(1/60);updateRadioSupport(1/60);
+        }
+        updateHud();
+      });
+    }
+    await testPage.close();
     assert.deepEqual(errors,[]);
-    console.log('Mobile drag casts across two selected trios, real draws/audio, pause, bunker movement lock, tag, restart and stairs passed.');
+    console.log('Mobile drag casts, all five test HUD taps, and five untrained C-grade special previews with saved effects passed.');
   } finally {
     await browser.close();
   }

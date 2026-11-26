@@ -101,7 +101,7 @@ function decodeBattle(text){
   }
   const skill=state.activeSkill,craft=state.cobra;
   if(skill){
-    const member=state.squad[skill.id],form=trainedSkillForm(member?.weapon,skill.id,state.talents);
+    const member=state.squad[skill.id],form=developerMode && skill.testSpecial?2:skillForm(skill.id,state);
     if(!member?.deployed || member.hp<=0 || member.id!==state.lead || !form || skill.awakened && form!==2){
       state.activeSkill=null;
       if(member){member.shoot=0;member.burstIndex=0}
@@ -118,7 +118,7 @@ function decodeBattle(text){
     }
   }
   if(craft){
-    const chief=state.squad[4],form=trainedSkillForm(chief.weapon,4,state.talents);
+    const chief=state.squad[4],form=developerMode && craft.testSpecial?2:skillForm(4,state);
     if(!chief.deployed || !form || craft.awakened && form!==2)state.cobra=null;
     else if(data.version===1)craft.awakened=false;
   }

@@ -64,6 +64,27 @@ async function exerciseFormation(page) {
         drawMemberGear(g,{...m,x:cx,y:feet,flip,moving},Infinity,moving);
       };
       for(const m of run.squad){
+        const subject={...m,x:150.3,y:170.4,gait:0,moving:true,aimTarget:{hp:999}};
+        delete subject.aimSector;
+        for(const [sector,row] of [6,7,8,7,6,5,4,5].entries()){
+          const a=sector*Math.PI/4;
+          combatAim(subject,subject.x+100*Math.cos(a),subject.y-32+100*Math.sin(a),1);
+          check(subject.aimSector===sector && Math.floor(recruitAimCel(subject)/6)===row,'wrong octant '+m.id+'/'+sector);
+          const facing=subject.flip;
+          for(const offset of [-.025,.025,-.025]){
+            combatAim(subject,subject.x+100*Math.cos(a+offset),subject.y-32+100*Math.sin(a+offset),1);
+            check(subject.flip===facing && subject.aimSector===sector,'mirrored while tracking the same bearing');
+          }
+        }
+        combatAim(subject,subject.x+100,subject.y-32,1);
+        const edge=Math.PI/8;
+        for(const delta of [.015,-.02,.008,-.01]){
+          combatAim(subject,subject.x+100*Math.cos(edge+delta),subject.y-32+100*Math.sin(edge+delta),1);
+          check(subject.aimSector===0,'flicker at sector boundary');
+        }
+        subject.gait=10;subject.flip=1;subject.aimSector=2;subject.shoot=0;
+        updateCrewStride(subject,0,-2,1/60);
+        check(subject.gait<10,'a retreat from a southern target should backpedal');
         for(const row of [1,6,7]){
           const poses=new Set();
           for(let step=0;step<6;step++){
@@ -153,9 +174,11 @@ async function exerciseFormation(page) {
     const reduced=await page.evaluate(()=>{
       const m={...run.squad[4],moving:true,operatorAngle:0};
       const tips=Array.from({length:6},(_,i)=>combatMuzzle({...m,gait:(i+.1)*crewStrideLength/6},1).y);
-      return Math.max(...tips)-Math.min(...tips)<6 && recruitPose({...m,aimTarget:null},Infinity,false)===0;
+      const idle={...m,aimTarget:null,aimHeldUntil:-Infinity,signalAt:-Infinity};
+      return {travel:Math.max(...tips)-Math.min(...tips),idle:recruitPose(idle,Infinity,false)};
     });
-    assert.ok(reduced,'reduced motion still bobs the firing socket');
+    assert.ok(reduced.travel<6,'reduced motion socket travel: '+reduced.travel);
+    assert.equal(reduced.idle,0,'an idle recruit should rest in the first pose under reduced motion');
     assert.deepEqual(errors,[]);
     console.log('Verified directional painted strides, grounded feet, equipment finishes, field muzzle alignment and CCT patrols.');
   }finally{await browser.close()}

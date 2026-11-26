@@ -51,7 +51,7 @@ const gameDirectory=path.join(__dirname,'../game');
           }
           const portrait=new Image();portrait.src=fieldPortrait(id);
           await portrait.decode();
-          check(portrait.naturalWidth>=112 && fieldPortrait(id)===wornPortrait(id),'portrait '+id+'/'+rank.rank);
+          check(portrait.naturalWidth>=112 && fieldPortrait(id)!==wornPortrait(id),'portrait '+id+'/'+rank.rank);
           const feet=new Set(),crown=[];
           function drawStep(member){
             clear();g.save();g.scale(3,3);drawMemberGear(g,member,.07,true);g.restore();

@@ -36,7 +36,8 @@
   <details id="rank-test" hidden><summary aria-label="대원 테스트" title="대원 테스트"><span>대원 테스트</span></summary><div class="rank-options">
     <label>조작 대원<select id="test-crew"></select></label>
     <label>테스트 등급<select id="test-rank"><option value="">대원 등급</option></select></label>
-    <output id="test-current"></output></div></details>
+    <output id="test-current"></output>
+    <button type="button" id="test-special" hidden>특수스킬 발동</button></div></details>
   <canvas id="world" aria-label="을지로 전투 지역"></canvas>
   <main id="home" class="overlay" hidden>
     <div id="lobby-hub">
@@ -114,7 +115,7 @@
           <button id="start" data-field-control="primary" class="menu-start" type="button" disabled>불러오는 중</button>
         </nav>
         <div class="controlhint">
-          <div class="hint-touch"><span>화면을 드래그해 이동</span><i></i><span>대원이나 스킬 버튼을 밀어 사용</span></div>
+          <div class="hint-touch"><span>화면을 드래그해 이동</span><i></i><span id="combat-input-hint">대원이나 스킬 버튼을 밀어 사용</span></div>
         </div>
       </div>
     </section>
