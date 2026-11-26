@@ -64,6 +64,7 @@ if(developerMode){
   $('test-rank').onchange=e=>{
     const id=Number($('test-crew').value);
     testGrades[id]=e.target.value===''?null:Number(e.target.value);
+    requestRecruitUniform(id,testGrades[id]??armory.crewTiers[id]);
     if(mode!=='home'){
       applyTestLoadout(run.squad[id]);$('party').replaceChildren();updateHud();
       if(mode==='pause')showLoadout();saveBattleCheckpoint();

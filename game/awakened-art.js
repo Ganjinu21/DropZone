@@ -76,10 +76,7 @@ function siegeShotSocket(m,s,port=0){
 }
 function drawSiegeLauncher(m,s){
   const p=siegeRackPose(m,s),f=p.facing;
-  ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(f,1);
-  const index=operatorSkillCel(m,s);
-  drawOperatorBody(ctx,m,index);
-  ctx.restore();
+  drawRecruit(ctx,{...m,x:s.x,y:s.y,flip:f},Infinity,false,recruitSkillCel(m,s));
   ctx.save();ctx.translate(Math.round(p.x),Math.round(p.y));ctx.scale(f,1);
   for(const end of [-15,15]){
     skillPixelLine(0,-1,end,p.plant*13,'#252b2e',4);

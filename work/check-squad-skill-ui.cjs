@@ -69,9 +69,9 @@ const {chromium} = require('playwright');
       // wouldn't detect a missing render hook or a sound played by a benched leader.
       const sprites = new Map(Object.keys(skillArt).map(key => [art[key],key]));
       for(const role of operatorRoles.filter(Boolean)){
-        for(const suffix of ['Base','Field72','Field144'])sprites.set(art[role+suffix],role);
+        for(const part of recruitParts)sprites.set(art[role+'Recruit'+part],role);
       }
-      sprites.set(art.ravenFollow,'ravenSpin');
+      sprites.set(art.ravenRecruitspecial,'ravenSpin');
       const draw = ctx.drawImage.bind(ctx);
       ctx.drawImage = (image,...args) => {
         if (sprites.has(image)) skillUI.drawn.add(sprites.get(image));

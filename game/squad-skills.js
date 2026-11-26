@@ -145,7 +145,9 @@ function activateSquadSkill() {
   }else if (id===0) {
     initializeRadioTeam();
     skill.hp=skill.maxHp=def.durability;
-    skill.entryCel=operatorCel(member,run.t-(member.lastShot??-Infinity));
+    const age=run.t-(member.lastShot??-Infinity);
+    skill.entryRecruitCel=(age<.20 || (member.moving && member.aimTarget?.hp>0))
+      ?recruitAimCel(member):member.moving?recruitWalkCel(member):null;
     skill.plantFacing=member.flip||1;
     assignBunkerCover(skill);
   }

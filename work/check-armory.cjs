@@ -169,7 +169,7 @@ const {chromium}=require('playwright');
     const actual=await page.evaluate(()=>{
       const seen=new Set(),original=ctx.drawImage;
       ctx.drawImage=function(img,...args){seen.add(img);return original.call(this,img,...args)};
-      const finish=()=>gearDecals.get('bulk-stand-gun:'+run.squad[0].weapon.tier)?.canvas;
+      const finish=()=>gearDecals.get('bulk-0-'+recruitPose(run.squad[0],Infinity,false)+'-gun:'+run.squad[0].weapon.tier)?.canvas;
       drawHero(run.squad[0]);const front=seen.has(finish());seen.clear();
       setLeader(1);drawHero(run.squad[0]);const rear=seen.has(finish());
       ctx.drawImage=original;return [run.squad[0].weapon.key,front,rear];
@@ -189,9 +189,9 @@ const {chromium}=require('playwright');
           try{
             drawEquippedMember(member);
             const role=operatorRoles[id];
-            const base=role?[role+'Recruitstand']:['ravenCels','ravenFieldCels','ravenField2x'];
-            const finish=role?gearDecals.get(role+'-stand-gun:'+i.tier)?.canvas:art['raven-finish'+i.rank];
-            if(!base.some(key=>seen.has(art[key])) || (i.tier && !seen.has(finish)))failures.push(i.key);
+            const frame=recruitPose(member,run.t-(member.lastShot??-Infinity),member.moving);
+            const finish=gearDecals.get(role+'-0-'+frame+'-gun:'+i.tier)?.canvas;
+            if(!seen.has(art[role+'Recruitframes']) || (i.tier && !seen.has(finish)))failures.push(i.key);
           }
           finally{ctx.drawImage=original;member.weapon=before}
         }
@@ -200,7 +200,7 @@ const {chromium}=require('playwright');
         const drawn=[],original=ctx.drawImage;
         ctx.drawImage=function(img,...args){drawn.push(img);return original.call(this,img,...args)};
         try{drawEquippedMember({...run.squad[0],shieldItem:shield.key})}finally{ctx.drawImage=original}
-        const worn=shield.tier?art[shield.artKey]:art.bulkRecruitstand;
+        const worn=shield.tier?art[shield.artKey]:art.bulkRecruitframes;
         if(!drawn.includes(worn))failures.push(shield.key);
       }
       return failures;

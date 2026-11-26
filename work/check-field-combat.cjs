@@ -54,11 +54,12 @@ const {chromium} = require('playwright');
       need(weaponRank(0)===3 && basicHitDamage(bulk,basicWeaponProfile(bulk,true))===Math.round(baseDamage*1.6),'Three weapon boosts');
       need(!activateSquadSkill() && $('cast').disabled,'Run boost unlocked C-grade bunker');
       bulk.weapon=gearByKey.get('pistol-3');bulk.loadout={...bulk.loadout,weapon:bulk.weapon.key};
-      updateHud();need(!$('cast').disabled,'A-grade weapon did not unlock bunker');
+      updateHud();need($('cast').disabled,'Weapon grade bypassed bunker training');
+      run.talents.bulkSkill=true;updateHud();need(!$('cast').disabled,'Trained bunker unavailable');
       need(activateSquadSkill(),'Bunker did not deploy');
       const fort=run.activeSkill;
-      need(run.radioTeam.every(m=>m.x===fort.x && m.y===fort.y),'Support did not board');
-      for(let i=0;i<400;i++)tickSquadSkills(.02);
+      for(let i=0;i<400;i++){moveFormation(.02);updateRadioSupport(.02);tickSquadSkills(.02)}
+      need(run.radioTeam.every((m,i)=>dist(m,fort.radioCover[i])<3),'Support did not reach cover');
       need(fort===run.activeSkill && fort.phase==='fire','Bunker timed out');
       const before=bulk.hp;
       hitSquadMember(target,bulk,nav);
@@ -70,7 +71,7 @@ const {chromium} = require('playwright');
       choose(offers.findIndex(k=>k>=fieldKit));applyUpgrade();
       need(run.activeSkill===fort && fort.hp===health,'Upgrade reset bunker durability');
       switchLead(4);need(run.lead===0,'Tag exited bunker');
-      advanceStage();need(run.activeSkill===fort,'Stage transition removed bunker');
+      beginWave(run.wave+1);need(run.activeSkill===fort,'Wave transition removed bunker');
       Object.assign(target,{x:fort.x+18,y:fort.y});run.enemies=[target];
       const far=enemy(fort.x+140,fort.y);
       run.enemies.push(far);
@@ -111,7 +112,7 @@ const {chromium} = require('playwright');
       const xp=run.xp;getOffer(magnet);applyUpgrade();
       need(run.xp===xp+5 && run.crystals.length===1 && run.magnetUntil===run.t+magnetSeconds,'Instant local magnet collection');
       setLeader(4);
-      chief.weapon=gearByKey.get('ar-5');chief.loadout={...chief.loadout,weapon:chief.weapon.key};
+      run.talents.cctSkill=true;chief.weapon=gearByKey.get('ar-5');chief.loadout={...chief.loadout,weapon:chief.weapon.key};
       need(weaponRank(4)===0 && activateSquadSkill() && run.cobra && !run.cobra.awakened,'S-grade Cobra unavailable without run boosts');
       run.swap=0;switchLead(0);
       need(run.lead===0 && run.cobra,'CCT support lost after lead switch');
@@ -123,12 +124,12 @@ const {chromium} = require('playwright');
     for(const width of [320,393,430]){
       await page.setViewportSize({width,height:852});
       const cards=await page.locator('#cards .card').evaluateAll(nodes=>nodes.map(n=>{
-        const b=n.getBoundingClientRect();return [b.x,b.y,b.right,n.scrollWidth,n.clientWidth];
+        const b=n.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,scroll:n.scrollWidth,client:n.clientWidth};
       }));
       assert.equal(cards.length,3);
-      assert.ok(cards.every((b,i)=>b[1]===cards[0][1] && b[0]>=0 && b[2]<=width && (!i || b[0]>cards[i-1][2]) && b[3]<=b[4]+1));
+      assert.ok(cards.every((b,i)=>b.x===cards[0].x && b.x>=0 && b.right<=width && (!i || b.y>=cards[i-1].bottom) && b.scroll<=b.client+1));
     }
-    assert.equal(await page.getByText('증강 선택',{exact:true}).count(),0);
+    assert.equal(await page.getByRole('heading',{name:'전투 증강 선택'}).isVisible(),true);
     if(process.env.PREVIEW_DIR){
       await page.setViewportSize({width:393,height:852});
       await page.screenshot({animations:'disabled',path:path.join(process.env.PREVIEW_DIR,'Field-Augments.png')});
@@ -136,6 +137,6 @@ const {chromium} = require('playwright');
     await page.locator('.card').first().tap();await page.locator('#equip').tap();
     assert.equal(await page.locator('#hud').isVisible(),true);
     assert.deepEqual(errors,[]);
-    console.log('Field combat, rescue and three-column augment layout passed.',field);
+    console.log('Field combat, rescue and mobile augment layout passed.',field);
   }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

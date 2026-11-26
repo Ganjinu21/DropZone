@@ -63,7 +63,7 @@ olive = ['1a2221','3c4535','68735a','a1ab88']
 palettes = {
     'B': (olive, olive, graphite, graphite),
     'A': (gold, graphite, graphite, gold),
-    'S': (red, red, graphite, graphite),
+    'S': (red, graphite, graphite, red),
     'S-plus': (ivory, ivory, graphite, cyan),
 }
 
@@ -75,6 +75,7 @@ def pack_actions():
     cell = 144
     base = Image.open(dest / 'base.png').convert('RGBA').resize((8*cell, rows*cell), Image.Resampling.LANCZOS)
     base_alpha = np.array(base.getchannel('A'))
+    insignia = Image.open(here / 'recruit-uniforms/unit-patches.webp').convert('RGBA').crop((100, 0, 200, 100))
     for name in names:
         result = Image.new('RGBA', base.size)
         for part, ramp in zip(('top','pants','boots','gloves'), palettes[name]):
@@ -92,6 +93,18 @@ def pack_actions():
             for i, (x, y) in enumerate(origins[part]):
                 col, row = i%8, i//8
                 patch = material.crop((col*width, row*height, (col+1)*width, (row+1)*height))
+                if part == 'top':
+                    # Place the insignia inside the largest visible panel of each vest.
+                    alpha = np.array(patch.getchannel('A'))
+                    inside = cv2.distanceTransform((alpha > 220).astype('uint8'), cv2.DIST_L2, 5)
+                    py, px = np.unravel_index(inside.argmax(), inside.shape)
+                    size = min(10, int(inside[py, px]*1.4))
+                    if size >= 4:
+                        badge = insignia.resize((size,size), Image.Resampling.LANCZOS)
+                        ink = {'B': (116,136,110), 'A': (251,208,108), 'S': (236,123,124), 'S-plus': (127,248,247)}[name]
+                        pixels = np.array(badge)
+                        pixels[:,:,:3] = pixels[:,:,:3].mean(axis=2)[:,:,None] * np.array(ink)/255
+                        patch.alpha_composite(Image.fromarray(pixels), (int(px)-size//2, int(py)-size//2))
                 result.alpha_composite(patch, (col*cell+x, row*cell+y))
         # Keep the costume inside the original silhouette, including the hair and soles.
         opacity = np.array(result.getchannel('A'))

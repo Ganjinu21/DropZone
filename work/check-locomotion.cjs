@@ -27,7 +27,7 @@ async function exerciseFormation(page) {
     stick={x:0,y:0,dx:1,dy:0};
     for(let t=0;t<65;t++){
       update(1/60);
-      squad.forEach((m,i)=>{if(m.moving)phases[i].add(crewStrideFrame(m))});
+      squad.forEach((m,i)=>{if(m.moving)phases[i].add(crewFootfall(m))});
     }
     stick=null;
     for(let t=0;t<90;t++)update(1/60);
@@ -48,7 +48,7 @@ async function exerciseFormation(page) {
     await launchSquad(page,[4,3,0]);
     const second=await exerciseFormation(page);
     for(const {id,frames,stopped} of [...first,...second]){
-      assert.equal(frames,8,'missing real movement frames for operator '+id);
+      assert.equal(frames,6,'missing real movement frames for operator '+id);
       assert.ok(stopped,'standing formation kept walking for operator '+id);
     }
 
@@ -66,14 +66,14 @@ async function exerciseFormation(page) {
       for(const m of run.squad){
         for(const row of [1,6,7]){
           const poses=new Set();
-          for(let step=0;step<8;step++){
-            const moving={...m,moving:true,gait:step*5,walkRow:row};
+          for(let step=0;step<6;step++){
+            const moving={...m,moving:true,gait:(step+.1)*crewStrideLength/6,walkRow:row};
             render(moving);
             poses.add(canvas.toDataURL());
             const foot=g.getImageData(0,feet-7,canvas.width,10).data;
             check(foot.some((v,i)=>i%4===3 && v>128),'missing grounded feet '+m.id);
           }
-          check(poses.size===(row===1 || m.id===1?8:4),'missing painted stride '+m.id+'/'+row);
+          check(poses.size===6,'missing painted stride '+m.id+'/'+row);
         }
         for(const bearing of [-1,1]){
           for(const dy of [-140,-75,0,75,140]){
@@ -107,9 +107,9 @@ async function exerciseFormation(page) {
         && Math.abs(rejoin.gait*.8-rejoin.walked)<1e-6,'summon stride is out of scale with footsteps');
       const backing={...run.squad[0],gait:0,moving:true,flip:1,shoot:.15};
       updateCrewStride(backing,-5,0,1/60);
-      check(backing.flip===1 && crewStrideFrame(backing)===7,'backpedal did not reverse the cycle');
+      check(backing.flip===1 && crewFootfall(backing)===5,'backpedal did not reverse the cycle');
       updateCrewStride(backing,5,0,1/60);
-      check(crewStrideFrame(backing)===0,'forward stride did not reverse the retreat');
+      check(crewFootfall(backing)===0,'forward stride did not reverse the retreat');
       Object.assign(ally,{x:run.x,y:run.y,post:{x:run.x,y:run.y},patrolTime:1});
       const gait=ally.gait;
       moveRadioAlly(ally,null,nav,1/60);
@@ -120,7 +120,7 @@ async function exerciseFormation(page) {
         let painted=false;
         ctx.save();ctx.setTransform(1,0,0,1,0,0);
         ctx.drawImage=function(image,...args){
-          if(image===art.cctRecruitstand||image===art.cctRecruitfield||image===art.cctRecruitstride)painted=true;
+          if(image===art.cctRecruitframes)painted=true;
           return draw.call(this,image,...args);
         };
         try{cctRadioSprite(support)}finally{ctx.drawImage=draw;ctx.restore()}
@@ -151,8 +151,9 @@ async function exerciseFormation(page) {
     });
     await page.emulateMedia({reducedMotion:'reduce'});
     const reduced=await page.evaluate(()=>{
-      const m={...run.squad[4],moving:true},y=shoulderAt({...m,gait:0}).y;
-      return Array.from({length:8},(_,i)=>shoulderAt({...m,gait:i*5}).y===y).every(Boolean);
+      const m={...run.squad[4],moving:true,operatorAngle:0};
+      const tips=Array.from({length:6},(_,i)=>combatMuzzle({...m,gait:(i+.1)*crewStrideLength/6},1).y);
+      return Math.max(...tips)-Math.min(...tips)<6 && recruitPose({...m,aimTarget:null},Infinity,false)===0;
     });
     assert.ok(reduced,'reduced motion still bobs the firing socket');
     assert.deepEqual(errors,[]);

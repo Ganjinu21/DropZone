@@ -42,6 +42,18 @@ function skillPixelLine(x1,y1,x2,y2,color,thickness=1){
 
 function hammerFlip(m) { return m.flip < 0 ? -1 : 1; }
 
+function recruitSkillCel(m,s,angle=s.angle){
+  const skill=crewMotion.skill*6;
+  if(m.id===2){
+    const aim=recruitAimCel(m,false,angle);
+    if(Math.floor(aim/6)!==crewMotion.level)return aim;
+    const step=s.phase==='charge'?Math.min(4,Math.floor(s.age/.09)):s.age-s.lastFire<.13?5:4;
+    return skill+step;
+  }
+  const plant=clamp(Math.min(s.age/.64,(s.duration-s.age)/.40),0,1);
+  return skill+Math.min(5,Math.floor(plant*6));
+}
+
 // Each position comes from the corresponding frame's gun tip. Combat calls this
 // before it spawns the round; camera movement never changes an in-flight origin.
 function skillShotSocket(m, s, angle, hand = 0) {
@@ -57,20 +69,18 @@ function skillShotSocket(m, s, angle, hand = 0) {
   }
   if (m.id === 3) {
     if(!s)return combatMuzzle(m,1,true);
-    return operatorTip(m,operatorSkillCel(m,s),s.plantFacing||hammerFlip(m),s.x,s.y);
+    return recruitSocket(m,recruitSkillCel(m,s),s.plantFacing||hammerFlip(m),s.x,s.y);
   }
-  return operatorTip(m,operatorSkillCel(m,s,angle),Math.cos(angle)<0?-1:1);
+  return recruitSocket(m,recruitSkillCel(m,s,angle),Math.cos(angle)<0?-1:1);
 }
 
 function drawRifleSkill(m,s){
   if(m.id===1){drawRavenCels(ctx,m,s.age-s.lastFire,s);return}
   const facing=Math.cos(s.angle)<0?-1:1;
-  const index=operatorSkillCel(m,s);
-  ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));ctx.scale(facing,1);
-  drawOperatorBody(ctx,m,index);
-  ctx.restore();
+  const index=recruitSkillCel(m,s);
+  drawRecruit(ctx,{...m,flip:facing},Infinity,false,index);
   if(s.phase==='charge'){
-    const tip=operatorTip(m,index,facing);
+    const tip=recruitSocket(m,index,facing);
     ctx.save();ctx.translate(tip.x,tip.y);ctx.rotate(tip.angle);
     ctx.fillStyle='#73b8c0';ctx.fillRect(-3,-1,5,2);
     if(s.age>.22){ctx.fillStyle='#e4ffdc';ctx.fillRect(-1,-2,2,3)}
@@ -127,22 +137,16 @@ function drawSpinPose(m, angle) {
 function drawHammerSkill(m,s){
   if(s.awakened){drawSiegeLauncher(m,s);return}
   const facing=s.plantFacing||hammerFlip(m);
-  ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.scale(facing,1);
-  drawOperatorBody(ctx,m,operatorSkillCel(m,s));
-  ctx.restore();
+  drawRecruit(ctx,{...m,x:s.x,y:s.y,flip:facing},Infinity,false,recruitSkillCel(m,s));
   const contact=(s.age-.60)/.24;
   if(contact>=0 && contact<1)skillFlash(art.hammerFx,1,Math.floor(contact*8),64,64,32,32,s.x+facing*17,s.y,0,.8);
 }
 
-// Start on the equipped field pose. These painted cels draw the left forearm
-// across the chest as the knees fold and the visor tucks behind the shield rim.
-const bunkerGuardCels=[36,37,8,38,39,9,40,41,10,42,43,11];
 function drawBunkerPilot(s,t){
-  const member=run.squad[0];
-  const step=Math.floor(t/bunkerCrouchTime*(bunkerGuardCels.length+1));
-  const cel=step===0?(s.entryCel??paintedOperators.bulk.breathStart)
-    :bunkerGuardCels[Math.min(step,bunkerGuardCels.length)-1];
-  drawOperatorBody(ctx,member,cel);
+  const member={...run.squad[0],x:0,y:0,flip:1};
+  const phase=clamp(t/bunkerCrouchTime,0,1);
+  const cel=phase<.1?(s.entryRecruitCel??0):crewMotion.skill*6+Math.min(5,Math.floor(phase*6));
+  drawRecruit(ctx,member,Infinity,false,cel);
 }
 
 function drawBunker(s) {

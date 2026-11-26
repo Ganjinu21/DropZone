@@ -1,17 +1,5 @@
 'use strict';
 
-const rankRoleNames=['bulk','raven','lynx','hammer','cct'];
-const rankBase='art/armory/rank-crew/';
-// Packed sheets use red, yellow, white in their last three columns.
-const uniformColumn=[0,1,3,2,4];
-const rankArt={};
-for(const role of rankRoleNames.filter(name=>name!=='raven')){
-  rankArt['uniformWalk'+role]=rankBase+role+'.webp';
-  rankArt['uniformSteps'+role]=rankBase+role+'-steps.webp';
-  rankArt['uniformAim'+role]=rankBase+role+'-aim.webp';
-  for(const tier of [2,3,4])rankArt['rankSkill'+role+tier]=rankBase+role+'-skill-'+uniformColumn[tier]+'.webp';
-}
-
 function memberTier(m){
   const gun=m.weapon?.tier??gearByKey.get(m.loadout?.weapon)?.tier??0;
   return m.id===0?Math.min(gun,gearByKey.get(m.shieldItem??m.loadout?.shield)?.tier??0):gun;
@@ -20,55 +8,6 @@ function memberTier(m){
 function outfitTier(m){
   return (developerMode?m.testTier:null)??armory.crewTiers[m.id];
 }
-function usesFieldUniform(m){
-  return m.id!==1 && outfitTier(m)>=2 && m.boarding==null &&
-    !(m.id===4 && run && run.t-(m.signalAt??-Infinity)<.83);
-}
-
-const uniformCell=192,uniformScale=72/uniformCell;
-// Helmet-to-sole measurements in the three packed A, S and S+ walking columns.
-const uniformRestHeight=[[160,159,160],null,[138,160,136],[159,159,157],[162,161,161]];
-function uniformBodyScale(m){return crewHeight[m.id]/uniformRestHeight[m.id][outfitTier(m)-2]}
-function uniformAimRow(pitch){
-  return pitch<-.45?0:pitch>.45?2:1;
-}
-function uniformSocket(m,col,pitch){
-  const role=rankRoleNames[m.id],column=uniformColumn[outfitTier(m)];
-  const socket=rankSightlines[role][column][uniformAimRow(pitch)];
-  const hand=col===3 && socket.length===5?3:0,unit=uniformBodyScale(m);
-  return {x:Math.round(m.x)+(m.flip||1)*(socket[hand]-96)*unit,
-    y:Math.round(m.y)+(socket[hand+1]-182)*unit,angle:m.aimAngle};
-}
-
-function drawFieldUniform(g,m,age,moving){
-  const role=rankRoleNames[m.id],column=uniformColumn[outfitTier(m)];
-  const step=moving?crewStrideFrame(m)>>1:0;
-  const aiming=(age>=0 && age<.21) || m.aimTarget?.hp>0;
-  const draw=(action,row)=>g.drawImage(art[action+role],
-    column*uniformCell,row*uniformCell,uniformCell,uniformCell,-36,-182*uniformScale,72,72);
-  g.save();
-  g.translate(Math.round(m.x),Math.round(m.y));const size=uniformBodyScale(m)/uniformScale;g.scale((m.flip||1)*size,size);
-  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-  const row=uniformAimRow(m.uniformElevation??m.aimPitch??0);
-  const drawBody=()=>{
-    if(!aiming || !moving){
-      draw(aiming?'uniformAim':'uniformWalk',aiming?row:step);
-      return;
-    }
-    const knee=133,strip=uniformCell-knee;
-    g.drawImage(art['uniformAim'+role],column*uniformCell,row*uniformCell,uniformCell,knee,
-      -36,-182*uniformScale,72,knee*uniformScale);
-    g.drawImage(art['uniformSteps'+role],crewStrideFrame(m)*uniformCell,
-      ((outfitTier(m)-2)*3+row)*strip,uniformCell,strip,-36,(knee-182)*uniformScale,72,strip*uniformScale);
-  };
-  if(m.id===0){
-    const tier=outfitTier(m),box=uniformShieldPoses[tier-2][aiming?4+row:step];
-    const forward=aiming && row===2?[92,68,111,72,123,90,161,124,162,130,153,134,120,105,99,90]:null;
-    drawFittedShield(g,m,box,drawBody,{x:-36,y:-182*uniformScale,scale:uniformScale,foreground:forward});
-  }else drawBody();
-  g.restore();
-}
-
 // Effects are stamped onto each shot at launch, including rounds still in flight
 // when a test operator switches equipment.
 const shotPalettes=[

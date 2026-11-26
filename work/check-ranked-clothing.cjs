@@ -7,138 +7,125 @@ const gameDirectory=path.join(__dirname,'../game');
 (async()=>{
   const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||undefined});
   try{
-    const page=await browser.newPage({viewport:{width:393,height:852}});
+    const page=await browser.newPage({viewport:{width:393,height:852},isMobile:true,hasTouch:true});
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.route('http://clothing.test/**',route=>{
       const file=path.join(gameDirectory,decodeURIComponent(new URL(route.request().url()).pathname));
       return fs.existsSync(file)?route.fulfill({path:file}):route.fulfill({status:404,body:''});
     });
-    await page.addInitScript(()=>{
-      window.requestAnimationFrame=()=>0;
-      localStorage.setItem('dropzone.dev.squad.v1','[4,0,3]');
-    });
+    await page.addInitScript(()=>{window.requestAnimationFrame=()=>0});
     await page.goto('http://clothing.test/index.html');
-    await page.locator('#start:enabled').waitFor();
-    await page.locator('#select-team').click();
-    const rows=await page.evaluate(async()=>{
-      const check=(test,message)=>{if(!test)throw Error(message)};
-      const gearSlots=['helmet','top','gloves','pants','boots'];
-      const colours=['#b8c5ab','#acc687','#82beb3','#c1a9ce','#f1ba6c'];
-      const rankTitles=['민간 장구','야전 장구','돌입 장구','중장 장구','펄스 장구'];
-      const slots=['헬멧','상의','장갑','하의','신발'];
-      await document.fonts.ready;
-      const loadImage=async url=>{const img=new Image(); img.src=url;await img.decode();return img};
-      const iconRows=await Promise.all(gearSlots.map(slot=>Promise.all(rankedTiers.map(async grade=>{
-        const item=gearByKey.get(slot+'-'+grade.variant);
-        return {img:await loadImage(itemImage(item)),label:item.label};
-      }))));
-      const canvas=(w,h)=>Object.assign(document.createElement('canvas'),{width:w,height:h});
-      const lensPixels=(image,box)=>{
-        const c=canvas(box[2],box[3]),g=c.getContext('2d');g.drawImage(image,...box,0,0,c.width,c.height);
-        const rgb=g.getImageData(0,0,c.width,c.height).data;let count=0;
-        for(let n=0;n<rgb.length;n+=4)if(rgb[n+3]>220 && rgb[n+1]>135 && rgb[n+1]>rgb[n]+35 && rgb[n+2]>rgb[n]+28)count++;
-        return count;
-      };
-      const frames=[];
-      for(const id of names.keys()){
-        const samples=[];
-        for(const [tier,{rank,variant}] of rankedTiers.entries()){
-          const row={...draftEquipment[id]};
-          for(const slot of gearSlots)row[slot]=slot+'-'+variant;
-          const op={id,loadout:row},sheet=crewOutfitSheet(op);
-          const capBox=[22,0,90,42];
-          check((lensPixels(sheet,capBox)>3)===(tier===4),'locker optics '+id+' '+rank);
-          for(let frame=0;frame<8;frame++){
-            const box=[192*(frame+1)+22,0,90,44];
-            check((lensPixels(sheet,box)>3)===(tier===4),'walking optics '+id+' '+rank+' frame '+frame);
-          }
-          const portrait=await loadImage(wornPortrait(id,row));
-          check((lensPixels(portrait,[0,0,112,61])>3)===(tier===4),'portrait optics '+id+' '+rank);
-          const preview=canvas(168,128);drawCrewPreview(preview,id,row);samples.push(preview);
-        }
-        frames.push(samples);
-      }
-      // Every grade must draw a different shape or material even when mixed with four starter slots.
-      for(const id of names.keys()){
-        for(const slot of gearSlots){
-          const signatures=new Set();
-          for(const {variant} of rankedTiers){
-            const row={...draftEquipment[id],[slot]:slot+'-'+variant},preview=canvas(168,128);
-            drawCrewPreview(preview,id,row);signatures.add(preview.toDataURL());
-          }
-          check(signatures.size===5,'indistinguishable grades '+id+' '+slot);
-        }
-      }
-      function board(title,labels,cells,drawCell){
-        const c=canvas(1190,922),g=c.getContext('2d');g.imageSmoothingEnabled=false;
-        g.fillStyle='#171f21';g.fillRect(0,0,c.width,c.height);
-        g.fillStyle='#ede6d2';g.font='bold 31px Arcade, sans-serif';g.fillText(title,29,53);
-        const left=125,step=208,top=119,height=155;
-        for(let j=0;j<5;j++){
-          const x=left+j*step;g.fillStyle=colours[j];g.font='bold 23px Arcade, sans-serif';g.fillText(rankedTiers[j].rank,x+10,98);
-          g.fillStyle='#d1cabc';g.font='17px Arcade, sans-serif';g.fillText(rankTitles[j],x+61,97);
-          g.fillStyle=colours[j];g.fillRect(x,107,step-6,3);
-        }
-        for(let i=0;i<5;i++){
-          const y=top+i*height;g.fillStyle='#d0d1c4';g.font='bold 20px Arcade, sans-serif';g.fillText(labels[i],29,y+height/2);
-          for(let j=0;j<5;j++){
-            const x=left+j*step;
-            g.fillStyle=j===4?'#394044':'#343b3c';g.fillRect(x,y,step-6,height-5);
-            drawCell(g,cells[i][j],x,y);
-          }
-        }
-        return c.toDataURL('image/png').split(',')[1];
-      }
-      const inventory=board('생활관  /  등급별 장비',slots,iconRows,(g,cell,x,y)=>{
-        const {img,label}=cell,scale=Math.min(2,150/img.width,98/img.height);
-        const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
-        g.drawImage(img,Math.round(x+(202-w)/2),Math.round(y+(113-h)/2),w,h);
-        g.textAlign='center';g.fillStyle='#e8e0cf';g.font='16px Arcade, sans-serif';g.fillText(label,x+101,y+134);g.textAlign='left';
-      });
-      const worn=board('분대  /  장비 착용 모습',names,frames,(g,img,x,y)=>{
-        g.drawImage(img,x+15,y+12,168,128);
-      });
-      return {inventory,worn};
-    });
-    await page.locator('[data-slot="helmet"]').click();
-    await page.locator('[data-item="helmet-6"]').click();
-    await page.locator('#item-action').click();
-    await page.locator('#change-crew').click();
-    assert.match(await page.locator('[data-pick="4"] img').getAttribute('src'),/cct-S-plus\.png$/);
-    await page.locator('#save-team').click();
-    await page.locator('#prep-save').click();
-    await page.locator('#start').click();
+    await page.locator('#start:enabled').click();
     await page.locator('#hud').waitFor();
-    const radioPortrait=await page.evaluate(()=>fieldPortrait(4));
-    assert.equal(await page.locator('#party [data-i="4"] img').getAttribute('src'),radioPortrait);
-    const support=await page.evaluate(()=>{
-      initializeRadioTeam();
-      const chief=run.squad[4],frames=[];
-      for(const {variant} of rankedTiers){
-        chief.loadout={...chief.loadout,helmet:'helmet-'+variant};
-        ctx.save();ctx.setTransform(1,0,0,1,0,0);
-        ctx.fillStyle='#35433d';ctx.fillRect(0,0,140,90);
-        for(const [index,ally] of run.radioTeam.entries()){
-          cctRadioSprite({...ally,x:35+index*65,y:62,flip:index?-1:1});
-        }
-        const frame=document.createElement('canvas');frame.width=140;frame.height=90;
-        frame.getContext('2d').drawImage(cv,0,0,140,90,0,0,140,90);
-        ctx.restore();
-        frames.push(frame.toDataURL());
+    const proofs=await page.evaluate(async exportProofs=>{
+      const check=(ok,detail)=>{if(!ok)throw Error(detail)};
+      const canvas=(w,h)=>Object.assign(document.createElement('canvas'),{width:w,height:h});
+      const shot=canvas(192,204),g=shot.getContext('2d',{willReadFrequently:true});
+      const columns=[1,2,3,4,0];
+      const plates=exportProofs?Array.from({length:1+Object.keys(crewMotion).length*6},()=>canvas(shot.width*5,shot.height*5)):null;
+      const colours=new Map();
+      function clear(){g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,shot.width,shot.height)}
+      function checkUniform(id,pose,tier){
+        const key=id+'/'+pose,seen=colours.get(key)??new Set();
+        const rgba=g.getImageData(0,0,shot.width,shot.height).data;
+        let solid=0;
+        for(let i=3;i<rgba.length;i+=4)if(rgba[i]>220)solid++;
+        check(solid>1000,key+' empty at '+tier);
+        seen.add(shot.toDataURL());colours.set(key,seen);
       }
-      openUpgrade([8,0,6]);
-      return {allies:run.radioTeam.length,unique:new Set(frames).size};
-    });
-    assert.deepEqual(support,{allies:2,unique:1});
-    assert.equal(await page.locator('#cards [data-operator="4"] .who img').getAttribute('src'),radioPortrait);
+      for(let tier=0;tier<5;tier++){
+        const rank=rankedTiers[tier];
+        for(const [col,id] of columns.entries()){
+          armory.crewTiers[id]=tier;
+          const request=requestRecruitUniform(id,tier);
+          if(request)check(await request.ready,'could not load '+id+'/'+tier);
+          const row={...savedEquipment[id],weapon:weaponFamilies[id]+'-0',shield:'shield-0'};
+          const m={...run.squad[id],testTier:null,loadout:row,weapon:gearByKey.get(row.weapon),shieldItem:row.shield,
+            x:30,y:65,flip:1,walkRow:1,moving:true,aimTarget:{hp:100},operatorAngle:0,ravenSector:0};
+          clear();drawCrewPreview(shot,id,row);checkUniform(id,'barracks',tier);
+          const promoted={...row,weapon:weaponFamilies[id]+'-'+rank.variant,shield:'shield-'+rank.variant};
+          const x=col*shot.width,y=tier*shot.height;
+          if(plates){
+            clear();drawCrewPreview(shot,id,promoted);plates[0].getContext('2d').drawImage(shot,x,y);
+          }
+          const portrait=new Image();portrait.src=fieldPortrait(id);
+          await portrait.decode();
+          check(portrait.naturalWidth>=112 && fieldPortrait(id)===wornPortrait(id),'portrait '+id+'/'+rank.rank);
+          const feet=new Set(),crown=[];
+          function drawStep(member){
+            clear();g.save();g.scale(3,3);drawMemberGear(g,member,.07,true);g.restore();
+          }
+          for(let step=0;step<6;step++){
+            m.gait=(step+.1)*crewStrideLength/6;
+            drawStep(m);
+            checkUniform(id,'aim'+step,tier);
+            const rgba=g.getImageData(0,0,shot.width,shot.height).data;
+            crown.push(Math.floor((rgba.findIndex((v,i)=>i%4===3 && v>180)/4)/shot.width));
+            feet.add(shot.toDataURL());
+          }
+          check(feet.size===6,'missing painted firing frame '+id+'/'+rank.rank);
+          check(Math.max(...crown)-Math.min(...crown)<=18,'excessive head travel '+id+'/'+rank.rank+' '+crown);
+          for(const [name,action] of Object.entries(crewMotion)){
+            if(id===1 && name==='skill'){
+              if(plates)for(let step=0;step<6;step++){
+                clear();g.save();g.scale(3,3);g.translate(m.x,m.y);
+                drawRavenBody(g,{...m,weapon:gearByKey.get(promoted.weapon)},{index:48+step*3,facing:1},{phase:'spin',follow:3});
+                g.restore();plates[1+action*6+step].getContext('2d').drawImage(shot,x,y);
+              }
+              continue;
+            }
+            const frames=new Set(),set=frameSet(m);
+            const original=g.drawImage;
+            for(let step=0;step<6;step++){
+              const cel=action*6+step,draws=[];
+              g.drawImage=function(img,...coords){draws.push({img,coords});return original.call(this,img,...coords)};
+              clear();g.save();g.scale(3,3);
+              try{drawRecruit(g,m,Infinity,false,cel)}finally{g.restore();g.drawImage=original}
+              check(draws.length===1 && draws[0].img===set.frames,'body was assembled from pieces '+name);
+              check(draws[0].coords[0]===step*256 && draws[0].coords[1]===action*256,'wrong frame '+name);
+              frames.add(shot.toDataURL());
+              if(plates){
+                clear();g.save();g.scale(3,3);
+                drawRecruit(g,{...m,weapon:gearByKey.get(promoted.weapon),shieldItem:promoted.shield},Infinity,false,cel);
+                g.restore();plates[1+cel].getContext('2d').drawImage(shot,x,y);
+              }
+            }
+            check(frames.size===6,'duplicate full-body frame '+id+'/'+rank.rank+'/'+name);
+          }
+          {
+            for(const angle of [-Math.PI/2,-Math.PI/4,0,Math.PI/4,Math.PI/2]){
+              m.operatorAngle=angle;
+              const barrel=recruitSocket(m);
+              check(Number.isFinite(barrel.x+barrel.y+barrel.angle),'field barrel '+id+'/'+tier);
+            }
+          }
+        }
+      }
+      for(const [pose,seen] of colours)check(seen.size===5,'repeated rank at '+pose);
+      // A pending earlier request must never replace the selected render set.
+      const requests=[1,3,2,4].map(tier=>requestRecruitUniform(0,tier).ready);
+      await Promise.all(requests);
+      check(recruitUniforms.get('bulk').tier===4,'stale render set');
+      await changeArmory(state=>{state.crewTiers=[4,4,4,4,4]});
+      return plates?.map(c=>c.toDataURL('image/webp',.94).split(',')[1])??[];
+    },!!process.env.PREVIEW_DIR);
+    await page.reload();await page.locator('#select-team:enabled').click();
+    assert.deepEqual(await page.evaluate(()=>operatorRoles.flatMap(role=>role?[recruitUniforms.get(role)?.images?.frames?.complete]:[])),[true,true,true,true,true]);
+    await page.locator('#change-crew').click();
+    for(let id=0;id<5;id++){
+      const src=await page.locator('[data-pick="'+id+'"] img').getAttribute('src');
+      assert.equal(src,await page.evaluate(id=>uniformPortrait(id,4),id));
+    }
     assert.deepEqual(errors,[]);
     if(process.env.PREVIEW_DIR){
       fs.mkdirSync(process.env.PREVIEW_DIR,{recursive:true});
-      for(const [key,file] of [['inventory','Armor-Ranks.png'],['worn','Equipped-Armor.png']]){
-        fs.writeFileSync(path.join(process.env.PREVIEW_DIR,file),Buffer.from(rows[key],'base64'));
-      }
+      const moves=await page.evaluate(()=>Object.keys(crewMotion));
+      proofs.forEach((encoded,i)=>{
+        const file=i?moves[Math.floor((i-1)/6)]+'-'+(i-1)%6+'.webp':'barracks.webp';
+        fs.writeFileSync(path.join(process.env.PREVIEW_DIR,file),Buffer.from(encoded,'base64'));
+      });
     }
-    console.log('All 25 locker items and five worn portraits follow equipped ranks. Combat HUD and augments use class portraits, and both CCT support sprites retain the same field appearance across all five helmet ranks.');
+    console.log('Verified all 25 barracks and combat uniforms, individual full-body cells, six-step moving fire, portraits, stale loads and saved grades after relaunch.');
   }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

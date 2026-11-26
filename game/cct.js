@@ -5,7 +5,7 @@ const summonDamageRatio=.8;
 
 function cctRadioSprite(member){
   ctx.save();ctx.translate(Math.round(member.x),Math.round(member.y));ctx.scale(summonScale,summonScale);
-  drawMemberGear(ctx,{...member,id:4,x:0,y:0,weapon:run.squad[4].weapon},run.t-(member.lastShot??-Infinity),member.moving);
+  drawMemberGear(ctx,{...member,id:4,x:0,y:0,testTier:run.squad[4].testTier,weapon:run.squad[4].weapon},run.t-(member.lastShot??-Infinity),member.moving);
   ctx.restore();
 }
 function callCobra(member){
@@ -92,12 +92,12 @@ function updateRadioSupport(dt){
       if(ally.hp<=0){ally.hp=0;ally.downFloor=run.floor;ally.reviveTime=0;ally.respawn=6;continue}
     }
     // The small CCT replica tracks the opponent from its scaled shoulder.
-    const pose={...ally,id:4,x:0,y:0,weapon:chief.weapon};
+    const pose={...ally,id:4,x:0,y:0,testTier:chief.testTier,weapon:chief.weapon};
     const x=Math.round(ally.x),y=Math.round(ally.y);
     const firing=ally.cool<=0 && magazineReady(ally,chief.weapon);
     if(firing)pose.lastShot=run.t;
     combatAim(pose,(enemy.x-x)/summonScale,(chestY(enemy)-y)/summonScale,1);
-    ally.flip=pose.flip;ally.uniformElevation=pose.uniformElevation;ally.aimPitch=pose.aimPitch;ally.operatorAngle=pose.operatorAngle;
+    ally.flip=pose.flip;ally.aimPitch=pose.aimPitch;ally.operatorAngle=pose.operatorAngle;
     if(firing){
       spendRound(ally,chief.weapon);
       const barrel=combatMuzzle(pose,1,false);

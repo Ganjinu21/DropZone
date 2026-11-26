@@ -7,7 +7,7 @@ const { chromium }=require('playwright'),fs=require('node:fs'),path=require('nod
  await p.addInitScript(()=>window.requestAnimationFrame=()=>0);
  await p.route('http://operators.test/**',r=>r.fulfill({path:path.join(process.cwd(),'game',new URL(r.request().url()).pathname)}));
  await p.goto('http://operators.test/index.html');await require('./select-test-squad.cjs')(p);
- const results=await p.evaluate(()=>{
+ const results=await p.evaluate(async()=>{
   const ids=[0,2,3,4],w=720,h=174,count=76,strip=document.createElement('canvas');strip.width=w*4;strip.height=h*Math.ceil(count/4);
   const out=strip.getContext('2d');cv.width=w;cv.height=h;
   const labels=['대기','측면 이동','전진','후진','기본 공격','스킬 동작'];
@@ -38,14 +38,14 @@ const { chromium }=require('playwright'),fs=require('node:fs'),path=require('nod
    });
    out.drawImage(cv,k%4*w,Math.floor(k/4)*h);
   }
-  // Verify all five independent equipment slots still affect the registered poses.
-  for(const id of ids)for(const slot of [...wornSlots,'gloves']){
+  for(const id of ids){
    const seen=new Set();
-   for(const grade of rankedTiers){
-    const m={...run.squad[id],x:75,y:80,flip:1,loadout:{...savedEquipment[id],[slot]:slot+'-'+grade.variant}};
+   for(let tier=0;tier<5;tier++){
+    await requestRecruitUniform(id,tier)?.ready;
+    const m={...run.squad[id],testTier:tier,x:75,y:80,flip:1};
     ctx.clearRect(0,0,w,h);drawMemberGear(ctx,m,Infinity,false);seen.add(cv.toDataURL());
    }
-   if(seen.size!==5)throw Error('Indistinct grades: '+id+' '+slot);
+   if(seen.size!==5)throw Error('Indistinct uniform grades: '+id);
   }
   const idle=document.createElement('canvas'),bw=800,bh=226,frames=80;
   idle.width=bw*5;idle.height=bh*Math.ceil(frames/5);
@@ -66,6 +66,6 @@ const { chromium }=require('playwright'),fs=require('node:fs'),path=require('nod
  if(errors.length)throw Error(errors.join('\n'));
  for(const [n,key] of ['operator-preview-strip','operator-breath-strip'].entries())
   fs.writeFileSync('work/'+key+'.png',Buffer.from(results[n],'base64'));
- console.log('All four operator renders, skills and 100 independent slot/grade combinations passed.');
+ console.log('All four operator renders, skills and 20 illustrated uniforms passed.');
  }finally{await b.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

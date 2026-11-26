@@ -41,10 +41,8 @@ function drawUnit(frame, row, x, y, flip, width = 64, height = 64) {
 }
 
 const tagRoles = ['bulk', 'raven', 'lynx'];
-const shoulder = { x: 32, y: 32 };
 const tagArt = {
   ...ravenCelArt,
-  ...operatorCelArt,
   ...recruitArt,
   ...Object.fromEntries(equipmentCatalog.filter(i=>i.weapon || i.family==='shield').flatMap(i=>{
     if(i.family==='shield')return [[i.key,inventoryImage(i)]];
@@ -52,12 +50,6 @@ const tagArt = {
     if(i.family==='sniper')return [[i.key,itemImage(i)],[i.key+'-skill',i.asset+'-skill.png']];
     return [[i.key,itemImage(i)]];
   })),
-  ...Object.fromEntries(equipmentCatalog.filter(i=>armorStats[i.family]).map(i=>{
-    const fitted=['helmet','pants','boots'].includes(i.family);
-    return [i.key,fitted?'art/armory/worn/'+i.family+'-'+(i.rank==='S+'?'S-plus':i.rank)+'.png':itemImage(i)];
-  })),
-  crewStride:'art/armory/crew-stride.png',
-  crewBodies:'art/armory/bodies.png',specialistHands:'art/armory/specialist-hands.png',
   combatUnits: 'combat-units.png',
   cobra:'art/skills/field-cobra.png',
   infectedBosses: 'art/bosses/infected.png',
@@ -71,222 +63,25 @@ function tagCell(atlas, col, row, x, y) {
   ctx.drawImage(atlas, col * 96, row * 64, 96, 64, x, y, 96, 64);
 }
 
-// Contact, compression, passing foot and lift repeat on the other side.
-const crewStepY=[0,1,0,-1,0,1,0,-1];
-function crewStrideFrame(m){
-  const step=Math.floor((m.gait||0)*8/crewStrideLength);
-  return (step%8+8)%8;
-}
-function crewTorsoY(m){
-  if(m.id===1 && !m.moving && !reduceMotion.matches && mode==='play' && !run.activeSkill && !(m.shoot>0))
-    return -1.85*(.5-.5*Math.cos(run.t*TAU/2));
-  return m.moving && !reduceMotion.matches?crewStepY[crewStrideFrame(m)]:0;
-}
-// A bent torso stays joined to the planted hips. All upper-body attachments
-// use the same facing-local offset as the pixels of the dressed operator.
-function torsoSlope(pitch){
-  const lean=Math.sin(pitch);
-  return {forward:lean*(lean>0?.31:.22),down:lean*(lean>0?.16:.025)};
-}
-function torsoOffset(y,slope){
-  const aboveHip=-20-y;
-  return {x:aboveHip*slope.forward,y:aboveHip*slope.down};
-}
-function shoulderAt(m,pitch=m.aimPitch||0){
-  const y=m.id===1?-37:shoulder.y-60,offset=torsoOffset(y,torsoSlope(pitch));
-  return {x:Math.round(m.x)+(m.flip||1)*offset.x,y:Math.round(m.y)+y+crewTorsoY(m)+offset.y};
-}
-
-// Widths are in game pixels. The same native art stays sharp in the larger locker preview.
-const fieldWidths={pistol:[18,19,20,21,22],smg:[19,20,21,22,24],
-  sniper:[49,52,54,57,60],rocket:[46,47,49,51,53],ar:[34,35,37,39,41]};
-// Rear and forward palm centers on the CCT rig, in field pixels from the shoulder.
-const rifleHands=[[0,-1],[11,0]];
-const fieldHands={
-  pistol:[[6,-2],[3,0]], smg:[[0,-1],[8,-3]],
-  sniper:[[0,2],[11,3]], rocket:[[0,-3],[8,-4]], ar:rifleHands
-};
-function weaponMount(m,col,recoil=0){
-  const {family,tier,artKey:key}=m.weapon,far=family==='smg' && col===3;
-  const image=art[far?key+'-far':key];
-  const w=fieldWidths[family][tier],h=Math.round(w*image.height/image.width);
-  const fit=weaponSockets[far?'smgFar':family][tier];
-  const [x,y]=fieldHands[family][far || family==='rocket'?1:0];
-  return {image,w,h,x:x-recoil-Math.round(w*fit.grip[0]),y:y-Math.round(h*fit.grip[1]),
-    gripX:x-recoil,gripY:y,bore:fit.bore};
-}
 function combatAim(m,tx,ty,col){
-  const facing=tx-Math.round(m.x);
-  if(facing)m.flip=Math.sign(facing);
-  if(usesFieldUniform(m)){
-    const pitch=Math.atan2(ty-(m.y-35),Math.abs(tx-m.x));
-    const tip=uniformSocket(m,col,pitch);
-    m.uniformElevation=pitch;
-    m.aimAngle=Math.atan2(ty-tip.y,tx-tip.x);
-    m.aimPitch=Math.atan2(Math.sin(m.aimAngle),m.flip*Math.cos(m.aimAngle));
-    m.operatorAngle=m.aimAngle;
-    m.ravenSector=(Math.round(m.aimAngle*8/TAU)+8)%8;
-    return;
-  }
-  if(m.id===1 && m.weapon.family==='smg'){
-    const angle=Math.atan2(ty-(m.y-32),tx-m.x);
-    m.ravenSector=(Math.round(angle*8/TAU)+8)%8;
-    const tip=combatMuzzle(m,col);
-    m.aimAngle=Math.atan2(ty-tip.y,tx-tip.x);
-    m.aimPitch=Math.atan2(Math.sin(m.aimAngle),m.flip*Math.cos(m.aimAngle));
-    return;
-  }
-  if(operatorRoles[m.id]){
-    m.operatorAngle=Math.atan2(ty-(m.y-32),tx-m.x);
-    const tip=combatMuzzle(m,col);
-    m.aimAngle=Math.atan2(ty-tip.y,tx-tip.x);
-    m.aimPitch=Math.atan2(Math.sin(m.aimAngle),m.flip*Math.cos(m.aimAngle));
-    return;
-  }
-  const mount=weaponMount(m,col),offset=mount.y+mount.h*mount.bore;
-  // Lean shifts the shoulder by at most three pixels. Solve from the displaced
-  // pivot so the visible bore also points at the target on steep diagonals.
-  let pitch=0;
-  for(let pass=0;pass<3;pass++){
-    const pivot=shoulderAt(m,pitch),dx=(tx-pivot.x)*m.flip,dy=ty-pivot.y;
-    pitch=Math.atan2(dy,dx)-Math.asin(clamp(offset/Math.max(1,Math.hypot(dx,dy)),-1,1));
-  }
-  m.aimPitch=pitch;
-  m.aimAngle=Math.atan2(Math.sin(m.aimPitch),m.flip*Math.cos(m.aimPitch));
+  const dx=tx-Math.round(m.x);
+  if(dx)m.flip=Math.sign(dx);
+  m.operatorAngle=Math.atan2(ty-(m.y-32),tx-m.x);
+  m.ravenSector=(Math.round(m.operatorAngle*8/TAU)+8)%8;
+  const tip=combatMuzzle(m,col);
+  m.aimAngle=Math.atan2(ty-tip.y,tx-tip.x);
+  m.aimPitch=Math.atan2(Math.sin(m.aimAngle),m.flip*Math.cos(m.aimAngle));
 }
-function combatMuzzle(m,col,lead,pitch=m.aimPitch??0,recoil=m.weapon.family==='smg' && !reduceMotion.matches?4:2){
-  if(usesRecruitArt(m))return recruitSocket(m);
-  if(usesFieldUniform(m))return uniformSocket(m,col,m.uniformElevation??m.aimPitch??0);
-  if(operatorRoles[m.id])return operatorTip(m,operatorCel(m,run.t-(m.lastShot??-Infinity)));
-  if(m.id===1 && m.weapon.family==='smg'){
-    return ravenBarrel(m,ravenShotCel(m,run.t-(m.lastShot??-Infinity)),col===3);
-  }
-  const pivot=shoulderAt(m,pitch),part=weaponMount(m,col,recoil);
-  const u=part.x+part.w,v=part.y+part.h*part.bore;
-  return {x:pivot.x+m.flip*(u*Math.cos(pitch)-v*Math.sin(pitch)),y:pivot.y+u*Math.sin(pitch)+v*Math.cos(pitch)};
+function combatMuzzle(m,col){
+  const cel=recruitAimCel(m);
+  return recruitSocket(m,cel,m.flip||1,m.x,m.y,col===3);
 }
-function drawCrewBody(g,m,moving,pitch=0,pose){
-  const sheet=crewOutfitSheet(m),frame=crewStrideFrame(m);
-  const sprite=sheet || (moving?art.crewStride:art.crewBodies);
-  const x=sheet?(moving?frame+1:0)*192:(moving?frame:m.id)*192;
-  const y=!sheet && moving?(m.id===1?(m.walkRow||1):m.id)*128:0;
-  if(m.id===1 && !moving && !pose){
-    const breath=crewTorsoY(m);
-    if(breath){
-      const waist=62,hip=-29,slope=torsoSlope(pitch);
-      g.drawImage(sprite,x,y+waist,192,128-waist,-32,hip,96,33);
-      g.save();g.translate(0,hip);g.transform(1,0,-slope.forward,1-slope.down-breath/24,0,0);
-      g.drawImage(sprite,x,y,192,waist,-32,-31,96,31);g.restore();return;
-    }
-  }
-  if(m.id===1 && pose){
-    // Anchor the legs while the hips twist, the chest dips and the head follows.
-    const waist=62+(moving?2*crewStepY[frame]:0), neck=30;
-    g.drawImage(sprite,x,y+waist,192,128-waist,-32,-60+waist/2,96,(128-waist)/2);
-    g.save();g.translate(0,-60+waist/2);
-    g.transform(pose.width,0,pose.lean,pose.height,0,0);
-    g.drawImage(sprite,x,y+neck,192,waist-neck,-32,(neck-waist)/2,96,(waist-neck)/2);
-    g.translate(0,(neck-waist)/2);g.rotate(pose.nod);
-    g.drawImage(sprite,x,y,192,neck,-32,-neck/2,96,neck/2);
-    g.restore();
-  }else if(Math.abs(pitch)>.001){
-    const step=moving?crewStepY[frame]:0,split=80+2*step;
-    const hip=-20+(reduceMotion.matches?0:step),slope=torsoSlope(pitch);
-    g.drawImage(sprite,x,y+split,192,128-split,-32,hip,96,4-hip);
-    g.save();g.translate(0,hip);
-    g.transform(1,0,-slope.forward,1-slope.down,0,0);
-    g.drawImage(sprite,x,y,192,split,-32,-split/2,96,split/2);
-    g.restore();
-  }else if(moving && reduceMotion.matches && crewStepY[frame]){
-    // Pin the torso while retaining the authored ground-contact position.
-    const hip=80, shift=crewStepY[frame]*2, split=hip+shift;
-    g.drawImage(sprite,x,y,192,split,-32,-60-shift/2,96,split/2);
-    g.drawImage(sprite,x,y+split,192,128-split,-32,-60+hip/2,96,(128-hip)/2);
-  }else g.drawImage(sprite,x,y,192,128,-32,-60,96,64);
-}
-// Hand positions are relative to the same shoulder pivot used for shot origins.
-// The forearm and forward palm are separate so the two SMGs can recoil independently.
-function drawCrewHand(g,id,forward,x,y,glove){
-  if(id===1){
-    const sx=forward?145:43,sy=39,w=forward?17:27,h=16;
-    const dx=x-(forward?11:21)/2,dy=y-3;
-    g.drawImage(art.specialistHands,192+sx,sy,w,h,dx,dy,w/2,h/2);
-    if(glove)g.drawImage(glove,x-2,y-2,5,4);
-    return;
-  }
-  const sx=forward?76:0,width=forward?116:76;
-  const offsetX=x-(forward?11:0),offsetY=y-(forward?0:-1);
-  g.drawImage(art.specialistHands,id*192+sx,0,width,128,sx/2-32+offsetX,-32+offsetY,width/2,64);
-  if(glove)g.drawImage(glove,x-4,y-3,8,6);
-}
-
-// Everything is drawn in the facing-local frame. The left hand stays around the
-// inside rail of the shield while the right forearm follows the pistol's pitch.
-function drawBulkGuard(g,m,offset,bob,glove,moving,shield){
-  const sway=moving && !reduceMotion.matches?[0,1,1,0,0,-1,-1,0][crewStrideFrame(m)]:0;
-  g.save();g.translate(sway+offset.x,-28+bob+offset.y);
-  g.drawImage(shield,-6,-11,22,34);
-  // Rear edge of the diagonal plate, the two strap lugs and their raised grip.
-  g.fillStyle='#29282c';g.fillRect(-7,-3,5,2);g.fillRect(-7,9,5,2);g.fillRect(-8,-2,3,12);
-  g.fillStyle='#826b4d';g.fillRect(-7,-1,2,10);
-  g.fillStyle='#c9b588';g.fillRect(-6,-3,2,1);g.fillRect(-5,9,2,1);
-  drawCrewHand(g,0,true,-6,4,glove);
-  g.fillStyle='#29282c';g.fillRect(-8,7,3,1);
-  g.restore();
-}
-
-const carryPitch=[0,.027,.018,0,-.018,-.027,-.018,0];
-function firingKick(age){
-  return age<.055?2:age<.105?1:0;
-}
-// Anticipation, two sharp kick poses, settle and return to guard.
-const ravenFirePoses=[
-  [1,-.05,.98,-.02],[.93,.10,.93,-.06],[.90,.14,.91,-.08],
-  [.94,.09,.94,-.04],[.98,.03,.97,0],[1,-.04,.99,.02],[1,-.02,1,.01],[1,0,1,0]
-].map(([width,lean,height,nod])=>({width,lean,height,nod}));
-function drawMemberGear(g,m,age,moving=false){
-  if(usesRecruitArt(m)){drawRecruit(g,m,age,moving);return}
-  if(usesFieldUniform(m)){drawFieldUniform(g,m,age,moving);return}
-  if(operatorRoles[m.id]){drawOperatorGear(g,m,age,moving);return}
-  if(m.id===1 && m.weapon.family==='smg'){drawRavenCels(g,m,age);return}
-  const id=m.id,dy=crewTorsoY(m),glove=fieldGear(m.loadout,'gloves');
-  const family=m.weapon.family;
-  g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
-  const rest=moving && !reduceMotion.matches?carryPitch[crewStrideFrame(m)]:0;
-  const aim=m.aimTarget?.hp>0?1:clamp((.34-age)/.12,0,1);
-  const jointY=id===1?-37:-28;
-  const pitch=(m.aimPitch||0)*aim,offset=torsoOffset(jointY,torsoSlope(pitch));
-  const firePose=id===1 && age<.20?ravenFirePoses[Math.min(7,Math.floor(Math.max(0,age)*40))]:null;
-  drawCrewBody(g,m,moving,pitch,firePose);
-  if(id===0)drawBulkGuard(g,m,offset,dy,glove,moving,art[gearByKey.get(m.shieldItem)?.artKey||'shield-0']);
-  g.save();g.translate(offset.x,jointY+dy+offset.y);
-  g.rotate(pitch+rest*(1-aim));
-  for(const col of (family==='smg'?[3,1]:[1])){
-    const kick=(m.shotColumn||1)===col?firingKick(age)*(family==='smg' && !reduceMotion.matches?2:1):0;
-    const mount=weaponMount(m,col,kick);
-    g.drawImage(mount.image,mount.x,mount.y,mount.w,mount.h);
-    if(family==='ar'){
-      const end=mount.x+mount.w,beamY=Math.round(mount.y+mount.h*mount.bore);
-      g.fillStyle='#94322e';g.fillRect(end+1,beamY,2,1);g.fillRect(end+5,beamY,1,1);
-      g.fillStyle='#ff5147';g.fillRect(end+8,beamY-1,2,2);
-    }
-    if(family==='smg'){
-      drawCrewHand(g,id,col===3,mount.gripX,mount.gripY,glove);
-    }else{
-      const [rear,forward]=fieldHands[family];
-      if(id!==0)drawCrewHand(g,id,true,forward[0]-kick,forward[1],glove);
-      drawCrewHand(g,id,false,rear[0]-kick,rear[1],glove);
-    }
-  }
-  g.restore();
-  g.restore();
-}
+function drawMemberGear(g,m,age,moving=false){drawRecruit(g,m,age,moving)}
 function drawCrewPreview(canvas,id,row){
-  const g=canvas.getContext('2d');g.imageSmoothingEnabled=false;
+  const g=canvas.getContext('2d');g.clearRect(0,0,canvas.width,canvas.height);g.imageSmoothingEnabled=false;
   const weapon=gearByKey.get(row.weapon);
   g.save();g.scale(canvas.width/64,canvas.height/68);
-  if(id===1)drawBarracksRaven(g,weapon,31,65);
-  else drawMemberGear(g,{id,weapon,loadout:row,shieldItem:row.shield,flip:1,x:weapon.family==='sniper'?25:31,y:65},Infinity);
+  drawRecruitStanding(g,{id,weapon,loadout:row,shieldItem:row.shield,x:weapon.family==='sniper'?25:31,y:65});
   g.restore();
 }
 function drawEquippedMember(m){
@@ -340,7 +135,7 @@ function drawDowned(m) {
   footShadow(m.x,m.y,14);
   ctx.save();ctx.translate(Math.round(m.x),Math.round(m.y));
   ctx.save();const scale=.72*(m.side?summonScale:1);ctx.scale(scale,scale);ctx.rotate(-Math.PI*.45);
-  drawMemberGear(ctx,{...m,id:m.id??4,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1,aimPitch:0,aimTarget:null},Infinity);
+  drawMemberGear(ctx,{...m,id:m.id??4,testTier:m.side?run.squad[4].testTier:m.testTier,weapon:m.weapon||run.squad[4].weapon,x:5,y:13,flip:1,aimPitch:0,aimTarget:null},Infinity);
   ctx.restore();
   const progress=(m.reviveTime||0)/3;
   ctx.fillStyle='#152322';ctx.fillRect(-24,-32,48,15);
@@ -494,7 +289,7 @@ function drawEffect(e) {
     if (!m || m.deployed === false || m.hp <= 0 || m.lastShot !== e.shotTime ||
       (m.id === run.lead) !== e.lead || deployedBunker() || (m.id===0 && run.activeSkill?.id===0)) return;
     const smg=m.weapon.family==='smg';
-    const tip=combatMuzzle(m,e.col,e.lead,m.aimPitch,firingKick(e.age)*(smg && !reduceMotion.matches?2:1));
+    const tip=combatMuzzle(m,e.col);
     const angle=tip.angle??m.aimAngle??e.angle;
     if(Number.isInteger(e.tier)){rankFlash(ctx,e,tip.x,tip.y,angle);return}
     drawTagEffect(e.clip,e.age,tip.x,tip.y,angle);
@@ -741,7 +536,7 @@ function flashTint(image) {
 
 async function loadGame() {
   const loadingArt = $('loading-art');
-  const assets = Object.entries({ ...ART, lobby: loadingArt.currentSrc || loadingArt.src, ...rankArt, ...tagArt, ...skillArt, ...awakenedArt });
+  const assets = Object.entries({ ...ART, lobby: loadingArt.currentSrc || loadingArt.src, ...tagArt, ...skillArt, ...awakenedArt });
   const meter = $('loading-progress');
   meter.max = assets.length + 1;
   meter.value = 0;
@@ -756,6 +551,8 @@ async function loadGame() {
       img.onerror = () => reject(new Error('이미지 ' + id + (url.startsWith('data:') ? '' : ' (' + url + ')')));
       img.src = url;
     })));
+    const uniforms=operatorRoles.map((_,id)=>requestRecruitUniform(id,armory.crewTiers[id])?.ready);
+    if((await Promise.all(uniforms)).includes(false))throw new Error('저장된 대원 제복');
     art.tagRigHit = flashTint(art.tagRig);
     art.infectedBossHit = flashTint(art.infectedBosses);
     art.tagEquipHit = flashTint(art.tagEquip);

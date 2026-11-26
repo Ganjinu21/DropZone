@@ -131,6 +131,11 @@ const figureResolution=new ResizeObserver(entries=>{
     drawCrewPreview(canvas,id,draftEquipment[id]);
   }
 });
+function redrawBarracksUniform(id,tier){
+  if(!draftEquipment || $('prep-screen').hidden || armory.crewTiers[id]!==tier)return;
+  const canvas=$('crew-figures').querySelector('[data-inspect="'+id+'"] canvas');
+  if(canvas)drawCrewPreview(canvas,id,draftEquipment[id]);
+}
 function paintPrep(){
   if(!draftSquad.includes(editId))editId=draftSquad[0];
   if(editSlot==='shield' && editId!==0)editSlot='weapon';

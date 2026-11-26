@@ -1,43 +1,49 @@
 'use strict';
 
+const operatorRoles=['bulk','raven','lynx','hammer','cct'];
+const recruitParts=['stand','frames'];
 const recruitArt={};
-for(const role of operatorRoles.filter(Boolean)){
-  for(const part of ['stand','field','stride'])
-    recruitArt[role+'Recruit'+part]='art/armory/recruits/'+role+'-'+part+'.webp';
+function recruitImagePath(role,part,tier=0){
+  const rank=rankedTiers[tier].rank.replace('+','-plus');
+  if(part==='frames' || part==='special')return 'art/armory/crew-frames/'+role+'/'+rank+(part==='special'?'-special':'')+'.webp';
+  if(tier)return 'art/armory/crew-frames/'+role+'/'+rank+'-'+part+'.webp';
+  if(role==='raven')return 'art/armory/raven-cels/'+(part==='face'?'portrait-C.png':'barracks-0.webp');
+  return 'art/armory/recruits/'+role+'-'+part+'.webp';
+}
+const uniformParts=role=>role==='raven'?[...recruitParts,'special']:recruitParts;
+for(const role of operatorRoles){
+  for(const part of uniformParts(role))recruitArt[role+'Recruit'+part]=recruitImagePath(role,part);
 }
 
-// Muzzles on the 160-unit field proofs, in walking, sight elevation and skill order.
-// The third coordinate is the illustrated barrel angle in screen space.
-const recruitTips={
-  bulk:[[94,78,0],[96,78,0],[96,79,0],[98,80,0],[87,75,0],[84,75,0],[101,82,18],[106,84,18],
-    [88,37,-78],[102,46,-34],[112,58,0],[111,85,34],[80,105,87],[113,59,0],[92,91,0],[91,98,0]],
-  lynx:[[121,95,40],[117,94,38],[120,96,39],[121,99,43],[117,97,43],[116,96,42],[99,101,49],[107,100,48],
-    [92,32,-89],[122,38,-41],[137,69,0],[122,102,43],[95,125,88],[137,62,0],[143,75,0],[147,91,0]],
-  hammer:[[116,69,-18],[111,69,-19],[108,70,-17],[115,69,-17],[105,69,-13],[107,69,-13],[106,69,-17],[100,70,-12],
-    [83,34,-90],[104,37,-46],[115,59,-3],[110,87,31],[100,101,76],[117,60,0],[121,71,0],[129,83,0]],
-  cct:[[115,98,40],[106,98,40],[109,100,41],[107,100,41],[103,97,40],[102,99,40],[103,90,41],[107,91,41],
-    [93,46,-70],[117,58,-29],[125,75,-4],[119,96,32],[94,120,69],[120,71,-3],[116,105,32],[103,116,49]]
-};
-// Hero art is measured at 275 units tall. Align the hips rather than the end of the weapon.
-const recruitStand={
-  bulk:{hip:.47,tip:[79,80,2]},
-  lynx:{hip:.43,tip:[196,126,29]},hammer:{hip:.46,tip:[122,62,-20]},cct:{hip:.48,tip:[129,115,27]}
-};
+// Keep one promoted uniform per operator in memory on mobile. A replaced load
+// may finish out of order, so only the current entry can refresh the barracks.
+const recruitUniforms=new Map();
+function requestRecruitUniform(id,tier){
+  const role=operatorRoles[id];
+  if(!role || !tier)return null;
+  const current=recruitUniforms.get(role);
+  if(current?.tier===tier && (!current.retryAfter || current.retryAfter>Date.now()))return current;
+  const entry={tier};
+  recruitUniforms.set(role,entry);
+  entry.ready=Promise.all(uniformParts(role).map(async part=>{
+    const image=new Image();
+    image.src=recruitImagePath(role,part,tier);
+    await image.decode();
+    return [part,image];
+  })).then(pairs=>{
+    entry.images=Object.fromEntries(pairs);
+    if(recruitUniforms.get(role)===entry)redrawBarracksUniform(id,tier);
+    return true;
+  }).catch(error=>{
+    entry.retryAfter=Date.now()+5000;
+    console.error('대원 제복을 불러오지 못했습니다.',role,tier,error);
+    return false;
+  });
+  return entry;
+}
+
 const finishColors=[null,'#7496a9','#efb847','#cf494a','#80e3ed'];
 const gearDecals=new Map();
-function usesRecruitArt(m){return m.id!==1 && outfitTier(m)===0}
-function recruitUnit(m){return crewHeight[m.id]/(204/1.8)}
-function recruitAimCel(m,age,moving){
-  const angle=m.operatorAngle??m.aimAngle??0;
-  const elevation=Math.round(Math.atan2(Math.sin(angle),Math.abs(Math.cos(angle)))/(Math.PI/4));
-  return elevation===0 && !moving && age>=.038 && age<.135?13:10+elevation;
-}
-function recruitSocket(m){
-  const cel=recruitAimCel(m,(run?.t??0)-(m.lastShot??-Infinity),m.moving);
-  const [x,y,a]=recruitTips[operatorRoles[m.id]][cel],unit=recruitUnit(m),f=m.flip||1,rad=a*Math.PI/180;
-  return {x:Math.round(m.x)+f*(x-80)*unit,y:Math.round(m.y)+(y-272/1.8)*unit,
-    angle:Math.atan2(Math.sin(rad),f*Math.cos(rad))};
-}
 function weaponSurface(tip,length,radius){
   const [x,y,angle]=tip,a=angle*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
   return [x+s*radius,y-c*radius,x-s*radius,y+c*radius,
@@ -64,49 +70,75 @@ function drawRecruitFinish(g,image,source,box,points,tier,key){
   }
   g.drawImage(cached.canvas,cached.x,cached.y,cached.w,cached.h);
 }
-function drawRecruit(g,m,age,moving){
-  const role=operatorRoles[m.id],standing=recruitStand[role],now=run?.t??0;
-  const signal=m.id===4 && now-(m.signalAt??-Infinity)<.83;
-  const working=signal || m.boarding!=null;
-  const aim=!working && ((age>=0 && age<.20) || (moving && m.aimTarget?.hp>0));
-  const stride=crewStrideFrame(m),weaponTier=m.weapon?.tier,shieldTier=m.id===0?gearByKey.get(m.shieldItem)?.tier:0;
-  g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale(m.flip||1,1);
+
+// Six complete illustrations per action. The player's traveled distance selects
+// the next footfall, even when the shooting timer resets between those footfalls.
+const crewFrameSize=256,crewFrameHeight=164,crewFrameFoot=[109,243];
+const crewMotion={guard:0,travel:1,toward:2,away:3,zenith:4,up:5,level:6,down:7,nadir:8,skill:9};
+function crewFootfall(m){
+  const beat=Math.floor((m.gait||0)*6/crewStrideLength);
+  return (beat%6+6)%6;
+}
+function recruitAimCel(m,moving=m.moving,angle=m.operatorAngle??m.aimAngle??0){
+  const pitch=Math.atan2(Math.sin(angle),Math.abs(Math.cos(angle)));
+  const action=crewMotion.level+Math.round(pitch/(Math.PI/4));
+  const phase=moving?crewFootfall(m):0;
+  return action*6+phase;
+}
+function recruitWalkCel(m){
+  const action=m.walkRow===6?crewMotion.toward:m.walkRow===7?crewMotion.away:crewMotion.travel;
+  return action*6+crewFootfall(m);
+}
+function recruitPose(m,age,moving){
+  const now=run?.t??0;
+  if(m.id!==1 && m.boarding!=null)return crewMotion.skill*6+Math.min(5,Math.floor(clamp(m.boarding,0,1)*6));
+  const radioAge=now-(m.signalAt??-Infinity);
+  if(m.id===4 && radioAge>=0 && radioAge<.83)return crewMotion.skill*6+Math.min(5,Math.floor(radioAge*6/.83));
+  if((age>=0 && age<.20) || (moving && m.aimTarget?.hp>0))return recruitAimCel(m,moving);
+  if(moving)return recruitWalkCel(m);
+  return reduceMotion.matches?0:Math.floor(now*3)%6;
+}
+function frameSet(m){
+  const role=operatorRoles[m.id],tier=outfitTier(m);
+  const uniform=requestRecruitUniform(m.id,tier)?.images;
+  return {role,tier:uniform?tier:0,frames:uniform?.frames??art[role+'Recruitframes'],stand:uniform?.stand??art[role+'Recruitstand'],special:uniform?.special??art.ravenRecruitspecial};
+}
+function recruitSocket(m,cel=recruitAimCel(m),f=m.flip||1,footX=m.x,footY=m.y,far=false){
+  const set=frameSet(m),mark=crewFrameAnchors[set.role][set.tier][cel];
+  const unit=crewHeight[m.id]/crewFrameHeight,rad=mark[2]*Math.PI/180;
+  const hand=far && m.id===1?3:0;
+  return {x:Math.round(footX)+f*(mark[hand]-crewFrameFoot[0])*unit,
+    y:Math.round(footY)+(mark[hand+1]-crewFrameFoot[1])*unit,angle:Math.atan2(Math.sin(rad),f*Math.cos(rad))};
+}
+function paintCrewEquipment(g,m,image,src,box,mark,key,standing=false){
+  const body=()=>g.drawImage(image,...src,0,0,...box);
+  const shield=m.id===0 && gearByKey.get(m.shieldItem??m.loadout?.shield);
+  const length=(standing?[15,16,39,34,24]:[11,17,33,25,19])[m.id];
+  const radius=m.id===3?3.5:1.8;
+  const barrel=shield?.tier || m.weapon?.tier?weaponSurface(mark,length,radius):null;
+  if(shield?.tier)drawFittedShield(g,m,mark.slice(3,7),body,{foreground:barrel});
+  else body();
+  if(!m.weapon?.tier)return;
+  drawRecruitFinish(g,image,src,box,barrel,m.weapon.tier,key);
+  if(m.id===1)drawRecruitFinish(g,image,src,box,weaponSurface([mark[3],mark[4],mark[2]],length,radius),m.weapon.tier,key+'-far');
+}
+function drawRecruit(g,m,age,moving,pose=null){
+  const set=frameSet(m),cel=pose??recruitPose(m,age,moving);
+  const size=crewFrameSize,unit=crewHeight[m.id]/crewFrameHeight;
+  g.save();g.translate(Math.round(m.x),Math.round(m.y));g.scale((m.flip||1)*unit,unit);
+  g.translate(-crewFrameFoot[0],-crewFrameFoot[1]);
   g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-  if(!moving && !aim && !working){
-    const image=art[role+'Recruitstand'],w=275*image.width/image.height;
-    const unit=crewHeight[m.id]/275;
-    const breath=run && !reduceMotion.matches?1+.0025*Math.sin(now*3+m.id):1;
-    g.scale(unit,unit*breath);g.translate(-w*standing.hip,-275);
-    const source=[0,0,image.width,image.height],box=[w,275];
-    const drawBody=()=>g.drawImage(image,0,0,...box);
-    if(shieldTier)drawFittedShield(g,m,recruitShieldStand,drawBody);
-    else drawBody();
-    if(weaponTier)drawRecruitFinish(g,image,source,box,weaponSurface(standing.tip,[15,0,39,34,24][m.id],m.id===3?5:2.2),weaponTier,role+'-stand-gun');
-  }else{
-    let cel;
-    if(working)cel=m.boarding!=null?(m.boarding>.45?15:14):(now-m.signalAt<.55?14:15);
-    else if(aim)cel=recruitAimCel(m,age,moving);
-    else cel=m.walkRow===6?4+(stride>>2):m.walkRow===7?6+(stride>>2):stride>>1;
-    const unit=recruitUnit(m),image=art[role+'Recruitfield'];
-    const source=[cel%4*288,(cel>>2)*288,288,288];
-    g.scale(unit,unit);g.translate(-80,-272/1.8);
-    const drawBody=()=>{
-      if(!moving || working){
-        g.drawImage(image,...source,0,0,160,160);
-        return;
-      }
-      const knee=204,strip=288-knee;
-      g.drawImage(image,source[0],source[1],288,knee,0,0,160,knee/1.8);
-      const row=aim?cel-8:m.walkRow===6?6:m.walkRow===7?7:5;
-      const step=!aim && row>=6?stride-stride%2:stride;
-      g.drawImage(art[role+'Recruitstride'],step*288,row*strip,288,strip,0,knee/1.8,160,strip/1.8);
-    };
-    if(shieldTier)drawFittedShield(g,m,recruitShieldPoses[cel],drawBody,{foreground:recruitShieldHands[cel]});
-    else drawBody();
-    if(weaponTier){
-      const tip=recruitTips[role][cel],length=[6,0,18,14,12][m.id];
-      drawRecruitFinish(g,image,source,[160,160],weaponSurface(tip,length,m.id===3?2.1:1.15),weaponTier,role+cel+'-gun');
-    }
-  }
+  const src=[cel%6*size,Math.floor(cel/6)*size,size,size];
+  paintCrewEquipment(g,m,set.frames,src,[size,size],crewFrameAnchors[set.role][set.tier][cel],
+    set.role+'-'+set.tier+'-'+cel+'-gun');
+  g.restore();
+}
+function drawRecruitStanding(g,m){
+  const set=frameSet(m),image=set.stand,mark=crewStandAnchors[set.role][set.tier];
+  const unit=crewHeight[m.id]/275,w=275*image.width/image.height;
+  g.save();g.translate(m.x,m.y);g.scale(unit,unit);g.translate(-w*mark[0],-275);
+  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+  paintCrewEquipment(g,m,image,[0,0,image.width,image.height],[w,275],mark.slice(1),
+    set.role+'-'+set.tier+'-stand-gun',true);
   g.restore();
 }
